@@ -22,7 +22,7 @@ all:
 	@if test ! -d "$(SCIDB)"; then echo  "Error. Try:\n\nmake SCIDB=<PATH TO SCIDB INSTALL PATH>"; exit 1; fi
 	$(CXX) $(CFLAGS) $(INC) -o libload_tools.so plugin.cpp LogicalSplit.cpp PhysicalSplit.cpp LogicalParse.cpp PhysicalParse.cpp $(LIBS)
 	@echo "Now copy *.so to your SciDB lib/scidb/plugins directory and run"
-	@echo "iquery -aq \"load_library('dmetric')\" # to load the plugin."
+	@echo "iquery -aq \"load_library('load_tools')\" # to load the plugin."
 	@echo
 	@echo "Re-start SciDB if the plugin was already loaded previously."
 	@echo "Remember to copy the plugin to all your nodes in the cluster."

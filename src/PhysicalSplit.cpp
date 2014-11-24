@@ -163,6 +163,7 @@ private:
     weak_ptr<Query> _query;
     FileSplitter _splitter;
     Address _chunkAddress;
+    char   _delimiter;
     char*  _buffer;
     size_t _bufferSize;
     MemChunk _chunk;
@@ -175,7 +176,8 @@ public:
                   settings->getLinesPerChunk(),
                   settings->getBufferSize(),
                   settings->getDelimiter()),
-         _chunkAddress(0, Coordinates(2,0))
+         _chunkAddress(0, Coordinates(2,0)),
+         _delimiter(settings->getDelimiter())
     {
         _buffer = _splitter.getBlock(_bufferSize);
     }
@@ -216,10 +218,20 @@ public:
         shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         shared_ptr<ChunkIterator> chunkIt = _chunk.getIterator(query, ChunkIterator::SEQUENTIAL_WRITE | ChunkIterator::NO_EMPTY_CHECK);
         Value v;
-        v.setSize(_bufferSize+1);
-        char *d = (char*) v.data();
-        memcpy(d, _buffer, _bufferSize);
-        d[_bufferSize] = 0;   //null-termination
+        if(_buffer[_bufferSize-1] == _delimiter) //add the null-termination character; replace the last delimiter character if one is present
+        {
+            v.setSize(_bufferSize);
+            char *d = (char*) v.data();
+            memcpy(d, _buffer, _bufferSize);
+            d[_bufferSize-1] = 0;
+        }
+        else
+        {
+            v.setSize(_bufferSize+1);
+            char *d = (char*) v.data();
+            memcpy(d, _buffer, _bufferSize);
+            d[_bufferSize] = 0;
+        }
         chunkIt->writeItem(v);
         chunkIt->flush();
         return _chunk;
