@@ -164,15 +164,35 @@ public:
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set delimiter multiple times";
                 }
                 string paramContent = parameterString.substr(delimiterHeader.size());
-                try
+                trim(paramContent);
+                if (paramContent == "\\t")
                 {
-                   _delimiter = lexical_cast<char>(paramContent);
-                   _delimiterSet = true;
+                    _delimiter = '\t';
                 }
-                catch (bad_lexical_cast const& exn)
+                else if (paramContent == "\\r")
                 {
-                   throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse delimiter";
+                    _delimiter = '\r';
                 }
+                else if (paramContent == "\\n")
+                {
+                    _delimiter = '\n';
+                }
+                else if (paramContent == "")
+                {
+                    _delimiter = ' ';
+                }
+                else
+                {
+                    try
+                    {
+                       _delimiter = lexical_cast<char>(paramContent);
+                    }
+                    catch (bad_lexical_cast const& exn)
+                    {
+                       throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse delimiter";
+                    }
+                }
+                _delimiterSet = true;
             }
             else
             {

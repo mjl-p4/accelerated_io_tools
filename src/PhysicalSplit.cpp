@@ -78,6 +78,13 @@ public:
         }
     }
 
+    /**
+     * Get a pointer to the next block of data which shall contain no more than numLinesPerBlock delimiter characters,
+     * may contain less if we are at the end of the file. Also advances the position and reads more data from the file
+     * if needed.
+     * @param[out] numCharacters the size of returned data block, 0 if there is no more data
+     * @return pointer to the data, not valid if numCharacters is 0
+     */
     char* getBlock(size_t& numCharacters)
     {
         size_t lineCounter = _linesPerBlock;
@@ -113,13 +120,13 @@ private:
     char* eatMoreData()
     {
         char *bufStart = &_buffer[0];
-        if (_dataStartPos != bufStart)   //we have a block of data at the end of the buffer - move it to the beginning
+        if (_dataStartPos != bufStart)   //we have a block of data at the end of the buffer, move it to the beginning, then read more
         {
             memmove(bufStart, _dataStartPos, _dataSize);
         }
         else
         {
-            if(_dataSize != _bufferSize) //invariant check: entire buffer must be full; double it, and read more
+            if(_dataSize != _bufferSize) //invariant check: entire buffer must be full; double the size of the buffer, then read more
             {
                 throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "FileSplitter()::eatMoreData internal error";
             }
@@ -256,7 +263,6 @@ public:
     }
 };
 
-
 //TODO: in 14.9 Igor introduced a new SinglePassArray which gives us much better form
 //But we also wanna make this work for 14.8 for now
 //class FileSplitArray : public SinglePassArray
@@ -341,9 +347,8 @@ public:
     {
         //TODO: change me when input from different instances or parallel is allowed.
         //see PhysicalInput.cpp
-        return ArrayDistribution(psLocalInstance,
-                                 boost::shared_ptr<DistributionMapper>(),
-                                 0);
+        //TODO: after 14.9 make FileSplitArray a subclass of SinglePassArray. After that, the explicit redistribute is not necessary
+        return ArrayDistribution(psHashPartitioned);
     }
 
     boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays, boost::shared_ptr<Query> query)
@@ -353,16 +358,18 @@ public:
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "PhysicalSplit::execute internal error";
         }
+        shared_ptr<Array> result;
         if(query->getInstanceID() == 0)
         {
-            shared_ptr<Array> result = shared_ptr<FileSplitArray>(new FileSplitArray(_schema, query, settings));
-            return result;
+            result = shared_ptr<FileSplitArray>(new FileSplitArray(_schema, query, settings));
         }
         else
         {
-            shared_ptr<Array> result = boost::shared_ptr<MemArray>(new MemArray(_schema,query));
-            return result;
+            result = boost::shared_ptr<MemArray>(new MemArray(_schema,query));
         }
+        //TODO: after 14.9 make FileSplitArray a subclass of SinglePassArray. After that, the explicit redistribute is not necessary
+        result = redistribute(result, query, psHashPartitioned);
+        return result;
     }
 };
 
