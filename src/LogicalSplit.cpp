@@ -29,8 +29,9 @@ public:
         SplitSettings settings (_parameters, true, query); //construct and check to ensure settings are legit
         vector<AttributeDesc> attributes(1);
         attributes[0] = AttributeDesc((AttributeID)0, "value",  TID_STRING, 0, 0);
-        vector<DimensionDesc> dimensions(1);
-        dimensions[0] = DimensionDesc("i", 0, 0, MAX_COORDINATE, MAX_COORDINATE, 1, 0);
+        vector<DimensionDesc> dimensions(2);
+        dimensions[0] = DimensionDesc("instance_id", 0, 0, MAX_COORDINATE, MAX_COORDINATE, 1, 0);
+        dimensions[1] = DimensionDesc("chunk_no",    0, 0, MAX_COORDINATE, MAX_COORDINATE, 1, 0);
         return ArrayDesc("split", attributes, dimensions);
     }
 

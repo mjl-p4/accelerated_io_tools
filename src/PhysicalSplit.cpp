@@ -100,7 +100,7 @@ public:
             }
             else
             {
-                ch = eatMoreData(); //careful: this call changes _dataStartPos and _dataSize
+                ch = eatMoreData(); //this call changes _dataStartPos and _dataSize
             }
         }
         char* res = _dataStartPos;
@@ -149,69 +149,178 @@ private:
     }
 };
 
-
-class FileSplitArray : public SinglePassArray
+class FileSplitArrayIterator : public ConstArrayIterator
 {
 private:
-    typedef SinglePassArray super;
-    size_t _rowIndex;
-    Address _chunkAddress;
-    MemChunk _chunk;
+    Array const* _parentArray;
     weak_ptr<Query> _query;
     FileSplitter _splitter;
+    Address _chunkAddress;
     char*  _buffer;
     size_t _bufferSize;
+    MemChunk _chunk;
 
 public:
-    FileSplitArray(ArrayDesc const& schema, shared_ptr<Query>& query,
-                   string const& filePath, size_t numLinesPerBlock, size_t bufferSize, char delimiter):
-        super(schema),
-        _rowIndex(0),
-        _chunkAddress(0, Coordinates(1,-1)),
+    FileSplitArrayIterator(Array const* parent, weak_ptr<Query> const& query, shared_ptr<SplitSettings> const& settings):
+        _parentArray(parent),
         _query(query),
-        _splitter(filePath, numLinesPerBlock, bufferSize, delimiter)
-    {
-        super::setEnforceHorizontalIteration(true);
-    }
-
-    virtual ~FileSplitArray()
-    {}
-
-    size_t getCurrentRowIndex() const
-    {
-        return _rowIndex;
-    }
-
-    bool moveNext(size_t rowIndex)
+        _splitter(settings->getInputFilePath(),
+                  settings->getLinesPerChunk(),
+                  settings->getBufferSize(),
+                  settings->getDelimiter()),
+         _chunkAddress(0, Coordinates(2,0))
     {
         _buffer = _splitter.getBlock(_bufferSize);
-        if(_bufferSize > 0)
-        {
-            ++_rowIndex;
-            ++(_chunkAddress.coords[0]);
-            return true;
-        }
-        else
-        {
-            return false;
-        }
     }
 
-    ConstChunk const& getChunk(AttributeID attr, size_t rowIndex)
+    virtual bool end()
     {
-        _chunk.initialize(this, &super::getArrayDesc(), _chunkAddress, 0);
+        return _bufferSize == 0;
+    }
+
+    virtual void operator ++()
+    {
+        if(end())
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "FileSplitArrayIterator::++ attempt to iterate past end";
+        }
+        ++(_chunkAddress.coords[1]);
+        _buffer = _splitter.getBlock(_bufferSize);
+    }
+
+    virtual Coordinates const& getPosition()
+    {
+        return _chunkAddress.coords;
+    }
+
+    virtual bool setPosition(Coordinates const& pos)
+    {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "FileSplitArrayIterator::setPosition() not supported";
+    }
+
+    virtual void reset()
+    {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "FileSplitArrayIterator::reset() not supported";
+    }
+
+    virtual ConstChunk const& getChunk()
+    {
+        _chunk.initialize(_parentArray, &_parentArray->getArrayDesc(), _chunkAddress, 0);
         shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         shared_ptr<ChunkIterator> chunkIt = _chunk.getIterator(query, ChunkIterator::SEQUENTIAL_WRITE | ChunkIterator::NO_EMPTY_CHECK);
         Value v;
         v.setSize(_bufferSize+1);
         char *d = (char*) v.data();
         memcpy(d, _buffer, _bufferSize);
-        d[_bufferSize] = 0;
+        d[_bufferSize] = 0;   //null-termination
         chunkIt->writeItem(v);
         chunkIt->flush();
         return _chunk;
     }
 };
+
+class FileSplitArray : public Array
+{
+private:
+    ArrayDesc _desc;
+    shared_ptr<SplitSettings> _settings;
+
+public:
+    FileSplitArray(ArrayDesc const& schema, shared_ptr<Query> const& query, shared_ptr<SplitSettings> const& settings):
+        _desc(schema),
+        _settings(settings)
+    {
+        _query = query;
+    }
+
+    virtual ~FileSplitArray()
+    {}
+
+    virtual Access getSupportedAccess() const
+    {
+        return SINGLE_PASS;
+    }
+
+    ArrayDesc const& getArrayDesc() const
+    {
+        return _desc;
+    }
+
+    virtual shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attr) const
+    {
+        if(attr != 0)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "FileSplitArray::getConstIterator request for nonexistent attribute";
+        }
+        return shared_ptr<ConstArrayIterator> (new FileSplitArrayIterator(this, _query, _settings));
+    }
+};
+
+
+//TODO: in 14.9 Igor introduced a new SinglePassArray which gives us much better form
+//But we also wanna make this work for 14.8 for now
+//class FileSplitArray : public SinglePassArray
+//{
+//private:
+//    typedef SinglePassArray super;
+//    size_t _rowIndex;
+//    Address _chunkAddress;
+//    MemChunk _chunk;
+//    weak_ptr<Query> _query;
+//    FileSplitter _splitter;
+//    char*  _buffer;
+//    size_t _bufferSize;
+//
+//public:
+//    FileSplitArray(ArrayDesc const& schema, shared_ptr<Query>& query,
+//                   string const& filePath, size_t numLinesPerBlock, size_t bufferSize, char delimiter):
+//        super(schema),
+//        _rowIndex(0),
+//        _chunkAddress(0, Coordinates(1,-1)),
+//        _query(query),
+//        _splitter(filePath, numLinesPerBlock, bufferSize, delimiter)
+//    {
+//        super::setEnforceHorizontalIteration(true);
+//    }
+//
+//    virtual ~FileSplitArray()
+//    {}
+//
+//    size_t getCurrentRowIndex() const
+//    {
+//        return _rowIndex;
+//    }
+//
+//    bool moveNext(size_t rowIndex)
+//    {
+//        _buffer = _splitter.getBlock(_bufferSize);
+//        if(_bufferSize > 0)
+//        {
+//            ++_rowIndex;
+//            ++(_chunkAddress.coords[0]);
+//            return true;
+//        }
+//        else
+//        {
+//            return false;
+//        }
+//    }
+//
+//    ConstChunk const& getChunk(AttributeID attr, size_t rowIndex)
+//    {
+//        _chunk.initialize(this, &super::getArrayDesc(), _chunkAddress, 0);
+//        shared_ptr<Query> query = Query::getValidQueryPtr(_query);
+//        shared_ptr<ChunkIterator> chunkIt = _chunk.getIterator(query, ChunkIterator::SEQUENTIAL_WRITE | ChunkIterator::NO_EMPTY_CHECK);
+//        Value v;
+//        v.setSize(_bufferSize+1);
+//        char *d = (char*) v.data();
+//        memcpy(d, _buffer, _bufferSize);
+//        d[_bufferSize] = 0;
+//        chunkIt->writeItem(v);
+//        chunkIt->flush();
+//        return _chunk;
+//    }
+//};
 
 class PhysicalSplit : public PhysicalOperator
 {
@@ -239,19 +348,14 @@ public:
 
     boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
-        SplitSettings settings (_parameters, false, query);
-        if (settings.getSourceInstanceId() != 0)
+        shared_ptr<SplitSettings> settings (new SplitSettings (_parameters, false, query));
+        if (settings->getSourceInstanceId() != 0)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "PhysicalSplit::execute internal error";
         }
         if(query->getInstanceID() == 0)
         {
-            shared_ptr<Array> result = shared_ptr<FileSplitArray>(new FileSplitArray(_schema,
-                                                                                     query,
-                                                                                     settings.getInputFilePath(),
-                                                                                     settings.getLinesPerChunk(),
-                                                                                     settings.getBufferSize(),
-                                                                                     settings.getDelimiter()));
+            shared_ptr<Array> result = shared_ptr<FileSplitArray>(new FileSplitArray(_schema, query, settings));
             return result;
         }
         else
