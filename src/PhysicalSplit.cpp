@@ -16,6 +16,11 @@ namespace scidb
 using namespace boost;
 using namespace scidb;
 
+
+/**
+ * A wrapper around an open file (or pipe) that may iterate over the data once and split it into blocks, each
+ * block containing a number of lines. Returns one block at a time.
+ */
 class FileSplitter
 {
 private:
@@ -24,18 +29,23 @@ private:
     vector<char> _buffer;
     char*        _dataStartPos;
     size_t       _dataSize;
-    bool         _finished;
+    bool         _endOfFile;
     FILE*        _inputFile;
+    char         _delimiter;
 
 public:
-    FileSplitter(string const& filePath, size_t numLinesPerBlock):
+    FileSplitter(string const& filePath,
+                 size_t numLinesPerBlock,
+                 size_t bufferSize,
+                 char delimiter):
         _linesPerBlock(numLinesPerBlock),
-        _bufferSize(1),
+        _bufferSize(bufferSize),
         _buffer(0),
         _dataStartPos(0),
         _dataSize(0),
-        _finished(false),
-        _inputFile(0)
+        _endOfFile(false),
+        _inputFile(0),
+        _delimiter(delimiter)
     {
         try
         {
@@ -53,7 +63,7 @@ public:
         _dataSize = fread(&_buffer[0], 1, _bufferSize, _inputFile);
         if (_dataSize != _bufferSize)
         {
-            _finished= true;
+            _endOfFile= true;
             fclose(_inputFile);
             _inputFile =0;
         }
@@ -77,20 +87,20 @@ public:
         {
             while (numCharacters < _dataSize && lineCounter != 0)
             {
-                if(*ch == '\n')
+                if(*ch == _delimiter)
                 {
                     lineCounter --;
                 }
                 ++ch;
                 ++numCharacters;
             }
-            if(lineCounter == 0 || _finished)
+            if(lineCounter == 0 || _endOfFile)
             {
                 break;
             }
             else
             {
-                ch = eatMoreData();
+                ch = eatMoreData(); //careful: this call changes _dataStartPos and _dataSize
             }
         }
         char* res = _dataStartPos;
@@ -103,12 +113,16 @@ private:
     char* eatMoreData()
     {
         char *bufStart = &_buffer[0];
-        if (_dataStartPos != bufStart)
+        if (_dataStartPos != bufStart)   //we have a block of data at the end of the buffer - move it to the beginning
         {
             memmove(bufStart, _dataStartPos, _dataSize);
         }
         else
         {
+            if(_dataSize != _bufferSize) //invariant check: entire buffer must be full; double it, and read more
+            {
+                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "FileSplitter()::eatMoreData internal error";
+            }
             _bufferSize = _bufferSize * 2;
             try
             {
@@ -125,7 +139,7 @@ private:
         size_t bytesRead = fread( newDataStart, 1, remainderSize, _inputFile);
         if(bytesRead != remainderSize)
         {
-            _finished = true;
+            _endOfFile = true;
             fclose(_inputFile);
             _inputFile =0;
         }
@@ -145,16 +159,17 @@ private:
     MemChunk _chunk;
     weak_ptr<Query> _query;
     FileSplitter _splitter;
-    char* _buffer;
+    char*  _buffer;
     size_t _bufferSize;
 
 public:
-    FileSplitArray(ArrayDesc const& schema, shared_ptr<Query>& query):
+    FileSplitArray(ArrayDesc const& schema, shared_ptr<Query>& query,
+                   string const& filePath, size_t numLinesPerBlock, size_t bufferSize, char delimiter):
         super(schema),
         _rowIndex(0),
         _chunkAddress(0, Coordinates(1,-1)),
         _query(query),
-        _splitter("/tmp/file", 2)
+        _splitter(filePath, numLinesPerBlock, bufferSize, delimiter)
     {
         super::setEnforceHorizontalIteration(true);
     }
@@ -208,30 +223,42 @@ public:
         PhysicalOperator(logicalName, physicalName, parameters, schema)
     {}
 
+    virtual bool changesDistribution(std::vector<ArrayDesc> const&) const
+    {
+        return true;
+    }
+
+    virtual ArrayDistribution getOutputDistribution(std::vector<ArrayDistribution> const&, std::vector<ArrayDesc> const&) const
+    {
+        //TODO: change me when input from different instances or parallel is allowed.
+        //see PhysicalInput.cpp
+        return ArrayDistribution(psLocalInstance,
+                                 boost::shared_ptr<DistributionMapper>(),
+                                 0);
+    }
+
     boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
-
+        SplitSettings settings (_parameters, false, query);
+        if (settings.getSourceInstanceId() != 0)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "PhysicalSplit::execute internal error";
+        }
         if(query->getInstanceID() == 0)
         {
-            shared_ptr<Array> result = shared_ptr<FileSplitArray>(new FileSplitArray(_schema,query));
+            shared_ptr<Array> result = shared_ptr<FileSplitArray>(new FileSplitArray(_schema,
+                                                                                     query,
+                                                                                     settings.getInputFilePath(),
+                                                                                     settings.getLinesPerChunk(),
+                                                                                     settings.getBufferSize(),
+                                                                                     settings.getDelimiter()));
             return result;
-//            string ss = "holla back!";
-//            boost::shared_ptr<ArrayIterator> arrIt = result->getIterator(0);
-//            Coordinates coords;
-//            coords.push_back(0);
-//            Chunk& chunk = arrIt->newChunk(coords);
-//            boost::shared_ptr<ChunkIterator> chunkIt = chunk.getIterator(query);
-//            Value v(TypeLibrary::getType(TID_STRING));
-//            v.setString(ss.c_str());
-//            chunkIt->writeItem(v);
-//            chunkIt->flush();
         }
         else
         {
             shared_ptr<Array> result = boost::shared_ptr<MemArray>(new MemArray(_schema,query));
             return result;
         }
-
     }
 };
 
