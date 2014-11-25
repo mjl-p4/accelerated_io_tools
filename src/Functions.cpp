@@ -171,3 +171,24 @@ static void int_to_char (const Value** args, Value *res, void*)
 
 static scidb::UserDefinedFunction int_to_c (scidb::FunctionDescription("int_to_char", list_of("uint8"), "char", &int_to_char ));
 static scidb::UserDefinedFunction c_to_int (scidb::FunctionDescription("char_to_int", list_of("char"), "uint8", &int_to_char ));
+
+static void codify (const Value** args, Value *res, void*)
+{
+    if(args[0]->isNull())
+    {
+      res->setNull(args[0]->getMissingReason());
+      return;
+    }
+    const char* input = args[0]->getString();
+    size_t inputLen = args[0]->size();
+    ostringstream out;
+    for (size_t i=0; i< inputLen; ++i)
+    {
+        char c = input[i];
+        int32_t res = c;
+        out<<res<<"|";
+    }
+    res->setString(out.str().c_str());
+}
+
+static scidb::UserDefinedFunction asciify_str (scidb::FunctionDescription("codify", list_of("string"), "string", &codify ));
