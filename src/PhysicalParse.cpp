@@ -169,6 +169,16 @@ public:
         PhysicalOperator(logicalName, physicalName, parameters, schema)
     {}
 
+    virtual bool changesDistribution(std::vector<ArrayDesc> const&) const
+    {
+        return true;
+    }
+
+    virtual ArrayDistribution getOutputDistribution(std::vector<ArrayDistribution> const&, std::vector<ArrayDesc> const&) const
+    {
+        return ArrayDistribution(psUndefined);
+    }
+
     boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
         ParseSettings settings (_parameters, false, query);
