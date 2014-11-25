@@ -72,7 +72,7 @@ public:
             ostringstream attname;
             attname<<"a";
             attname<<i;
-            attributes[i] =  AttributeDesc((AttributeID)i, attname.str(),  TID_STRING, 0, 0);
+            attributes[i] =  AttributeDesc((AttributeID)i, attname.str(),  TID_STRING, AttributeDesc::IS_NULLABLE, 0);
         }
         attributes[numRequestedAttributes] = AttributeDesc((AttributeID)numRequestedAttributes, "error", TID_STRING, AttributeDesc::IS_NULLABLE, 0);
         attributes = addEmptyTagAttribute(attributes);

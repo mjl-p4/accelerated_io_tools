@@ -158,3 +158,16 @@ static void trim (const Value** args, Value *res, void*)
 static scidb::UserDefinedFunction trim_str (scidb::FunctionDescription("trim", list_of("string")("string"), "string", &trim ));
 
 
+static void int_to_char (const Value** args, Value *res, void*)
+{
+    if(args[0]->isNull())
+    {
+      res->setNull(args[0]->getMissingReason());
+      return;
+    }
+    uint8_t input = args[0]->getUint8();
+    res->setChar(input);
+}
+
+static scidb::UserDefinedFunction int_to_c (scidb::FunctionDescription("int_to_char", list_of("uint8"), "char", &int_to_char ));
+static scidb::UserDefinedFunction c_to_int (scidb::FunctionDescription("char_to_int", list_of("char"), "uint8", &int_to_char ));

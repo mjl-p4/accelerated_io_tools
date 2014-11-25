@@ -127,7 +127,7 @@ public:
                 }
                 else
                 {
-                    _outputLine[t].setString("");
+                    _outputLine[t].setNull();
                 }
             }
             ++(_outputPosition[2]);
