@@ -28,4 +28,4 @@ all:
 	@echo "Remember to copy the plugin to all your nodes in the cluster."
 
 clean:
-	rm -f libdmetric.so *.o
+	rm -f *.so *.o
