@@ -106,7 +106,7 @@ $ iquery -aq "project(apply(filter(tmp, not (line_no=0 and chunk_no=0)), da2, dc
 ```
 Note, the value at {0,1,1} was not present in the file and is thus "null". The value {0,3,0} was not castable, and we decided to use ?1 to differentiate.
 
-### Some string utilities:
+### Some string utilities
 trim() can be used to remove all characters from a given list from the start and end of the given string:
 ```
 $ iquery -aq "project(apply(filter(tmp, not (line_no=0 and chunk_no=0)), ta0, trim(a0, '\"')), a0, ta0)"
