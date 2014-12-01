@@ -1,7 +1,7 @@
 load_tools
 ==========
 
-Tools for efficient and error-tolerant loading of character-delimited data into SciDB.
+Tools for efficient and error-tolerant loading of character-delimited data into SciDB. This work is currently in prototype phase.
 
 ## Intro
 
