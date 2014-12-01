@@ -143,3 +143,22 @@ $ iquery -aq "project(apply(tmp, ca0, codify(a0)), a0, ca0)"
 ```
 ===
 Hopefully more enhancements coming soon!
+
+## Installing the plug in
+
+You'll need SciDB installed, along with the SciDB development header packages.
+The names vary depending on your operating system type, but they are the
+package that have "-dev" in the name. You *don't* need the SciDB source code to
+compile and install this.
+
+Run `make` and copy  `*.so` to the `lib/scidb/plugins`
+directory on each of your SciDB cluster nodes. Here is an example:
+
+```
+cd load_tools
+make
+cp *.so /opt/scidb/14.8/lib/scidb/plugins
+
+iquery -aq "load_library('load_tools')"
+```
+Remember to copy the plugin to __all__ your SciDB cluster nodes.
