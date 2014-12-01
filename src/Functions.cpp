@@ -71,9 +71,21 @@ static void dcast(const Value** args, Value *res, void*)
   }
 }
 
-static scidb::UserDefinedFunction dcast_uint64 (scidb::FunctionDescription("dcast", list_of("string")("uint64"), "uint64", &dcast<uint64_t> ));
-static scidb::UserDefinedFunction dcast_int64  (scidb::FunctionDescription("dcast", list_of("string")("int64"),  "int64" , &dcast<int64_t>));
 static scidb::UserDefinedFunction dcast_double (scidb::FunctionDescription("dcast", list_of("string")("double"), "double", &dcast<double> ));
+static scidb::UserDefinedFunction dcast_float (scidb::FunctionDescription("dcast", list_of("string")("float"), "float", &dcast<float> ));
+static scidb::UserDefinedFunction dcast_bool (scidb::FunctionDescription("dcast", list_of("string")("bool"), "bool", &dcast<bool> ));
+static scidb::UserDefinedFunction dcast_int64  (scidb::FunctionDescription("dcast", list_of("string")("int64"),  "int64" , &dcast<int64_t>));
+static scidb::UserDefinedFunction dcast_int32 (scidb::FunctionDescription("dcast", list_of("string")("int32"), "int32", &dcast<int32_t> ));
+static scidb::UserDefinedFunction dcast_int16 (scidb::FunctionDescription("dcast", list_of("string")("int16"), "int16", &dcast<int16_t> ));
+static scidb::UserDefinedFunction dcast_int8 (scidb::FunctionDescription("dcast", list_of("string")("int8"), "int8", &dcast<int8_t> ));
+static scidb::UserDefinedFunction dcast_uint64 (scidb::FunctionDescription("dcast", list_of("string")("uint64"), "uint64", &dcast<uint64_t> ));
+static scidb::UserDefinedFunction dcast_uint32 (scidb::FunctionDescription("dcast", list_of("string")("uint32"), "uint32", &dcast<uint32_t> ));
+static scidb::UserDefinedFunction dcast_uint16 (scidb::FunctionDescription("dcast", list_of("string")("uint16"), "uint16", &dcast<uint16_t> ));
+static scidb::UserDefinedFunction dcast_uint8 (scidb::FunctionDescription("dcast", list_of("string")("uint8"), "uint8", &dcast<uint8_t> ));
+
+// XXX How to add datetime conversion here? The naive approach:
+//static scidb::UserDefinedFunction dcast_datetimetz (scidb::FunctionDescription("dcast", list_of("string")("datetimetz"), "datetimetz", &dcast<datetimetz> ));
+// doesn't work!
 
 /**
  * first argument: the string to trim
