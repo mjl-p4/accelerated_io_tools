@@ -93,7 +93,7 @@ $ iquery -aq "apply(filter(tmp, error is not null), original_line_number, 1+line
 ```
 
 ### dcast: error-tolerant casting
-The supplied UDF dcast can be used to cast a string to a double, int64 or uint64 (at the moment). Note, the default casting in scidb will fail the query on first error. The second argument to dcast is the "default value" to use when the cast fails, usually a null or missing code. For example:
+The supplied UDF dcast can be used to cast a string to a double, float, bool, int{64,32,16,8} or uint{64,32,16,8} (at the moment). Note, the default casting in scidb will fail the query on first error. The second argument to dcast is the "default value" to use when the cast fails, usually a null or missing code. For example:
 ```
 $ iquery -aq "project(apply(filter(tmp, not (line_no=0 and chunk_no=0)), da2, dcast(a2, double(missing(1)))), a2, da2)"
 {source_instance_id,chunk_no,line_no} a2,da2
