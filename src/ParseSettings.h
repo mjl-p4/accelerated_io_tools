@@ -39,6 +39,8 @@ private:
     bool    _attributeDelimiterSet;
     char    _lineDelimiter;
     bool    _lineDelimiterSet;
+    bool    _splitOnDimension;
+    bool    _splitOnDimensionSet;
 
 public:
     static const size_t MAX_PARAMETERS = 4;
@@ -52,12 +54,15 @@ public:
        _attributeDelimiter('\t'),
        _attributeDelimiterSet(false),
        _lineDelimiter('\n'),
-       _lineDelimiterSet(false)
+       _lineDelimiterSet(false),
+       _splitOnDimension(false),
+       _splitOnDimensionSet(false)
     {
         string const numAttributesHeader        = "num_attributes=";
         string const chunkSizeHeader            = "chunk_size=";
         string const attributeDelimiterHeader   = "attribute_delimiter=";
         string const lineDelimiterHeader        = "line_delimiter=";
+        string const splitOnDimensionHeader     = "split_on_dimension=";
         size_t const nParams = operatorParameters.size();
         if (nParams > MAX_PARAMETERS)
         {   //assert-like exception. Caller should have taken care of this!
@@ -192,6 +197,23 @@ public:
                 }
                 _lineDelimiterSet = true;
             }
+            else if (starts_with (parameterString, splitOnDimensionHeader))
+            {
+                if(_splitOnDimensionSet)
+                {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set split_on_dimension multiple times";
+                }
+                string paramContent = parameterString.substr(splitOnDimensionHeader.size());
+                trim(paramContent);
+                try
+                {
+                   _splitOnDimension = lexical_cast<bool>(paramContent);
+                }
+                catch (bad_lexical_cast const& exn)
+                {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse split_on_dimension";
+                }
+            }
         }
         if (_numAttributes == 0)
         {
@@ -217,6 +239,11 @@ public:
     char getLineDelimiter() const
     {
         return _lineDelimiter;
+    }
+
+    bool getSplitOnDimension() const
+    {
+        return _splitOnDimension;
     }
 };
 

@@ -66,21 +66,29 @@ public:
         }
         ParseSettings settings (_parameters, true, query);
         size_t numRequestedAttributes = settings.getNumAttributes();
-        vector<AttributeDesc> attributes(numRequestedAttributes + 1); //+ "error" attribute
-        for(size_t i=0, n=numRequestedAttributes; i<n; ++i)
-        {
-            ostringstream attname;
-            attname<<"a";
-            attname<<i;
-            attributes[i] =  AttributeDesc((AttributeID)i, attname.str(),  TID_STRING, AttributeDesc::IS_NULLABLE, 0);
-        }
-        attributes[numRequestedAttributes] = AttributeDesc((AttributeID)numRequestedAttributes, "error", TID_STRING, AttributeDesc::IS_NULLABLE, 0);
-        attributes = addEmptyTagAttribute(attributes);
         size_t requestedChunkSize = settings.getChunkSize();
         vector<DimensionDesc> dimensions(3);
         dimensions[0] = DimensionDesc("source_instance_id", 0, 0, MAX_COORDINATE, MAX_COORDINATE, 1, 0);
-        dimensions[1] = DimensionDesc("chunk_no",    0, 0, MAX_COORDINATE, MAX_COORDINATE, 1, 0);
-        dimensions[2] = DimensionDesc("line_no",     0, 0, MAX_COORDINATE, MAX_COORDINATE, requestedChunkSize, 0);
+        dimensions[1] = DimensionDesc("chunk_no",           0, 0, MAX_COORDINATE, MAX_COORDINATE, 1, 0);
+        dimensions[2] = DimensionDesc("line_no",            0, 0, MAX_COORDINATE, MAX_COORDINATE, requestedChunkSize, 0);
+        vector<AttributeDesc> attributes;
+        if (settings.getSplitOnDimension())
+        {   //add 1 for the error column
+            dimensions.push_back(DimensionDesc("attribute_no", 0, 0, numRequestedAttributes, numRequestedAttributes, numRequestedAttributes+1, 0));
+            attributes.push_back(AttributeDesc(0, "a", TID_STRING, AttributeDesc::IS_NULLABLE, 0));
+        }
+        else
+        {
+            for(size_t i=0, n=numRequestedAttributes; i<n; ++i)
+            {
+                ostringstream attname;
+                attname<<"a";
+                attname<<i;
+                attributes.push_back(AttributeDesc((AttributeID)i, attname.str(),  TID_STRING, AttributeDesc::IS_NULLABLE, 0));
+            }
+            attributes.push_back(AttributeDesc((AttributeID)numRequestedAttributes, "error", TID_STRING, AttributeDesc::IS_NULLABLE, 0));
+        }
+        attributes = addEmptyTagAttribute(attributes);
         return ArrayDesc("parse", attributes, dimensions);
     }
 

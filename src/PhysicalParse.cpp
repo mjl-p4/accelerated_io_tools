@@ -46,22 +46,26 @@ private:
     size_t const _numLiveAttributes;
     char _lineDelimiter;
     char _attributeDelimiter;
+    size_t const _outputLineSize;
     vector<Value> _outputLine;
     size_t const _outputChunkSize;
     vector<shared_ptr<ArrayIterator> > _outputArrayIterators;
     vector<shared_ptr<ChunkIterator> > _outputChunkIterators;
+    bool _splitOnDimension;
 
 public:
-    OutputWriter(ArrayDesc const& schema, shared_ptr<Query>& query, char lineDelimiter, char attributeDelimiter):
+    OutputWriter(ArrayDesc const& schema, shared_ptr<Query>& query, char lineDelimiter, char attributeDelimiter, bool splitOnDimension):
         _output(boost::make_shared<MemArray>(schema,query)),
-        _outputPosition(3, 0),
+        _outputPosition( splitOnDimension ? 4 : 3, 0),
         _numLiveAttributes(schema.getAttributes(true).size()),
         _lineDelimiter(lineDelimiter),
         _attributeDelimiter(attributeDelimiter),
-        _outputLine(_numLiveAttributes),
+        _outputLineSize(splitOnDimension ? schema.getDimensions()[3].getChunkInterval() : _numLiveAttributes),
+        _outputLine(_outputLineSize),
         _outputChunkSize(schema.getDimensions()[2].getChunkInterval()),
         _outputArrayIterators(_numLiveAttributes),
-        _outputChunkIterators(_numLiveAttributes)
+        _outputChunkIterators(_numLiveAttributes),
+        _splitOnDimension(splitOnDimension)
     {
         for(AttributeID i =0; i<_numLiveAttributes; ++i)
         {
@@ -74,11 +78,14 @@ public:
         _outputPosition[0] = inputChunkPosition[0];
         _outputPosition[1] = inputChunkPosition[1];
         _outputPosition[2] = 0;
+        if(_splitOnDimension)
+        {
+            _outputPosition[3] = 0;
+        }
         for(AttributeID i =0; i<_numLiveAttributes; ++i)
         {
             _outputChunkIterators[i] = _outputArrayIterators[i]->newChunk(_outputPosition).getIterator(query,
                 i == 0 ? ChunkIterator::SEQUENTIAL_WRITE : ChunkIterator::SEQUENTIAL_WRITE | ChunkIterator::NO_EMPTY_CHECK);
-            _outputChunkIterators[i]->setPosition(_outputPosition);
         }
         const char *data = value.getString();
         if(data[ value.size() - 1] != 0)
@@ -86,7 +93,6 @@ public:
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Encountered a string that is not null-terminated; bailing";
         }
         string input(data);
-        //vector <string> lines = boost::split(input, boost::is_any_of(_lineDelimiter));
         vector <string> lines;
         split(lines, input, is_from_range(_lineDelimiter, _lineDelimiter));
         size_t const nLines = lines.size();
@@ -97,45 +103,21 @@ public:
         for ( size_t l = 0; l<nLines; ++l)
         {
             string const& line = lines[l];
-            vector<string> tokens;
-            split(tokens, line, is_from_range(_attributeDelimiter, _attributeDelimiter));
-            size_t const nTokens = tokens.size();
-            //set the error string
-            if(nTokens < _numLiveAttributes -1 )
+            parseLine(line);
+            if(_splitOnDimension)
             {
-                _outputLine[_numLiveAttributes-1].setString("short");
+                _outputPosition[3] = 0;
             }
-            else if (nTokens >_numLiveAttributes -1 )
+            for(AttributeID i =0; i<_outputLineSize; ++i)
             {
-                ostringstream error;
-                error<<"long";
-                for(size_t t = _numLiveAttributes - 1; t<nTokens; ++t)
-                {
-                    error << _attributeDelimiter << tokens[t];
-                }
-                _outputLine[_numLiveAttributes-1].setString(error.str().c_str());
-            }
-            else
-            {
-                _outputLine[_numLiveAttributes-1].setNull();
-            }
-            for(size_t t= 0; t<_numLiveAttributes -1; ++t)
-            {
-                if(t<nTokens)
-                {
-                    _outputLine[t].setString(tokens[t].c_str());
-                }
-                else
-                {
-                    _outputLine[t].setNull();
-                }
+               _outputChunkIterators[ _splitOnDimension ? 0 : i]->setPosition(_outputPosition);
+               _outputChunkIterators[ _splitOnDimension ? 0 : i]->writeItem(_outputLine[i]);
+               if(_splitOnDimension)
+               {
+                   ++(_outputPosition[3]);
+               }
             }
             ++(_outputPosition[2]);
-            for(AttributeID i =0; i<_numLiveAttributes; ++i)
-            {
-               _outputChunkIterators[i]->writeItem(_outputLine[i]);
-               _outputChunkIterators[i]->setPosition(_outputPosition);
-            }
         }
         for(AttributeID i =0; i<_numLiveAttributes; ++i)
         {
@@ -156,6 +138,45 @@ public:
             _outputArrayIterators[i].reset();
         }
         return _output;
+    }
+
+
+private:
+    void parseLine(string const& line)
+    {
+        vector<string> tokens;
+        split(tokens, line, is_from_range(_attributeDelimiter, _attributeDelimiter));
+        size_t const nTokens = tokens.size();
+        //set the error string
+        if(nTokens < _outputLineSize -1 )
+        {
+            _outputLine[_outputLineSize-1].setString("short");
+        }
+        else if (nTokens >_outputLineSize -1 )
+        {
+            ostringstream error;
+            error<<"long";
+            for(size_t t = _outputLineSize - 1; t<nTokens; ++t)
+            {
+                error << _attributeDelimiter << tokens[t];
+            }
+            _outputLine[_outputLineSize-1].setString(error.str().c_str());
+        }
+        else
+        {
+            _outputLine[_outputLineSize-1].setNull();
+        }
+        for(size_t t= 0; t<_outputLineSize -1; ++t)
+        {
+            if(t<nTokens)
+            {
+                _outputLine[t].setString(tokens[t].c_str());
+            }
+            else
+            {
+                _outputLine[t].setNull();
+            }
+        }
     }
 };
 
@@ -182,7 +203,7 @@ public:
     boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
         ParseSettings settings (_parameters, false, query);
-        OutputWriter writer(_schema, query, settings.getLineDelimiter(), settings.getAttributeDelimiter());
+        OutputWriter writer(_schema, query, settings.getLineDelimiter(), settings.getAttributeDelimiter(), settings.getSplitOnDimension());
         shared_ptr<Array>& input = inputArrays[0];
         shared_ptr<ConstArrayIterator> inputIterator = input->getConstIterator(0);
         while(!inputIterator-> end())
