@@ -43,7 +43,7 @@ private:
     bool    _splitOnDimensionSet;
 
 public:
-    static const size_t MAX_PARAMETERS = 4;
+    static const size_t MAX_PARAMETERS = 5;
 
     ParseSettings(vector<shared_ptr<OperatorParam> > const& operatorParameters,
                  bool logical,
@@ -111,7 +111,7 @@ public:
                 trim(paramContent);
                 try
                 {
-                    _chunkSize = lexical_cast<int64_t>(_chunkSize);
+                    _chunkSize = lexical_cast<int64_t>(paramContent);
                     if(_chunkSize<=0)
                     {
                         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "chunk_size must be positive";
@@ -120,7 +120,7 @@ public:
                 }
                 catch (bad_lexical_cast const& exn)
                 {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse lines_per_chunk";
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse chunk_size";
                 }
             }
             else if (starts_with(parameterString, attributeDelimiterHeader))
@@ -213,6 +213,12 @@ public:
                 {
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse split_on_dimension";
                 }
+            }
+            else
+            {
+                ostringstream err;
+                err<<"Unrecognized parameter: "<<parameterString;
+                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << err.str();
             }
         }
         if (_numAttributes == 0)
