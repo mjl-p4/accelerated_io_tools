@@ -6,17 +6,26 @@ ifeq ($(SCIDB),)
   endif
 endif
 
+# A way to set the 3rdparty prefix path that is convenient
+# for SciDB developers.
 ifeq ($(SCIDB_VER),)
-  SCIDB_3RDPARTY = $(SCIDB)/3rdparty
+  SCIDB_3RDPARTY = $(SCIDB)
 else
-  SCIDB_3RDPARTY = /opt/scidb/$(SCIDB_VER)/3rdparty
+  SCIDB_3RDPARTY = /opt/scidb/$(SCIDB_VER)
+endif
+
+# A better way to set the 3rdparty prefix path that does
+# not assume an absolute path. You can still use the above
+# method if you prefer.
+ifeq ($(SCIDB_THIRDPARTY_PREFIX),)
+  SCIDB_THIRDPARTY_PREFIX := $(SCIDB_3RDPARTY)
 endif
 
 # Debug:
 #CFLAGS=-pedantic -W -Wextra -Wall -Wno-variadic-macros -Wno-strict-aliasing -Wno-long-long -Wno-unused-parameter -fPIC -D_STDC_FORMAT_MACROS -Wno-system-headers -isystem -g -ggdb3  -D_STDC_LIMIT_MACROS
 CFLAGS=-pedantic -W -Wextra -Wall -Wno-variadic-macros -Wno-strict-aliasing -Wno-long-long -Wno-unused-parameter -fPIC -D_STDC_FORMAT_MACROS -Wno-system-headers -isystem -O3 -g -DNDEBUG -D_STDC_LIMIT_MACROS
-INC=-I. -DPROJECT_ROOT="\"$(SCIDB)\"" -I"$(SCIDB_3RDPARTY)/boost/include/" -I"$(SCIDB)/include"
-LIBS=-shared -Wl,-soname,libload_tools.so -L. -L"$(SCIDB_3RDPARTY)/boost/lib" -L"$(SCIDB)/lib" -Wl,-rpath,$(SCIDB)/lib:$(RPATH) -lm
+INC=-I. -DPROJECT_ROOT="\"$(SCIDB)\"" -I"$(SCIDB_THIRDPARTY_PREFIX)/3rdparty/boost/include/" -I"$(SCIDB)/include"
+LIBS=-shared -Wl,-soname,libload_tools.so -L. -L"$(SCIDB_THIRDPARTY_PREFIX)/3rdparty/boost/lib" -L"$(SCIDB)/lib" -Wl,-rpath,$(SCIDB)/lib:$(RPATH) -lm
 
 all:
 	@if test ! -d "$(SCIDB)"; then echo  "Error. Try:\n\nmake SCIDB=<PATH TO SCIDB INSTALL PATH>"; exit 1; fi
