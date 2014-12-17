@@ -205,14 +205,14 @@ static void codify (const Value** args, Value *res, void*)
 
 static scidb::UserDefinedFunction asciify_str (scidb::FunctionDescription("codify", list_of("string"), "string", &codify ));
 
-int match_length( 
+size_t match_length(
   const char* pattern, 
   size_t patternLength,
   const char* str,
   size_t strLength, 
   int strOffset) { 
 
-  int i = 0; 
+  size_t i = 0;
   for(; i < patternLength && strOffset + i < strLength && pattern[i] == str[strOffset + i]; i++) 
     {}
 
@@ -220,7 +220,7 @@ int match_length(
 }
 
 int find_next(const char* str, size_t strLen, int offset, char nextChar) { 
-  int i = 0;
+  size_t i = 0;
   for(i = offset; i < strLen; i++) { 
     if(str[i] == nextChar) { return i; }
   }
@@ -234,9 +234,11 @@ int find_first_pattern_match(
   const char* str, 
   size_t strLength) { 
 
-  for(int i = 0; i < strLength; i++) { 
-    if(match_length(pattern, patternLength, str, strLength, i) == patternLength) { 
-      return i;
+  for(size_t i = 0; i < strLength; i++) {
+    if(match_length(pattern, patternLength, str, strLength, i) == patternLength &&
+       i + patternLength < strLength &&
+       str[i+patternLength] == '=') {
+       return i;
     }
   }
 
@@ -256,24 +258,11 @@ static void keyed_value( const Value** args, Value *res, void* ) {
   size_t infoLen = args[0]->size();
   const char* keyName = args[1]->getString();
   size_t keyLen = args[1]->size();
-  const char* defaultValue = args[2]->getString();
-  size_t defaultLen = args[2]->size();
 
   int kstart = find_first_pattern_match(keyName, keyLen-1, infoField, infoLen-1);
 
-  if(kstart == -1) { 
-    res->setSize(defaultLen+1);
-    memcpy(res->data(), &defaultValue[0], defaultLen);
-    ((char*)res->data())[defaultLen]=0;
-
-    //ostringstream out;
-    //out << keyLen << ":";
-    //for (size_t i=0; i< infoLen; ++i)
-    //{
-    //int res = match_length(keyName, keyLen, infoField, infoLen, i);
-    //out<<res<<",";
-    //}
-    //res->setString(out.str().c_str());
+  if(keyLen == 0  || (keyLen == 1 && keyName[0]==0) || kstart == -1) {
+    *res = *(args[2]);
     return;
   }
 
@@ -287,6 +276,25 @@ static void keyed_value( const Value** args, Value *res, void* ) {
 }
 
 static scidb::UserDefinedFunction key_value_extract( scidb::FunctionDescription("keyed_value", list_of("string")("string")("string"), "string", &keyed_value));
+
+void num_csv(const scidb::Value** args, scidb::Value* res, void*)
+{
+    if (args[0]->isNull())
+    {
+        res->setNull(args[0]->getMissingReason());
+        return;
+    }
+    string const& cell = args[0]->getString();
+    uint32_t count = 0;
+    if (!cell.empty())
+    {
+        count = 1 + std::count(cell.begin(), cell.end(), ',');
+    }
+    res->setUint32(count);
+}
+
+static scidb::UserDefinedFunction ncsv( scidb::FunctionDescription("num_csv", list_of("string"), "uint32", &num_csv));
+
 
 /**
  * arg0: FORMAT FIELD
@@ -308,8 +316,8 @@ static void extract_format_field( const Value **args, Value* res, void*) {
     const char* attrName = args[2]->getString();
     size_t attrLen = args[2]->size();
 
-    int index = 0;
-    int j = 0, k = 0;
+    size_t index = 0;
+    size_t j = 0, k = 0;
     bool match = false;
     for(; j < formatLen && !match; j += k) { 
       if(formatField[j] == ':') { index++; j++; }
@@ -324,15 +332,15 @@ static void extract_format_field( const Value **args, Value* res, void*) {
       return;
     }
 
-    int start = 0; 
-    int indexi = 0;
+    size_t start = 0;
+    size_t indexi = 0;
     for(; start < sampleLen && indexi < index; start++) { 
         if(sampleField[start] == ':') { 
             indexi += 1;
         }
     }
     
-    int end = start+1;
+    size_t end = start+1;
     for(; end < sampleLen && sampleField[end] != ':'; end += 1) 
         {}
 
