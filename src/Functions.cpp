@@ -27,17 +27,16 @@
 
 #include <boost/lexical_cast.hpp>
 #include <boost/assign.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include "query/FunctionLibrary.h"
 #include "query/FunctionDescription.h"
 #include "system/ErrorsLibrary.h"
 
-
 using namespace std;
 using namespace boost;
 using namespace boost::assign;
 using namespace scidb;
-
 
 /**
  * DCAST: cast with default, does not throw an error. Tries to cast input to the appropriate type. If the cast fails,
@@ -274,9 +273,30 @@ static void keyed_value( const Value** args, Value *res, void* ) {
   memcpy(res->data(), &infoField[vstart], (vend-vstart));
   ((char*)res->data())[size-1]=0;
 }
-
 static scidb::UserDefinedFunction key_value_extract( scidb::FunctionDescription("keyed_value", list_of("string")("string")("string"), "string", &keyed_value));
 
+//in some rare cases, on older versions, string values are not null-terminated; we aim to be nice
+string get_null_terminated_string(char const* input, size_t const size)
+{
+    if(size == 0)
+    {
+        return string("");
+    }
+    else if (input[size-1] != 0)
+    {
+        return string(input, size);
+    }
+    else
+    {
+        return string(input);
+    }
+}
+
+/**
+ * Loosely based on https://github.com/slottad/scidb-genotypes/
+ * Thanks to Douglas Slotta.
+ * We find we are repeating some of the work and it might make sense to merge in more of that functionality
+ */
 void num_csv(const scidb::Value** args, scidb::Value* res, void*)
 {
     if (args[0]->isNull())
@@ -284,7 +304,7 @@ void num_csv(const scidb::Value** args, scidb::Value* res, void*)
         res->setNull(args[0]->getMissingReason());
         return;
     }
-    string const& cell = args[0]->getString();
+    string cell = get_null_terminated_string(args[0]->getString(), args[0]->size());
     uint32_t count = 0;
     if (!cell.empty())
     {
@@ -292,9 +312,33 @@ void num_csv(const scidb::Value** args, scidb::Value* res, void*)
     }
     res->setUint32(count);
 }
-
 static scidb::UserDefinedFunction ncsv( scidb::FunctionDescription("num_csv", list_of("string"), "uint32", &num_csv));
 
+void nth_csv(const scidb::Value** args, scidb::Value* res, void*)
+{
+    if (args[0]->isNull())
+    {
+        res->setNull(args[0]->getMissingReason());
+        return;
+    }
+    if (args[1]->isNull())
+    {
+        res->setNull(0);
+        return;
+    }
+    uint32_t n = args[1]->getUint32();
+    string cell = get_null_terminated_string(args[0]->getString(), args[0]->size());
+    vector<string> values;
+    split(values, cell, is_from_range(',', ','));
+    if (values.size() <= n)
+    {
+        res->setNull(0);
+        return;
+    }
+    res->setString(values[n]);
+}
+
+static scidb::UserDefinedFunction ntcsv( scidb::FunctionDescription("nth_csv", list_of("string")("uint32"), "string", &nth_csv));
 
 /**
  * arg0: FORMAT FIELD
