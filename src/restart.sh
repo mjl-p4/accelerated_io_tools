@@ -3,15 +3,16 @@
 iquery -aq "unload_library('load_tools')" > /dev/null 2>&1
 set -e
 
-DBNAME="mydb"
+DBNAME="single_server"
 mydir=`dirname $0`
 pushd $mydir
-#Replace this with your 3RDParty directory!
-make SCIDB_3RDPARTY="/opt/scidb/14.12"
-#Replace this with your install directory!
+
 SCIDB_INSTALL="/opt/scidb/14.12"
+make SCIDB_3RDPARTY=$SCIDB_INSTALL
+
 scidb.py stopall $DBNAME 
-cp libload_tools.so $SCIDB_INSTALL/lib/scidb/plugins/
+cp libload_tools.so ${SCIDB_INSTALL}/lib/scidb/plugins/
+
 #for multinode setups, dont forget to copy to every instance
 scidb.py startall $DBNAME
 iquery -aq "load_library('load_tools')"
