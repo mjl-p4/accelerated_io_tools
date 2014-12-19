@@ -253,7 +253,7 @@ static void keyed_value( const Value** args, Value *res, void* )
             return;
         }
     }
-    res->setNull(0);
+    (*res) = (*args[2]);
 }
 static scidb::UserDefinedFunction key_value_extract( scidb::FunctionDescription("keyed_value", list_of("string")("string")("string"), "string", &keyed_value));
 
