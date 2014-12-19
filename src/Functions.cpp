@@ -204,77 +204,6 @@ static void codify (const Value** args, Value *res, void*)
 
 static scidb::UserDefinedFunction asciify_str (scidb::FunctionDescription("codify", list_of("string"), "string", &codify ));
 
-size_t match_length(
-  const char* pattern, 
-  size_t patternLength,
-  const char* str,
-  size_t strLength, 
-  int strOffset) { 
-
-  size_t i = 0;
-  for(; i < patternLength && strOffset + i < strLength && pattern[i] == str[strOffset + i]; i++) 
-    {}
-
-  return i;
-}
-
-int find_next(const char* str, size_t strLen, int offset, char nextChar) { 
-  size_t i = 0;
-  for(i = offset; i < strLen; i++) { 
-    if(str[i] == nextChar) { return i; }
-  }
-
-  return i;
-}
-
-int find_first_pattern_match(
-  const char* pattern,
-  size_t patternLength,
-  const char* str, 
-  size_t strLength) { 
-
-  for(size_t i = 0; i < strLength; i++) {
-    if(match_length(pattern, patternLength, str, strLength, i) == patternLength &&
-       i + patternLength < strLength &&
-       str[i+patternLength] == '=') {
-       return i;
-    }
-  }
-
-  return -1;
-}
-
-static void keyed_value( const Value** args, Value *res, void* ) {
-  
-  for(int i = 0; i < 2; i++) { 
-    if(args[i]->isNull()) { 
-      res->setNull(args[i]->getMissingReason());
-      return;
-    }
-  }
-
-  const char* infoField = args[0]->getString();
-  size_t infoLen = args[0]->size();
-  const char* keyName = args[1]->getString();
-  size_t keyLen = args[1]->size();
-
-  int kstart = find_first_pattern_match(keyName, keyLen-1, infoField, infoLen-1);
-
-  if(keyLen == 0  || (keyLen == 1 && keyName[0]==0) || kstart == -1) {
-    *res = *(args[2]);
-    return;
-  }
-
-  int vstart = kstart + keyLen;
-  int vend = find_next(infoField, infoLen-1, vstart, ';');
-
-  size_t size = vend - vstart + 1;
-  res->setSize(size);
-  memcpy(res->data(), &infoField[vstart], (vend-vstart));
-  ((char*)res->data())[size-1]=0;
-}
-static scidb::UserDefinedFunction key_value_extract( scidb::FunctionDescription("keyed_value", list_of("string")("string")("string"), "string", &keyed_value));
-
 //in some rare cases, on older versions, string values are not null-terminated; we aim to be nice
 string get_null_terminated_string(char const* input, size_t const size)
 {
@@ -291,6 +220,44 @@ string get_null_terminated_string(char const* input, size_t const size)
         return string(input);
     }
 }
+
+
+static void keyed_value( const Value** args, Value *res, void* )
+{
+    if(args[0]->isNull())
+    {
+        res->setNull(args[0]->getMissingReason());
+        return;
+    }
+    else if (args[1]->isNull())
+    {
+        res->setNull(1);
+        return;
+    }
+    string cell =        get_null_terminated_string(args[0]->getString(), args[0]->size());
+    string info_field =  get_null_terminated_string(args[1]->getString(), args[1]->size());
+    vector<string> values;
+    split(values, cell, is_from_range(';', ';'));
+    for(size_t i=0, n=values.size(); i<n; ++i)
+    {
+        vector<string> pair;
+        split(pair, values[i], is_from_range('=','='));
+        if(pair.size()!=2)
+        {
+            res->setNull(2);
+            return;
+        }
+        if(pair[0]==info_field)
+        {
+            res->setString(pair[1]);
+            return;
+        }
+    }
+    res->setNull(0);
+}
+static scidb::UserDefinedFunction key_value_extract( scidb::FunctionDescription("keyed_value", list_of("string")("string")("string"), "string", &keyed_value));
+
+
 
 /**
  * Loosely based on https://github.com/slottad/scidb-genotypes/
