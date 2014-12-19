@@ -340,6 +340,28 @@ void nth_csv(const scidb::Value** args, scidb::Value* res, void*)
 
 static scidb::UserDefinedFunction ntcsv( scidb::FunctionDescription("nth_csv", list_of("string")("uint32"), "string", &nth_csv));
 
+void maxlen_csv(const scidb::Value** args, scidb::Value* res, void*)
+{
+    if (args[0]->isNull())
+    {
+        res->setNull(args[0]->getMissingReason());
+        return;
+    }
+    string cell = get_null_terminated_string(args[0]->getString(), args[0]->size());
+    vector<string> values;
+    split(values, cell, is_from_range(',', ','));
+    uint32_t maxSize =0;
+    for(size_t i=0, n=values.size(); i<n; ++i)
+    {
+        if(values[i].size()> maxSize)
+            maxSize=values[i].size();
+    }
+    res->setUint32(maxSize);
+}
+
+static scidb::UserDefinedFunction mlcsv( scidb::FunctionDescription("maxlen_csv", list_of("string"), "uint32", &maxlen_csv));
+
+
 /**
  * arg0: FORMAT FIELD
  * arg1: sample FIELD
