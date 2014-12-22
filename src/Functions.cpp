@@ -42,7 +42,7 @@ using namespace scidb;
  * DCAST: cast with default, does not throw an error. Tries to cast input to the appropriate type. If the cast fails,
  * returns the supplied default.
  */
-template <typename T>
+template <typename T, bool eight_bit>
 static void dcast(const Value** args, Value *res, void*)
 {
   if(args[0]->isNull())
@@ -53,7 +53,15 @@ static void dcast(const Value** args, Value *res, void*)
   const char* s = args[0]->getString();
   try
   {
-      T result = lexical_cast<T>(s);
+      T result;
+      if (!eight_bit)
+      {
+          result = lexical_cast<T>(s);
+      }
+      else
+      {
+          result = numeric_cast <T> (lexical_cast<int32_t> (s));
+      }
       res->set<T>(result);
   }
   catch(...)
@@ -70,104 +78,71 @@ static void dcast(const Value** args, Value *res, void*)
   }
 }
 
-static scidb::UserDefinedFunction dcast_double (scidb::FunctionDescription("dcast", list_of("string")("double"), "double", &dcast<double> ));
-static scidb::UserDefinedFunction dcast_float (scidb::FunctionDescription("dcast", list_of("string")("float"), "float", &dcast<float> ));
-static scidb::UserDefinedFunction dcast_bool (scidb::FunctionDescription("dcast", list_of("string")("bool"), "bool", &dcast<bool> ));
-static scidb::UserDefinedFunction dcast_int64  (scidb::FunctionDescription("dcast", list_of("string")("int64"),  "int64" , &dcast<int64_t>));
-static scidb::UserDefinedFunction dcast_int32 (scidb::FunctionDescription("dcast", list_of("string")("int32"), "int32", &dcast<int32_t> ));
-static scidb::UserDefinedFunction dcast_int16 (scidb::FunctionDescription("dcast", list_of("string")("int16"), "int16", &dcast<int16_t> ));
-static scidb::UserDefinedFunction dcast_int8 (scidb::FunctionDescription("dcast", list_of("string")("int8"), "int8", &dcast<int8_t> ));
-static scidb::UserDefinedFunction dcast_uint64 (scidb::FunctionDescription("dcast", list_of("string")("uint64"), "uint64", &dcast<uint64_t> ));
-static scidb::UserDefinedFunction dcast_uint32 (scidb::FunctionDescription("dcast", list_of("string")("uint32"), "uint32", &dcast<uint32_t> ));
-static scidb::UserDefinedFunction dcast_uint16 (scidb::FunctionDescription("dcast", list_of("string")("uint16"), "uint16", &dcast<uint16_t> ));
-static scidb::UserDefinedFunction dcast_uint8 (scidb::FunctionDescription("dcast", list_of("string")("uint8"), "uint8", &dcast<uint8_t> ));
+static scidb::UserDefinedFunction dcast_double (scidb::FunctionDescription("dcast", list_of("string")("double"),  "double", &dcast<double,   false> ));
+static scidb::UserDefinedFunction dcast_float  (scidb::FunctionDescription("dcast", list_of("string")("float"),   "float",  &dcast<float,    false> ));
+static scidb::UserDefinedFunction dcast_bool   (scidb::FunctionDescription("dcast", list_of("string")("bool"),    "bool",   &dcast<bool,     false> ));
+static scidb::UserDefinedFunction dcast_int64  (scidb::FunctionDescription("dcast", list_of("string")("int64"),   "int64" , &dcast<int64_t,  false> ));
+static scidb::UserDefinedFunction dcast_int32  (scidb::FunctionDescription("dcast", list_of("string")("int32"),   "int32",  &dcast<int32_t,  false> ));
+static scidb::UserDefinedFunction dcast_int16  (scidb::FunctionDescription("dcast", list_of("string")("int16"),   "int16",  &dcast<int16_t,  false> ));
+static scidb::UserDefinedFunction dcast_uint64 (scidb::FunctionDescription("dcast", list_of("string")("uint64"),  "uint64", &dcast<uint64_t, false> ));
+static scidb::UserDefinedFunction dcast_uint32 (scidb::FunctionDescription("dcast", list_of("string")("uint32"),  "uint32", &dcast<uint32_t, false> ));
+static scidb::UserDefinedFunction dcast_uint16 (scidb::FunctionDescription("dcast", list_of("string")("uint16"),  "uint16", &dcast<uint16_t, false> ));
+static scidb::UserDefinedFunction dcast_uint8  (scidb::FunctionDescription("dcast", list_of("string")("uint8"),   "uint8",  &dcast<uint8_t,  true>  ));
+static scidb::UserDefinedFunction dcast_int8   (scidb::FunctionDescription("dcast", list_of("string")("int8"),    "int8",   &dcast<int8_t,   true>  ));
+
+// XXX this gives a wrong result when
 
 // XXX How to add datetime conversion here? The naive approach:
 //static scidb::UserDefinedFunction dcast_datetimetz (scidb::FunctionDescription("dcast", list_of("string")("datetimetz"), "datetimetz", &dcast<datetimetz> ));
 // doesn't work!
 
-/**
- * first argument: the string to trim
- * second argument: a set of characters to trim, represented as another string {S}
- * returns: the first argument with all occurrences of any of the characters in S removed from the beginning or end of the string
- */
+//in some rare cases, on older versions, string values are not null-terminated; we aim to be nice
+string get_null_terminated_string(char const* input, size_t const size)
+{
+    if(size == 0)
+    {
+        return string("");
+    }
+    else if (input[size-1] != 0)
+    {
+        return string(input, size);
+    }
+    else
+    {
+        return string(input);
+    }
+}
+
+static void trim_inner(string& input, string const& characters, Value* res)
+{
+    trim_if(input, is_any_of(characters));
+    res->setString(input);
+}
+
+template <bool two_arg>
 static void trim (const Value** args, Value *res, void*)
 {
     if(args[0]->isNull())
     {
-      res->setNull(args[0]->getMissingReason());
-      return;
-    }
-    const char* input = args[0]->getString();
-    size_t inputLen = args[0]->size();
-    const char* chars = args[1]->getString();
-    size_t charsLen = args[1]->size();
-    if (charsLen == 0 || (charsLen ==1 && chars[0]==0))
-    {
-        res->setSize(inputLen);
-        memcpy(res->data(), input, inputLen);
+        res->setNull(args[0]->getMissingReason());
         return;
     }
-    const char* start = input;
-    for(size_t i=0; i<inputLen; ++i)
+    string characters = " ";
+    if(two_arg)
     {
-        char ch = input[i];
-        if(ch==0)
+        if(args[1]->isNull())
         {
-            break;
+            res->setNull(0);
+            return;
         }
-        bool match = false;
-        for(size_t j=0; j<charsLen; ++j)
-        {
-            if(ch == chars[j])
-            {
-                match =true;
-                break;
-            }
-        }
-        if(!match)
-        {
-            break;
-        }
-        ++start;
+        characters = get_null_terminated_string(args[1]->getString(), args[1]->size());
     }
-    const char* end = input + inputLen - 1;
-    for(ssize_t i = inputLen-1; i>=0; --i)
-    {
-        char ch = input[i];
-        if(ch==0)
-        {
-            continue;
-        }
-        bool match = false;
-        for(size_t j=0; j<charsLen; ++j)
-        {
-            if(ch == chars[j])
-            {
-                match =true;
-                break;
-            }
-        }
-        if(!match)
-        {
-            break;
-        }
-        --end;
-    }
-    if (inputLen == 0 || (inputLen ==1 && input[0]==0) || start >= end)
-    {
-        res->setSize(1);
-        ((char *) res->data())[0]=0;
-        return;
-    }
-    size_t size = end - start + 1;
-    res->setSize(size);
-    memcpy(res->data(), start, (end-start));
-    ((char*)res->data())[size-1]=0;
+    string input = get_null_terminated_string(args[0]->getString(), args[0]->size());
+    trim_inner(input, characters, res);
 }
 
-static scidb::UserDefinedFunction trim_str (scidb::FunctionDescription("trim", list_of("string")("string"), "string", &trim ));
-
+static scidb::UserDefinedFunction trim_space (scidb::FunctionDescription("trim", list_of("string"),           "string", &trim<false> ));
+static scidb::UserDefinedFunction trim_str   (scidb::FunctionDescription("trim", list_of("string")("string"), "string", &trim<true> ));
 
 static void int_to_char (const Value** args, Value *res, void*)
 {
@@ -204,24 +179,6 @@ static void codify (const Value** args, Value *res, void*)
 
 static scidb::UserDefinedFunction asciify_str (scidb::FunctionDescription("codify", list_of("string"), "string", &codify ));
 
-//in some rare cases, on older versions, string values are not null-terminated; we aim to be nice
-string get_null_terminated_string(char const* input, size_t const size)
-{
-    if(size == 0)
-    {
-        return string("");
-    }
-    else if (input[size-1] != 0)
-    {
-        return string(input, size);
-    }
-    else
-    {
-        return string(input);
-    }
-}
-
-
 static void keyed_value( const Value** args, Value *res, void* )
 {
     if(args[0]->isNull())
@@ -256,7 +213,6 @@ static void keyed_value( const Value** args, Value *res, void* )
     (*res) = (*args[2]);
 }
 static scidb::UserDefinedFunction key_value_extract( scidb::FunctionDescription("keyed_value", list_of("string")("string")("string"), "string", &keyed_value));
-
 
 
 /**
