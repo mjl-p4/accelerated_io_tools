@@ -38,6 +38,23 @@ using namespace boost;
 using namespace boost::assign;
 using namespace scidb;
 
+//in some rare cases, on older versions, string values are not null-terminated; we aim to be nice
+string get_null_terminated_string(char const* input, size_t const size)
+{
+    if(size == 0)
+    {
+        return string("");
+    }
+    else if (input[size-1] != 0)
+    {
+        return string(input, size);
+    }
+    else
+    {
+        return string(input);
+    }
+}
+
 /**
  * DCAST: cast with default, does not throw an error. Tries to cast input to the appropriate type. If the cast fails,
  * returns the supplied default.
@@ -50,7 +67,7 @@ static void dcast(const Value** args, Value *res, void*)
       res->setNull(args[0]->getMissingReason());
       return;
   }
-  const char* s = args[0]->getString();
+  string s = get_null_terminated_string(args[0]->getString(), args[0]->size());
   try
   {
       T result;
@@ -58,7 +75,9 @@ static void dcast(const Value** args, Value *res, void*)
       {
           result = lexical_cast<T>(s);
       }
-      else
+      else //there's an extra coockalacka here because lexical_cast<uint8_t> resolves to lexical_cast<char>
+           //which turns an input like '6' to the corresponding ASCII character value (54). This is a workaround
+           //directly from the boost web page
       {
           result = numeric_cast <T> (lexical_cast<int32_t> (s));
       }
@@ -90,36 +109,9 @@ static scidb::UserDefinedFunction dcast_uint16 (scidb::FunctionDescription("dcas
 static scidb::UserDefinedFunction dcast_uint8  (scidb::FunctionDescription("dcast", list_of("string")("uint8"),   "uint8",  &dcast<uint8_t,  true>  ));
 static scidb::UserDefinedFunction dcast_int8   (scidb::FunctionDescription("dcast", list_of("string")("int8"),    "int8",   &dcast<int8_t,   true>  ));
 
-// XXX this gives a wrong result when
+// XXX To add a datetime conversion here, need to find a boost routine that does it, and/or replicate what parseDateTime (TypeSystem.cpp) does
 
-// XXX How to add datetime conversion here? The naive approach:
-//static scidb::UserDefinedFunction dcast_datetimetz (scidb::FunctionDescription("dcast", list_of("string")("datetimetz"), "datetimetz", &dcast<datetimetz> ));
-// doesn't work!
-
-//in some rare cases, on older versions, string values are not null-terminated; we aim to be nice
-string get_null_terminated_string(char const* input, size_t const size)
-{
-    if(size == 0)
-    {
-        return string("");
-    }
-    else if (input[size-1] != 0)
-    {
-        return string(input, size);
-    }
-    else
-    {
-        return string(input);
-    }
-}
-
-static void trim_inner(string& input, string const& characters, Value* res)
-{
-    trim_if(input, is_any_of(characters));
-    res->setString(input);
-}
-
-template <bool two_arg>
+template <bool trim_characters_supplied>
 static void trim (const Value** args, Value *res, void*)
 {
     if(args[0]->isNull())
@@ -128,7 +120,7 @@ static void trim (const Value** args, Value *res, void*)
         return;
     }
     string characters = " ";
-    if(two_arg)
+    if(trim_characters_supplied)
     {
         if(args[1]->isNull())
         {
@@ -138,7 +130,8 @@ static void trim (const Value** args, Value *res, void*)
         characters = get_null_terminated_string(args[1]->getString(), args[1]->size());
     }
     string input = get_null_terminated_string(args[0]->getString(), args[0]->size());
-    trim_inner(input, characters, res);
+    trim_if(input, is_any_of(characters));
+    res->setString(input);
 }
 
 static scidb::UserDefinedFunction trim_space (scidb::FunctionDescription("trim", list_of("string"),           "string", &trim<false> ));
@@ -214,30 +207,44 @@ static void keyed_value( const Value** args, Value *res, void* )
 }
 static scidb::UserDefinedFunction key_value_extract( scidb::FunctionDescription("keyed_value", list_of("string")("string")("string"), "string", &keyed_value));
 
-
-/**
- * Loosely based on https://github.com/slottad/scidb-genotypes/
- * Thanks to Douglas Slotta.
- * We find we are repeating some of the work and it might make sense to merge in more of that functionality
- */
-void num_csv(const scidb::Value** args, scidb::Value* res, void*)
+void char_count(const scidb::Value** args, scidb::Value* res, void*)
 {
-    if (args[0]->isNull())
+    if(args[0]->isNull())
     {
         res->setNull(args[0]->getMissingReason());
         return;
     }
-    string cell = get_null_terminated_string(args[0]->getString(), args[0]->size());
-    uint32_t count = 0;
-    if (!cell.empty())
+    string input =      get_null_terminated_string(args[0]->getString(), args[0]->size());
+    if(args[1]->isNull())
     {
-        count = 1 + std::count(cell.begin(), cell.end(), ',');
+        res->setNull(0);
+        return;
     }
-    res->setUint32(count);
+    string separator =  get_null_terminated_string(args[1]->getString(), args[1]->size());
+    if (separator.size() == 0)
+    {
+        res->setNull(1);
+        return;
+    }
+    size_t sepSize = separator.size();
+    uint32_t count = 0;
+    for (size_t i =0, s=input.size(); i<s; ++i) //XXX: is there a boost any_of splitter for this? One that does not require splitting?
+    {
+        for(size_t j=0; j<sepSize; ++j)
+        {
+            if(input[i] == separator[j])
+            {
+                ++count;
+                break;
+            }
+        }
+    }
+    res -> setUint32(count);
 }
-static scidb::UserDefinedFunction ncsv( scidb::FunctionDescription("num_csv", list_of("string"), "uint32", &num_csv));
+static scidb::UserDefinedFunction ntdv( scidb::FunctionDescription("char_count", list_of("string")("string"), "uint32", &char_count));
 
-void nth_csv(const scidb::Value** args, scidb::Value* res, void*)
+template <bool custom_separator>
+void nth_tdv(const scidb::Value** args, scidb::Value* res, void*)
 {
     if (args[0]->isNull())
     {
@@ -249,10 +256,25 @@ void nth_csv(const scidb::Value** args, scidb::Value* res, void*)
         res->setNull(0);
         return;
     }
+    string separator = ",";
+    if(custom_separator)
+    {
+       if(args[2]->isNull())
+       {
+           res->setNull(0);
+           return;
+       }
+       separator = get_null_terminated_string(args[2]->getString(), args[2]->size());
+       if(separator.size()==0)
+       {
+           res->setNull(0);
+           return;
+       }
+    }
     uint32_t n = args[1]->getUint32();
     string cell = get_null_terminated_string(args[0]->getString(), args[0]->size());
     vector<string> values;
-    split(values, cell, is_from_range(',', ','));
+    split(values, cell, is_any_of(separator));
     if (values.size() <= n)
     {
         res->setNull(0);
@@ -260,10 +282,11 @@ void nth_csv(const scidb::Value** args, scidb::Value* res, void*)
     }
     res->setString(values[n]);
 }
+static scidb::UserDefinedFunction ntcsv( scidb::FunctionDescription("nth_csv", list_of("string")("uint32"),           "string", &nth_tdv<false>));
+static scidb::UserDefinedFunction nttdv( scidb::FunctionDescription("nth_tdv", list_of("string")("uint32")("string"), "string", &nth_tdv<true>));
 
-static scidb::UserDefinedFunction ntcsv( scidb::FunctionDescription("nth_csv", list_of("string")("uint32"), "string", &nth_csv));
-
-void maxlen_csv(const scidb::Value** args, scidb::Value* res, void*)
+template <bool custom_separator>
+void maxlen_tdv(const scidb::Value** args, scidb::Value* res, void*)
 {
     if (args[0]->isNull())
     {
@@ -272,7 +295,22 @@ void maxlen_csv(const scidb::Value** args, scidb::Value* res, void*)
     }
     string cell = get_null_terminated_string(args[0]->getString(), args[0]->size());
     vector<string> values;
-    split(values, cell, is_from_range(',', ','));
+    string separator = ",";
+    if(custom_separator)
+    {
+       if(args[1]->isNull())
+       {
+           res->setNull(0);
+           return;
+       }
+       separator = get_null_terminated_string(args[1]->getString(), args[1]->size());
+       if(separator.size()==0)
+       {
+           res->setNull(0);
+           return;
+       }
+    }
+    split(values, cell, is_any_of(separator));
     uint32_t maxSize =0;
     for(size_t i=0, n=values.size(); i<n; ++i)
     {
@@ -282,8 +320,8 @@ void maxlen_csv(const scidb::Value** args, scidb::Value* res, void*)
     res->setUint32(maxSize);
 }
 
-static scidb::UserDefinedFunction mlcsv( scidb::FunctionDescription("maxlen_csv", list_of("string"), "uint32", &maxlen_csv));
-
+static scidb::UserDefinedFunction mlcsv( scidb::FunctionDescription("maxlen_csv", list_of("string"),           "uint32", &maxlen_tdv<false>));
+static scidb::UserDefinedFunction mltdv( scidb::FunctionDescription("maxlen_tdv", list_of("string")("string"), "uint32", &maxlen_tdv<true>));
 
 /**
  * arg0: FORMAT FIELD
@@ -338,5 +376,19 @@ static void extract_format_field( const Value **args, Value* res, void*) {
     memcpy(res->data(), &sampleField[start], (end-start));
     ((char*)res->data())[size-1]=0;
 }
-
 static scidb::UserDefinedFunction format_extract(scidb::FunctionDescription("format_extract", list_of("string")("string")("string"), "string", &extract_format_field));
+
+void toss(const scidb::Value** args, scidb::Value* res, void*)
+{
+    string error;
+    if(args[0]->isNull())
+    {
+        error = "null";
+    }
+    else
+    {
+        error = get_null_terminated_string(args[0]->getString(), args[0]->size());
+    }
+    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << error;
+}
+static scidb::UserDefinedFunction errortoss( scidb::FunctionDescription("throw", list_of("string"), "uint8", &toss));
