@@ -83,6 +83,60 @@ $ iquery -aq "store(parse(split('/tmp/testfile', 'lines_per_chunk=2'), 'num_attr
 ```
 There are only two possible non-null error values: "long" and "short" as shown above. Note we've stored this result into a temporary array where we can perform some data correction. Also note, we ingested the header line of the file "col1,...". However, we can easily filter() it out.
 
+### Split Columns along a Dimension
+Instead of creating an array with multiple attributes, we can create another dimension along which the columns are populated. The result chema will then be:
+```
+<a: string null>
+[source_instance_id=0:*,1,0, chunk_no=0:*,1,0, line_no=0:*,CS,0, attribute_no=0:{NA-1},NA,0]
+```
+where "NA" is the 'num_attributes' parameter as passed to the parse operator. Indeed, this is just another way to represent the same data. It's very efficient for loading large matrix-like data where all, or most of the columns are the same type. For example, this form is very useful when loading large multi-sample VCF files. To split columns along a new dimension like this, supply the argument 'split_on_dimension=1' to parse like so:
+```
+$ iquery -aq "parse(split('/tmp/testfile', 'lines_per_chunk=2'), 'num_attributes=3', 'split_on_dimension=1')"
+{source_instance_id,chunk_no,line_no,attribute_no} a
+{0,0,0,0} 'col1'
+{0,0,0,1} 'col2'
+{0,0,0,2} 'col3'
+{0,0,0,3} null
+{0,0,1,0} '"alex"'
+{0,0,1,1} '1'
+{0,0,1,2} '3.5'
+{0,0,1,3} null
+{0,1,0,0} '"b"ob"'
+{0,1,0,1} '2'
+{0,1,0,2} '4.8'
+{0,1,0,3} null
+{0,1,1,0} 'jake'
+{0,1,1,1} '4.0'
+{0,1,1,2} null
+{0,1,1,3} 'short'
+{0,2,0,0} 'random'
+{0,2,0,1} ''
+{0,2,0,2} '3.1'
+{0,2,0,3} 'long	"extra stuff"'
+{0,2,1,0} 'bill'
+{0,2,1,1} 'abc'
+{0,2,1,2} '9'
+{0,2,1,3} null
+{0,3,0,0} 'alice'
+{0,3,0,1} '4'
+{0,3,0,2} 'not_a_number'
+{0,3,0,3} null
+```
+
+We can then use an operator like slice to pick out the first column. 
+```
+$ iquery -aq "slice(parse(split('/tmp/testfile', 'lines_per_chunk=2'), 'num_attributes=3', 'split_on_dimension=1'), attribute_no, 0)"
+{source_instance_id,chunk_no,line_no} a
+{0,0,0} 'col1'
+{0,0,1} '"alex"'
+{0,1,0} '"b"ob"'
+{0,1,1} 'jake'
+{0,2,0} 'random'
+{0,2,1} 'bill'
+{0,3,0} 'alice'
+```
+We can even join the first few slices together build a partial multi-attribute representation (for example to pick out the first few columns of a VCF file).
+
 ### Where are the errors?
 We can easily find all the erroneous lines by filtering on the error attribute. We can also map these cells to the original line number in the file by using this simple formula. Remember: the number "2" is the chunk size we used during the load:
 ```
@@ -107,7 +161,7 @@ $ iquery -aq "project(apply(filter(tmp, not (line_no=0 and chunk_no=0)), da2, dc
 Note, the value at {0,1,1} was not present in the file and is thus "null". The value {0,3,0} was not castable, and we decided to use ?1 to differentiate.
 
 ### Some string utilities
-trim() can be used to remove all characters from a given list from the start and end of the given string:
+#### trim() removes specific characters from the beginning and end of a string:
 ```
 $ iquery -aq "project(apply(filter(tmp, not (line_no=0 and chunk_no=0)), ta0, trim(a0, '\"')), a0, ta0)"
 {source_instance_id,chunk_no,line_no} a0,ta0
@@ -127,9 +181,68 @@ $ iquery -aq "project(apply(filter(tmp, not (line_no=0 and chunk_no=0)), ta0, tr
 {0,2,1} 'bill','ill'
 {0,3,0} 'alice','alice'
 ```
-For more serious processing, consult the regular expression substitution routine provided in https://github.com/paradigm4/superfunpack
 
-codify() can be used to convert a given string to its ascii representation:
+#### char_count() counts the occurrences of a particular character or list of characters:
+```
+$ iquery -aq "apply(build(<val:string>[i=0:0,1,0], 'abc, def, xyz'), cc, char_count(val, 'x'))"
+{i} val,cc
+{0} 'abc, def, xyz',1
+
+$ iquery -aq "apply(build(<val:string>[i=0:0,1,0], 'abc, def, xyz'), cc, char_count(val, ','))"
+{i} val,cc
+{0} 'abc, def, xyz',2
+```
+
+#### nth_tdv() and nth_csv() extract a substring from a field that contains delimiters:
+```
+$ iquery -aq "apply(build(<val:string>[i=0:0,1,0], 'abc, def, xyz'), n, nth_csv(val, 0))"
+{i} val,n
+{0} 'abc, def, xyz','abc'
+
+$ iquery -aq "apply(build(<val:string>[i=0:0,1,0], 'abc, def, xyz'), n, nth_csv(val, 1))"
+{i} val,n
+{0} 'abc, def, xyz',' def'
+```
+nth_tdv lets you specify a delimiter other than a comma:
+```
+$ iquery -aq "apply(build(<val:string>[i=0:0,1,0], 'abc, def, xyz'), n, nth_tdv(val, 1, ' '))"
+{i} val,n
+{0} 'abc, def, xyz','def,'
+```
+Note the benefit of using small cross_joins to decompose compound fields.
+The iif is present to overcome a limitation in SciDB's logic that determines when an attribute can be nullable,
+the iif can be skipped if you know exactly how many fields there are:
+```
+$ iquery -aq "apply(cross_join(build(<val:string>[i=0:0,1,0], 'abc, def, xyz'), build(<x:int64>[j=0:3,4,0], j)), n, iif(nth_csv(val, j) is null, null, nth_csv(val,j)))"
+{i,j} val,x,n
+{0,0} 'abc, def, xyz',0,'abc'
+{0,1} 'abc, def, xyz',1,' def'
+{0,2} 'abc, def, xyz',2,' xyz'
+{0,3} 'abc, def, xyz',3,null
+```
+Similarly, maxlen_csv() and maxlen_tdv() first split a string along a delimiter but then return the length of the longest field as an integer. 
+
+####keyed_value() pulls values out of key-value lists
+It expects an input in the form of "KEY1=VALUE1;KEY2=VALUE2;.." and returns a value for a given key name. The third argument is a default to return when the key is not found:
+```
+$ iquery -aq "apply(build(<val:string>[i=0:0,1,0], 'LEN=43;WID=35.3'), l, double(keyed_value(val, 'LEN', null)), w, double(keyed_value(val, 'WID', null)))"
+{i} val,l,w
+{0} 'LEN=43;WID=35.3',43,35.3
+```
+
+####throw() terminates a query with an error if a particular condition is not met:
+```
+$ iquery -aq "apply(apply(build(<val:string>[i=0:0,1,0], 'LEN=43;WID=35.3'), l, double(keyed_value(val, 'LEN', null)), w, double(keyed_value(val, 'WID', null))), input_check, iif(w < 50, true, throw('Invalid Width')))"
+{i} val,l,w,input_check
+{0} 'LEN=43;WID=35.3',43,35.3,true
+
+$ iquery -aq "apply(apply(build(<val:string>[i=0:0,1,0], 'LEN=43;WID=35.3'), l, double(keyed_value(val, 'LEN', null)), w, double(keyed_value(val, 'WID', null))), input_check, iif(w < 30, true, throw('Invalid Width')))"
+SystemException in file: Functions.cpp function: toss line: 392
+Error id: scidb::SCIDB_SE_INTERNAL::SCIDB_LE_ILLEGAL_OPERATION
+Error description: Internal SciDB error. Illegal operation: Invalid Width
+```
+
+####codify() converts a given string to its ascii representation:
 ```
 $ iquery -aq "project(apply(tmp, ca0, codify(a0)), a0, ca0)"
 {source_instance_id,chunk_no,line_no} a0,ca0
@@ -141,15 +254,16 @@ $ iquery -aq "project(apply(tmp, ca0, codify(a0)), a0, ca0)"
 {0,2,1} 'bill','98|105|108|108|0|'
 {0,3,0} 'alice','97|108|105|99|101|0|'
 ```
+
+For an example of using regular expressions, consult the regular expression substitution routine provided in https://github.com/paradigm4/superfunpack
+
 ===
-Hopefully more enhancements coming soon!
 
 ## Installing the plug in
 
-You'll need SciDB installed, along with the SciDB development header packages.
-The names vary depending on your operating system type, but they are the
-package that have "-dev" in the name. You *don't* need the SciDB source code to
-compile and install this.
+You'll need SciDB installed. The easiest way to install and load the plugin is by using https://github.com/paradigm4/dev_tools
+
+Otherwise, you can build manually using the SciDB development header packages. The names vary depending on your operating system type, but they are the package that have "-dev" in the name. You *don't* need the SciDB source code to compile and install this.
 
 Run `make` and copy  `*.so` to the `lib/scidb/plugins`
 directory on each of your SciDB cluster nodes. Here is an example:
