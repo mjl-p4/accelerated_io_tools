@@ -57,7 +57,8 @@ public:
     FileSplitter(string const& filePath,
                  size_t numLinesPerBlock,
                  size_t bufferSize,
-                 char delimiter):
+                 char delimiter,
+                 int64_t header):
         _linesPerBlock(numLinesPerBlock),
         _bufferSize(bufferSize),
         _buffer(0),
@@ -76,6 +77,17 @@ public:
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "FileSplitter() cannot allocate memory";
         }
         _inputFile = fopen(filePath.c_str(), "r");
+        if(header>0)
+        {
+            char *line = NULL;
+            size_t linesize = 0;
+            ssize_t nread;
+            for(int64_t j=0; j<header && nread>=0; ++j)
+            {
+                nread = getdelim(&line, &linesize, (int)_delimiter, _inputFile);
+            }
+            free(line);
+        }
         if (_inputFile == NULL)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "FileSplitter() cannot open file";
@@ -195,7 +207,8 @@ public:
         _splitter(settings->getInputFilePath(),
                   settings->getLinesPerChunk(),
                   settings->getBufferSize(),
-                  settings->getDelimiter()),
+                  settings->getDelimiter(),
+                  settings->getHeader()),
          _chunkAddress(0, Coordinates(2,0)),
          _delimiter(settings->getDelimiter())
     {

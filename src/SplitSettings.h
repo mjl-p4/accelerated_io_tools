@@ -41,9 +41,11 @@ private:
     bool    _sourceInstanceIdSet;
     char    _delimiter;
     bool    _delimiterSet;
+    int64_t _header;
+    bool    _headerSet;
 
 public:
-    static const size_t MAX_PARAMETERS = 5;
+    static const size_t MAX_PARAMETERS = 6;
 
     SplitSettings(vector<shared_ptr<OperatorParam> > const& operatorParameters,
                  bool logical,
@@ -56,13 +58,16 @@ public:
        _sourceInstanceId(0),
        _sourceInstanceIdSet(false),
        _delimiter('\n'),
-       _delimiterSet(false)
+       _delimiterSet(false),
+       _header(0),
+       _headerSet(false)
     {
         string const inputFilePathHeader        = "input_file_path=";
         string const linesPerChunkHeader        = "lines_per_chunk=";
         string const bufferSizeHeader           = "buffer_size=";
         string const sourceInstanceIdHeader     = "source_instance_id=";
         string const delimiterHeader            = "delimiter=";
+        string const headerHeader               = "header=";
         size_t const nParams = operatorParameters.size();
         if (nParams > MAX_PARAMETERS)
         {   //assert-like exception. Caller should have taken care of this!
@@ -89,6 +94,17 @@ public:
                 string paramContent = parameterString.substr(inputFilePathHeader.size());
                 trim(paramContent);
                 _inputFilePath = paramContent;
+            }
+            else if (starts_with(parameterString, headerHeader))
+            {
+                if (_headerSet)
+                {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set the header multiple times";
+                }
+                string paramContent = parameterString.substr(headerHeader.size());
+                trim(paramContent);
+                _header = lexical_cast<int64_t>(paramContent);
+                _headerSet = true;
             }
             else if (starts_with(parameterString, linesPerChunkHeader))  //yeah, yeah it's a long function...
             {
@@ -233,6 +249,11 @@ public:
     char getDelimiter() const
     {
         return _delimiter;
+    }
+
+    int64_t getHeader() const
+    {
+        return _header;
     }
 };
 
