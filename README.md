@@ -35,6 +35,12 @@ Split reads from an absolute path (instance 0 only at the moment) and returns an
 ```
 <value:string> [source_instance_id = 0:*,1,0, chunk_no = 0:*,1,0]
 ```
+#### Optional split parameters
+
+ * `lines_per_chunk=n`   where n is a nonnegative integer value of delimited lines per array chunk, default is 1,000,000
+ * `delimiter=c` where c is a single character or escaped tab (\t) or newline (\n), defaults to newline
+ * `header=n`  where n is a nonnegative integer value of header lines to skip, defaults to 0.
+
 Note, value is a large string that stores an entire block of the file, 1 million lines by default - in a single chunk. The number of lines per chunk and the delimiter character can be passed as optional parameters:
 ```
 $ iquery -aq "split('/tmp/testfile', 'lines_per_chunk=2')"
