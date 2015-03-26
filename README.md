@@ -101,9 +101,9 @@ There are only two possible non-null error values: "long" and "short" as shown a
 Instead of creating an array with multiple attributes, we can create another dimension along which the columns are populated. The result chema will then be:
 ```
 <a: string null>
-[source_instance_id=0:*,1,0, chunk_no=0:*,1,0, line_no=0:*,CS,0, attribute_no=0:{NA-1},NA,0]
+[source_instance_id=0:*,1,0, chunk_no=0:*,1,0, line_no=0:*,CS,0, attribute_no=0:{NA},NA+1,0]
 ```
-where "NA" is the 'num_attributes' parameter as passed to the parse operator. Indeed, this is just another way to represent the same data. It's very efficient for loading large matrix-like data where all, or most of the columns are the same type. For example, this form is very useful when loading large multi-sample VCF files. To split columns along a new dimension like this, supply the argument 'split_on_dimension=1' to parse like so:
+where "NA" is the 'num_attributes' parameter as passed to the parse operator. Note, we use zero-based intexing and add one more value to contain the "error" status of each line. Indeed, this is just another way to represent the same data. It's very efficient for loading large matrix-like data where all, or most of the columns are the same type. For example, this form is very useful when loading large multi-sample VCF files. To split columns along a new dimension like this, supply the argument 'split_on_dimension=1' to parse like so:
 ```
 $ iquery -aq "parse(split('/tmp/testfile', 'lines_per_chunk=2'), 'num_attributes=3', 'split_on_dimension=1')"
 {source_instance_id,chunk_no,line_no,attribute_no} a
