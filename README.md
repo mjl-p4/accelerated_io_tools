@@ -35,11 +35,11 @@ Split reads from an absolute path (instance 0 only at the moment) and returns an
 ```
 <value:string> [source_instance_id = 0:*,1,0, chunk_no = 0:*,1,0]
 ```
-#### Optional split parameters
-
- * `lines_per_chunk=n`   where n is a nonnegative integer value of delimited lines per array chunk, default is 1,000,000
- * `delimiter=c` where c is a single character or escaped tab (\t) or newline (\n), defaults to newline
- * `header=n`  where n is a nonnegative integer value of header lines to skip, defaults to 0.
+####  Split parameters (all optional)
+Must be specified in string form; see examples below
+ * `lines_per_chunk=n`   where n is a nonnegative integer value of delimited lines per array chunk. Default is 1,000,000.
+ * `delimiter=c` where c is a single character or escaped tab (\t) newline (\n) or space. Default is newline.
+ * `header=n`  where n is a nonnegative integer value of header lines to skip. Default is 0.
 
 Note, value is a large string that stores an entire block of the file, 1 million lines by default - in a single chunk. The number of lines per chunk and the delimiter character can be passed as optional parameters:
 ```
@@ -75,7 +75,15 @@ After the file is split, it can be parsed into a desired number of attributes, a
 <a0:string null, a1:string null... aN:string null, error:string null> 
 [source_instance_id=0:*,1,0, chunk_no=0:*,1,0, line_no=0:*,CS,0]"
 ```
-The chunk size is passed as an argument and should match the lines per chunk used in the call to split(). The attribute "error" is always provided and populated with null, unless a particular line does not have the matching number of attributes:
+#### Parse parameters
+Must be specified in string form; see examples below
+ * `num_attributes=n`   required; n is a nonnegative integer value of the number of columns in the file
+ * `chunk_size=CS`  optional; CS is a nonnegative integer chunk size; must match the lines_per_chunk value used in split. Default is 1,000,000.
+ * `attribute_delimiter=d`  optional; d is a single character attribute that separates columns in the file, or escaped tab (\t), newline (\n) or space. Default is tab.
+ * `line_delimiter=l`  optional; n is single character that separates lines in the file, or escapted tab (\t), newline (\n) or space. Default is newline.
+ * `split_on_dimension=s` optional; s is either 0 or 1. If set to 1, the output schema will be single attribute and an extra dimension will be added along which columns are populated. Default is 0. See example below.
+
+The attribute "error" is always provided and populated with null, unless a particular line does not have the matching number of attributes:
 ```
 $ iquery -aq "store(parse(split('/tmp/testfile', 'lines_per_chunk=2'), 'num_attributes=3', 'chunk_size=2'), tmp)"
 {source_instance_id,chunk_no,line_no} a0,a1,a2,error
