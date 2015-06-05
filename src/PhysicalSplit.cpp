@@ -81,7 +81,7 @@ public:
         {
             char *line = NULL;
             size_t linesize = 0;
-            ssize_t nread;
+            ssize_t nread = 0;
             for(int64_t j=0; j<header && nread>=0; ++j)
             {
                 nread = getdelim(&line, &linesize, (int)_delimiter, _inputFile);

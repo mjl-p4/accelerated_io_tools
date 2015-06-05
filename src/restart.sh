@@ -8,7 +8,7 @@ mydir=`dirname $0`
 pushd $mydir
 
 SCIDB_INSTALL="/opt/scidb/14.12"
-make SCIDB_3RDPARTY=$SCIDB_INSTALL
+make SCIDB_3RDPARTY="/opt/scidb/14.12"
 
 scidb.py stopall $DBNAME 
 cp libload_tools.so ${SCIDB_INSTALL}/lib/scidb/plugins/

@@ -24,6 +24,7 @@
 #include <time.h>
 #include <errno.h>
 #include <vector>
+#include <stdlib.h>
 
 #include <boost/lexical_cast.hpp>
 #include <boost/assign.hpp>
@@ -55,61 +56,120 @@ string get_null_terminated_string(char const* input, size_t const size)
     }
 }
 
+enum conversion_type
+{
+    INTEGER = 0,
+    UINT64 = 1,
+    DOUBLE = 2,
+    BOOL   = 3
+};
+
 /**
  * DCAST: cast with default, does not throw an error. Tries to cast input to the appropriate type. If the cast fails,
  * returns the supplied default.
  */
-template <typename T, bool eight_bit>
-static void dcast(const Value** args, Value *res, void*)
+template <typename T, typename S, conversion_type C>
+static void dcast (const Value** args, Value* res, void*)
 {
-  if(args[0]->isNull())
-  {
-      res->setNull(args[0]->getMissingReason());
-      return;
-  }
-  string s = get_null_terminated_string(args[0]->getString(), args[0]->size());
-  try
-  {
-      T result;
-      if (!eight_bit)
-      {
-          result = lexical_cast<T>(s);
-      }
-      else //there's an extra coockalacka here because lexical_cast<uint8_t> resolves to lexical_cast<char>
-           //which turns an input like '6' to the corresponding ASCII character value (54). This is a workaround
-           //directly from the boost web page
-      {
-          result = numeric_cast <T> (lexical_cast<int32_t> (s));
-      }
-      res->set<T>(result);
-  }
-  catch(...)
-  {
-      Value const* def = args[1];
-      if(def->isNull())
-      {
-          res->setNull( def->getMissingReason());
-      }
-      else
-      {
-          res->set<T>(def->get<T>());
-      }
-  }
+    if(args[0]->isNull())
+    {
+        res->setNull(args[0]->getMissingReason());
+        return;
+    }
+    const char* start = args[0]->getString();
+    char* end = const_cast<char*> (start);
+    S val;
+    bool error = false;
+    if(C == INTEGER)
+    {
+        errno = 0;
+        val = strtoll(start,  &end, 10);
+        error = (errno != 0);
+    }
+    else if (C == DOUBLE)
+    {
+        errno = 0;
+        val = strtold(start, &end);
+        error = (errno != 0);
+    }
+    else if (C == UINT64)
+    {
+        //a case-specific coockalacka:
+        //strtoull will accept '-1' and happily convert it to a big number. We aim to avoid that.
+        //the solution is to quickly reject the conversion if the string contains a '-' anywhere
+        size_t i = 0;
+        while(start[i] != '\0')
+        {
+            if(start[i] == '-')
+            {
+                error = true;
+                break;
+            }
+            ++i;
+        }
+        if(!error)
+        {
+            errno = 0;
+            val = strtoull(start, &end, 10);
+            error = (errno != 0);
+        }
+    }
+    else //BOOL: accepts 0,F,N,NO,FALSE, or 1,T,Y,YES,TRUE (ignore case)
+    {
+        string str(start);
+        trim(str);
+        to_lower(str);
+        if ( str == "0" || str == "f" || str == "n" || str == "no" || str == "false")
+        {
+            res->set<bool>(false);
+            return;
+        }
+        else if (str == "1" || str == "t" || str == "y" || str == "yes" || str == "true")
+        {
+            res->set<bool>(true);
+            return;
+        }
+        error = true;
+        val   = false;
+    }
+    while( isspace(*end) )
+    {   ++end; }
+    T const min = std::numeric_limits<T>::min();
+    T const max = std::numeric_limits<T>::max();
+    if ( error          ||
+         *start == '\0' ||
+         *end   != '\0' ||
+         ((C == INTEGER) && val < min) ||
+         ((C == INTEGER) && val > max) )
+    {
+        Value const* def = args[1];
+        if(def->isNull())
+        {
+            res->setNull( def->getMissingReason() );
+        }
+        else
+        {
+            res->set<T>( def->get<T>() );
+        }
+    }
+    else
+    {
+        res->set<T>(static_cast<T>(val));
+    }
 }
 
-static scidb::UserDefinedFunction dcast_double (scidb::FunctionDescription("dcast", list_of("string")("double"),  "double", &dcast<double,   false> ));
-static scidb::UserDefinedFunction dcast_float  (scidb::FunctionDescription("dcast", list_of("string")("float"),   "float",  &dcast<float,    false> ));
-static scidb::UserDefinedFunction dcast_bool   (scidb::FunctionDescription("dcast", list_of("string")("bool"),    "bool",   &dcast<bool,     false> ));
-static scidb::UserDefinedFunction dcast_int64  (scidb::FunctionDescription("dcast", list_of("string")("int64"),   "int64" , &dcast<int64_t,  false> ));
-static scidb::UserDefinedFunction dcast_int32  (scidb::FunctionDescription("dcast", list_of("string")("int32"),   "int32",  &dcast<int32_t,  false> ));
-static scidb::UserDefinedFunction dcast_int16  (scidb::FunctionDescription("dcast", list_of("string")("int16"),   "int16",  &dcast<int16_t,  false> ));
-static scidb::UserDefinedFunction dcast_uint64 (scidb::FunctionDescription("dcast", list_of("string")("uint64"),  "uint64", &dcast<uint64_t, false> ));
-static scidb::UserDefinedFunction dcast_uint32 (scidb::FunctionDescription("dcast", list_of("string")("uint32"),  "uint32", &dcast<uint32_t, false> ));
-static scidb::UserDefinedFunction dcast_uint16 (scidb::FunctionDescription("dcast", list_of("string")("uint16"),  "uint16", &dcast<uint16_t, false> ));
-static scidb::UserDefinedFunction dcast_uint8  (scidb::FunctionDescription("dcast", list_of("string")("uint8"),   "uint8",  &dcast<uint8_t,  true>  ));
-static scidb::UserDefinedFunction dcast_int8   (scidb::FunctionDescription("dcast", list_of("string")("int8"),    "int8",   &dcast<int8_t,   true>  ));
-
-// XXX To add a datetime conversion here, need to find a boost routine that does it, and/or replicate what parseDateTime (TypeSystem.cpp) does
+static scidb::UserDefinedFunction dcast_double (scidb::FunctionDescription("dcast", list_of("string")("double"),  "double", &dcast<double,   double,   DOUBLE> ));
+static scidb::UserDefinedFunction dcast_float  (scidb::FunctionDescription("dcast", list_of("string")("float"),   "float",  &dcast<float,    double,   DOUBLE>  ));
+static scidb::UserDefinedFunction dcast_bool   (scidb::FunctionDescription("dcast", list_of("string")("bool"),    "bool",   &dcast<bool,     bool,     BOOL>    ));
+static scidb::UserDefinedFunction dcast_int64  (scidb::FunctionDescription("dcast", list_of("string")("int64"),   "int64" , &dcast<int64_t,  int64_t,  INTEGER> ));
+static scidb::UserDefinedFunction dcast_int32  (scidb::FunctionDescription("dcast", list_of("string")("int32"),   "int32",  &dcast<int32_t,  int64_t,  INTEGER> ));
+static scidb::UserDefinedFunction dcast_int16  (scidb::FunctionDescription("dcast", list_of("string")("int16"),   "int16",  &dcast<int16_t,  int64_t,  INTEGER> ));
+static scidb::UserDefinedFunction dcast_uint64 (scidb::FunctionDescription("dcast", list_of("string")("uint64"),  "uint64", &dcast<uint64_t, uint64_t, UINT64> ));
+static scidb::UserDefinedFunction dcast_uint32 (scidb::FunctionDescription("dcast", list_of("string")("uint32"),  "uint32", &dcast<uint32_t, int64_t,  INTEGER> ));
+static scidb::UserDefinedFunction dcast_uint16 (scidb::FunctionDescription("dcast", list_of("string")("uint16"),  "uint16", &dcast<uint16_t, int64_t,  INTEGER> ));
+static scidb::UserDefinedFunction dcast_uint8  (scidb::FunctionDescription("dcast", list_of("string")("uint8"),   "uint8",  &dcast<uint8_t,  int64_t,  INTEGER>  ));
+static scidb::UserDefinedFunction dcast_int8   (scidb::FunctionDescription("dcast", list_of("string")("int8"),    "int8",   &dcast<int8_t,   int64_t,  INTEGER>  ));
+// XXX To add a datetime conversion here, need to find a routine that does it, and/or replicate what parseDateTime (TypeSystem.cpp) does
 
 template <bool trim_characters_supplied>
 static void trim (const Value** args, Value *res, void*)
