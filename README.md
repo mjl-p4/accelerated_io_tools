@@ -174,6 +174,8 @@ $ iquery -aq "project(apply(filter(tmp, not (line_no=0 and chunk_no=0)), da2, dc
 ```
 Note, the value at {0,1,1} was not present in the file and is thus "null". The value {0,3,0} was not castable, and we decided to use ?1 to differentiate.
 
+dcast ignores any whitespace preceding or following the numeric value. When converting to an unsigned type, a negative input is considered non-convertible and the supplied defaul is returned. An input out of range is also considered non-convertible for integers (overflow will not happen). When converting to float or double, all ranges of values are supported but inf or -inf may be returned if the input exceeds machine limits. When converting to bool, values of 0,N,NO,F,FALSE or 1,Y,YES,T,TRUE (ignore case) are supported. Internally strtod, strtoll, strtoull are used - see those routines for details on locale sensitivity and what "whitespace" means.
+
 ### Some string utilities
 #### trim() removes specific characters from the beginning and end of a string:
 ```
