@@ -19,6 +19,7 @@
 * END_COPYRIGHT
 */
 
+
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <query/Operator.h>
@@ -32,24 +33,33 @@ namespace scidb
 class SplitSettings
 {
 private:
-    string  _inputFilePath;
-    int64_t _linesPerChunk;
-    bool    _linesPerChunkSet;
-    int64_t _bufferSize;
-    bool    _bufferSizeSet;
-    int64_t _sourceInstanceId;
-    bool    _sourceInstanceIdSet;
-    char    _delimiter;
-    bool    _delimiterSet;
-    int64_t _header;
-    bool    _headerSet;
+
+	bool            _singlepath;
+	bool            _multiplepath;
+	string          _inputFilePath;
+    vector<string>  _inputPaths;
+    vector<string>  _inputInstances;
+    int64_t         _instanceParse;
+    int64_t         _linesPerChunk;
+    bool            _linesPerChunkSet;
+    int64_t         _bufferSize;
+    bool            _bufferSizeSet;
+    int64_t         _sourceInstanceId;
+    bool            _sourceInstanceIdSet;
+    char            _delimiter;
+    bool            _delimiterSet;
+    int64_t         _header;
+    bool            _headerSet;
 
 public:
-    static const size_t MAX_PARAMETERS = 6;
+    static const size_t MAX_PARAMETERS = 7;
 
     SplitSettings(vector<shared_ptr<OperatorParam> > const& operatorParameters,
                  bool logical,
                  shared_ptr<Query>& query):
+       _singlepath(false),
+	   _multiplepath(false),
+	   _instanceParse(-1),
        _inputFilePath(""),
        _linesPerChunk(1000000),
        _linesPerChunkSet(false),
@@ -63,11 +73,14 @@ public:
        _headerSet(false)
     {
         string const inputFilePathHeader        = "input_file_path=";
+        string const inputPathsHeader           = "paths=";
+        string const inputInstancesHeader       = "instances=";
         string const linesPerChunkHeader        = "lines_per_chunk=";
         string const bufferSizeHeader           = "buffer_size=";
         string const sourceInstanceIdHeader     = "source_instance_id=";
         string const delimiterHeader            = "delimiter=";
         string const headerHeader               = "header=";
+
         size_t const nParams = operatorParameters.size();
         if (nParams > MAX_PARAMETERS)
         {   //assert-like exception. Caller should have taken care of this!
@@ -87,13 +100,56 @@ public:
             }
             if      (starts_with(parameterString, inputFilePathHeader))
             {
+
                 if (_inputFilePath != "")
                 {
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set the input file path multiple times";
                 }
+
                 string paramContent = parameterString.substr(inputFilePathHeader.size());
                 trim(paramContent);
+                _singlepath = true;
                 _inputFilePath = paramContent;
+            }
+            else if  (starts_with(parameterString, inputPathsHeader))
+            {
+            	/*if (_inputPaths != "")
+            	{
+            		throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set the input file path multiple times";
+            	}
+            	*/
+            	string paramContent = parameterString.substr(inputPathsHeader.size());
+            	trim(paramContent);
+            	char delimiter=';';
+            	vector<string> internal;
+            	stringstream ss(paramContent); // Turn the string into a stream.
+            	string tok;
+
+                _multiplepath = true;
+            	  while(getline(ss, tok, delimiter)) {
+            		  _inputPaths.push_back(tok);
+            	  }
+
+            }
+            else if  (starts_with(parameterString, inputInstancesHeader))
+            {
+            	/*if (_inputInstances != "")
+            	{
+            		throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set the input file path multiple times";
+            	}
+                */
+            	string paramContent = parameterString.substr(inputPathsHeader.size());
+            	trim(paramContent);
+
+            	char delimiter=';';
+            	vector<string> internal;
+            	stringstream ss(paramContent); // Turn the string into a stream.
+            	string tok;
+
+            	  while(getline(ss, tok, delimiter)) {
+            		  _inputInstances.push_back(tok);
+            	  }
+
             }
             else if (starts_with(parameterString, headerHeader))
             {
@@ -217,14 +273,57 @@ public:
                 }
                 string path = parameterString;
                 trim(path);
-                _inputFilePath = path;
+                _singlepath     = true;
+                _inputFilePath  = path;
             }
         }
-        if (_inputFilePath == "")
+
+        if(_multiplepath)
         {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "input file path was not provided";
+        	if(_inputInstances.size() != _inputPaths.size())
+        	{
+        		throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Number of paths do not equal the number of instances.";
+            }
+
+        	set<string>uniqueInstances;
+        	std::set<std::string> s(_inputInstances.begin(), _inputInstances.end());
+
+        	if(s.size() !=  _inputPaths.size())
+        	{
+        		throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Input instances were not unique.";
+        	}
+
+        	if (_singlepath == true)
+        	{
+        		throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Both single path and multiple path were declared.";
+        	}
+        	string instanceid = boost::lexical_cast<std::string>(query->getInstanceID());
+
+
+        	std::vector<string>::iterator it = std::find(_inputInstances.begin(), _inputInstances.end(), instanceid);
+
+        	if (it == _inputInstances.end())
+        	{
+        	  //Instance not in vector
+        	  _instanceParse = -1;
+        	}
+        	//else
+        	{
+        	    int64_t index = std::distance(_inputInstances.begin(), it);
+
+        	   _instanceParse = boost::lexical_cast<int64_t>(*it);
+        	   _inputFilePath = _inputPaths[index];
+
+        	}
+
         }
+
     }
+
+    int64_t const& getParseInstance() const
+        {
+            return _instanceParse;
+        }
 
     string const& getInputFilePath() const
     {

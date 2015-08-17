@@ -58,6 +58,6 @@ public:
 
 };
 
-REGISTER_LOGICAL_OPERATOR_FACTORY(LogicalSplit, "split");
+REGISTER_LOGICAL_OPERATOR_FACTORY(LogicalSplit, "genx");
 
 } // emd namespace scidb

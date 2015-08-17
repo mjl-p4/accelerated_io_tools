@@ -399,12 +399,17 @@ public:
     boost::shared_ptr< Array> execute(std::vector< boost::shared_ptr< Array> >& inputArrays, boost::shared_ptr<Query> query)
     {
         shared_ptr<SplitSettings> settings (new SplitSettings (_parameters, false, query));
-        if (settings->getSourceInstanceId() != 0)
+
+        /*
+          if (settings->getSourceInstanceId() != 0)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "PhysicalSplit::execute internal error";
         }
+        */
+
         shared_ptr<Array> result;
-        if(query->getInstanceID() == 0)
+
+        if(query->getInstanceID() == settings->getParseInstance())
         {
             result = shared_ptr<FileSplitArray>(new FileSplitArray(_schema, query, settings));
         }
@@ -418,7 +423,7 @@ public:
     }
 };
 
-REGISTER_PHYSICAL_OPERATOR_FACTORY(PhysicalSplit, "split", "PhysicalSplit");
+REGISTER_PHYSICAL_OPERATOR_FACTORY(PhysicalSplit, "genx", "PhysicalSplit");
 
 
 } // end namespace scidb
