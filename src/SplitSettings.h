@@ -113,11 +113,11 @@ public:
             }
             else if  (starts_with(parameterString, inputPathsHeader))
             {
-            	/*if (_inputPaths != "")
+            	if (_inputPaths.size() > 0)
             	{
             		throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set the input file path multiple times";
             	}
-            	*/
+
             	string paramContent = parameterString.substr(inputPathsHeader.size());
             	trim(paramContent);
             	char delimiter=';';
@@ -133,11 +133,11 @@ public:
             }
             else if  (starts_with(parameterString, inputInstancesHeader))
             {
-            	/*if (_inputInstances != "")
+            	if (_inputInstances.size() > 0)
             	{
             		throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set the input file path multiple times";
             	}
-                */
+
             	string paramContent = parameterString.substr(inputInstancesHeader.size());
             	trim(paramContent);
 
@@ -277,7 +277,9 @@ public:
                 _inputFilePath  = path;
             }
         }
-        LOG4CXX_DEBUG(logger, "Beginning of multiplepath: "<< "1");
+
+        //LOG4CXX_DEBUG(logger, "Beginning of multiplepath: "<< "1");
+
         if(_multiplepath)
         {
         	if(_inputInstances.size() != _inputPaths.size())
@@ -299,30 +301,32 @@ public:
         	}
         	string instanceid = boost::lexical_cast<std::string>(query->getInstanceID());
 
-
         	std::vector<string>::iterator it = std::find(_inputInstances.begin(), _inputInstances.end(), instanceid);
-        	for (std::vector<string>::const_iterator i = _inputInstances.begin(); i != _inputInstances.end(); ++i)
+
+        	/*for (std::vector<string>::const_iterator i = _inputInstances.begin(); i != _inputInstances.end(); ++i)
         		LOG4CXX_DEBUG(logger, "multiplepath:inputInstances "<< *i << " ");
         	LOG4CXX_DEBUG(logger, "multiplepath:FIND "<< instanceid << " ");
+        	*/
+
         	if (it == _inputInstances.end())
         	{
-        	  //Instance not in vector
+        	  //Instance not in the input vector
         	  _instanceParse = -1;
         	}
         	else
         	{
         	    int64_t index = std::distance(_inputInstances.begin(), it);
 
-        	   _instanceParse    = boost::lexical_cast<int64_t>(*it);
-        	   _inputFilePath    = _inputPaths[index];
-        	   _sourceInstanceId =  query->getInstanceID();
+        	   _instanceParse       = boost::lexical_cast<int64_t>(*it);
+        	   _inputFilePath       = _inputPaths[index];
+        	   _sourceInstanceId    =  query->getInstanceID();
         	   _sourceInstanceIdSet = true;
         	   LOG4CXX_DEBUG(logger, "multiplepath:Log file: " << _instanceParse << "" << _inputFilePath << "sourceinstanceid" << _sourceInstanceId);
         	}
 
-        	LOG4CXX_DEBUG(logger, "multiplepath:For "<< "1");
+        	//LOG4CXX_DEBUG(logger, "multiplepath:For "<< "1");
         }
-            LOG4CXX_DEBUG(logger, "End of multiplepath: "<< "1");
+            //LOG4CXX_DEBUG(logger, "End of multiplepath: "<< "1");
     }
 
     int64_t const& getParseInstance() const

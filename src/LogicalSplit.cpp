@@ -53,11 +53,11 @@ public:
         vector<DimensionDesc> dimensions(2);
         dimensions[0] = DimensionDesc("source_instance_id", 0, 0, MAX_COORDINATE, MAX_COORDINATE, 1, 0);
         dimensions[1] = DimensionDesc("chunk_no",    0, 0, MAX_COORDINATE, MAX_COORDINATE, 1, 0);
-        return ArrayDesc("genx", attributes, dimensions);
+        return ArrayDesc("multisplit", attributes, dimensions);
     }
 
 };
 
-REGISTER_LOGICAL_OPERATOR_FACTORY(LogicalSplit, "genx");
+REGISTER_LOGICAL_OPERATOR_FACTORY(LogicalSplit, "multisplit");
 
 } // emd namespace scidb

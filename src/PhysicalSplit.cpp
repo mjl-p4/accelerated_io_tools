@@ -425,7 +425,7 @@ public:
     }
 };
 
-REGISTER_PHYSICAL_OPERATOR_FACTORY(PhysicalSplit, "genx", "PhysicalSplit");
+REGISTER_PHYSICAL_OPERATOR_FACTORY(PhysicalSplit, "multisplit", "PhysicalSplit");
 
 
 } // end namespace scidb
