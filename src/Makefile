@@ -29,7 +29,7 @@ LIBS=-shared -Wl,-soname,libload_tools.so -L. -L"$(SCIDB_THIRDPARTY_PREFIX)/3rdp
 
 all:
 	@if test ! -d "$(SCIDB)"; then echo  "Error. Try:\n\nmake SCIDB=<PATH TO SCIDB INSTALL PATH>"; exit 1; fi
-	$(CXX) $(CFLAGS) $(INC) -o libgenx.so plugin.cpp LogicalSplit.cpp PhysicalSplit.cpp Functions.cpp $(LIBS)
+	$(CXX) $(CFLAGS) $(INC) -o libmultisplit.so plugin.cpp LogicalSplit.cpp PhysicalSplit.cpp Functions.cpp $(LIBS)
 	@echo "Now copy *.so to your SciDB lib/scidb/plugins directory and run"
 	@echo "iquery -aq \"load_library('load_tools')\" # to load the plugin."
 	@echo
