@@ -209,10 +209,12 @@ public:
                   settings->getBufferSize(),
                   settings->getDelimiter(),
                   settings->getHeader()),
-         _chunkAddress(0, Coordinates(2,0)),
+				  _chunkAddress(0, Coordinates(2,0)),
          _delimiter(settings->getDelimiter())
     {
-        _buffer = _splitter.getBlock(_bufferSize);
+
+    	_chunkAddress.coords[0] = settings->getParseInstance();
+    	_buffer = _splitter.getBlock(_bufferSize);
     }
 
     virtual bool end()
@@ -408,7 +410,7 @@ public:
         */
 
         shared_ptr<Array> result;
-
+        LOG4CXX_DEBUG(logger, "multiplepath:PHYSICAL "<< query->getInstanceID()  << " " << settings->getParseInstance());
         if(query->getInstanceID() == settings->getParseInstance())
         {
             result = shared_ptr<FileSplitArray>(new FileSplitArray(_schema, query, settings));
