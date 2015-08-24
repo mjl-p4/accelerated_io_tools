@@ -19,13 +19,16 @@
 * END_COPYRIGHT
 */
 
-
+#include <algorithm>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/filesystem.hpp>
 #include <query/Operator.h>
 
 #ifndef SPLIT_SETTINGS
 #define SPLIT_SETTINGS
+
+using namespace boost::filesystem;
 
 namespace scidb
 {
@@ -38,7 +41,7 @@ private:
 	bool            _multiplepath;
 	string          _inputFilePath;
     vector<string>  _inputPaths;
-    vector<string>  _inputInstances;
+    vector<int64_t>  _inputInstances;
     int64_t         _instanceParse;
     int64_t         _linesPerChunk;
     bool            _linesPerChunkSet;
@@ -147,7 +150,7 @@ public:
             	string tok;
 
             	  while(getline(ss, tok, delimiter)) {
-            		  _inputInstances.push_back(tok);
+            		  _inputInstances.push_back(lexical_cast<int64_t>(tok));
             	  }
 
             }
@@ -173,7 +176,7 @@ public:
                 try
                 {
                     _linesPerChunk = lexical_cast<int64_t>(paramContent);
-                    if(_linesPerChunk<=0)
+                    if(_linesPerChunk <=0 )
                     {
                         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "lines_per_chunk must be positive";
                     }
@@ -288,7 +291,7 @@ public:
             }
 
         	set<string>uniqueInstances;
-        	std::set<std::string> s(_inputInstances.begin(), _inputInstances.end());
+        	std::set<int64_t> s(_inputInstances.begin(), _inputInstances.end());
         	LOG4CXX_DEBUG(logger, "multiplepath:Unique "<< s.size() << " " << _inputPaths.size());
         	if(s.size() !=  _inputPaths.size())
         	{
@@ -299,34 +302,107 @@ public:
         	{
         		throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Both single path and multiple path were declared.";
         	}
-        	string instanceid = boost::lexical_cast<std::string>(query->getInstanceID());
+        	int64_t instanceid = query->getInstanceID();
 
-        	std::vector<string>::iterator it = std::find(_inputInstances.begin(), _inputInstances.end(), instanceid);
-
-        	/*for (std::vector<string>::const_iterator i = _inputInstances.begin(); i != _inputInstances.end(); ++i)
-        		LOG4CXX_DEBUG(logger, "multiplepath:inputInstances "<< *i << " ");
-        	LOG4CXX_DEBUG(logger, "multiplepath:FIND "<< instanceid << " ");
-        	*/
-
-        	if (it == _inputInstances.end())
+        	//if "paths=" specifies an absolute path...
+        	std::vector<int64_t>::iterator itrel = std::find(_inputInstances.begin(), _inputInstances.end(), -1);
+        	//only take a -1 relative path if every instance is set to do this.
+        	if((_inputInstances.size()==1) && (itrel != _inputInstances.end()))
         	{
-        	  //Instance not in the input vector
-        	  _instanceParse = -1;
+
+        		bool relfilefound = false; // bool to answer, did we find a relative path file?
+        		int64_t index = std::distance(_inputInstances.begin(), itrel);
+
+        		string relinputpath  = _inputPaths[index];
+        		_sourceInstanceId    = query->getInstanceID();
+        		_sourceInstanceIdSet = true;
+        		_instanceParse       = query->getInstanceID();
+        		try
+        		{
+        			path p (relinputpath);
+        			directory_iterator end_itr;
+        			// cycle through the directory
+        			for (directory_iterator itr(p); itr != end_itr; ++itr)
+        			{
+        				// If it's not a directory, list it. If you want to list directories too, just remove this check.
+        				if (is_regular_file(itr->path()))
+        				{
+        					//use the first file found in directory
+        					relfilefound    = true;
+        					_inputFilePath  = itr->path().string();
+        					LOG4CXX_DEBUG(logger, "relative path file:"<< _inputFilePath << ";");
+        					break;
+        				}
+        			}
+        		}
+        		catch(std::exception const&  ex)
+        		{
+        			throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Directory specified is not a directory or other boost path related error:" << ex.what();
+        		}
+
+        		if(relfilefound == false)
+        		{
+        			LOG4CXX_DEBUG(logger, "relative path file was not found in the directory:"<< relinputpath << ";");
+        			_inputFilePath = "";
+        			_instanceParse = -1;
+
+        			//set instance to -1 because it will not be reading a file, but will be taking part in the redistribute
+        		}
+
         	}
         	else
         	{
-        	    int64_t index = std::distance(_inputInstances.begin(), it);
+        		/*if((_inputInstances.size() > 1) && (itrel != _inputInstances.end()))
+        		{
+        			throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Relative path specified with list of absolute paths";
+        		}
+                */
 
-        	   _instanceParse       = boost::lexical_cast<int64_t>(*it);
-        	   _inputFilePath       = _inputPaths[index];
-        	   _sourceInstanceId    =  query->getInstanceID();
-        	   _sourceInstanceIdSet = true;
-        	   LOG4CXX_DEBUG(logger, "multiplepath:Log file: " << _instanceParse << "" << _inputFilePath << "sourceinstanceid" << _sourceInstanceId);
-        	}
+        		int numinstances = query->getInstancesCount()-1;
+        		if (std::find_if (_inputInstances.begin(), _inputInstances.end() , bind2nd(greater<int64_t>(),numinstances)) != _inputInstances.end())
+        		{
+        		   // yes, it contains at least one number greater than numinstaces
+        			throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "instance specified that is greater than numinstances for abs path";
+        		}
+        		if (std::find_if (_inputInstances.begin(), _inputInstances.end() , bind2nd(less<int64_t>(),0)) != _inputInstances.end())
+        		{
+        			// yes, it contains at least one number greater than numinstaces
+        			throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "instance specified that is less than 0 for abs path";
+        		}
 
+
+        		std::vector<int64_t>::iterator it = std::find(_inputInstances.begin(), _inputInstances.end(), instanceid);
+        		/*for (std::vector<string>::const_iterator i = _inputInstances.begin(); i != _inputInstances.end(); ++i)
+        		   LOG4CXX_DEBUG(logger, "multiplepath:inputInstances "<< *i << " ");
+        	       LOG4CXX_DEBUG(logger, "multiplepath:FIND "<< instanceid << " ");
+        		 */
+
+        		if (it == _inputInstances.end())
+        		{
+        			//Instance not in the input vector
+        			_instanceParse = -1;
+        			LOG4CXX_DEBUG(logger, "_inputInstance - Instance not in the input vector - setting -1");
+        		}
+        		else
+        		{
+        			int64_t index = std::distance(_inputInstances.begin(), it);
+
+        			_instanceParse       = boost::lexical_cast<int64_t>(*it);
+        			_inputFilePath       = _inputPaths[index];
+
+        			if (is_regular_file(_inputFilePath)!= true)
+        			{
+        				throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "A folder was specified and not a file for absolute path";
+        			}
+
+        			_sourceInstanceId    =  query->getInstanceID();
+        			_sourceInstanceIdSet = true;
+        			LOG4CXX_DEBUG(logger, "multiplepath:Log file: " << _instanceParse << "" << _inputFilePath << "sourceinstanceid" << _sourceInstanceId);
+        		}
+        	}//if paths are relative or absolute
         	//LOG4CXX_DEBUG(logger, "multiplepath:For "<< "1");
-        }
-            //LOG4CXX_DEBUG(logger, "End of multiplepath: "<< "1");
+        }//if "paths=" is defined as an arguments, multiplepath = true
+        //LOG4CXX_DEBUG(logger, "End of multiplepath: "<< "1");
     }
 
     int64_t const& getParseInstance() const
