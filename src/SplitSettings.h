@@ -28,31 +28,38 @@
 #ifndef SPLIT_SETTINGS
 #define SPLIT_SETTINGS
 
+#ifdef CPP11
+using std::shared_ptr;
+#else
+using boost::shared_ptr;
+#endif
+
+using boost::starts_with;
+using boost::lexical_cast;
+using boost::bad_lexical_cast;
 using namespace boost::filesystem;
+using namespace std;
 
 namespace scidb
 {
-static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.splitsettings"));
 class SplitSettings
 {
 private:
 
-	bool            _singlepath;
-	bool            _multiplepath;
-	string          _inputFilePath;
-    vector<string>  _inputPaths;
+    bool             _singlepath;
+    bool             _multiplepath;
+    string           _inputFilePath;
+    vector<string>   _inputPaths;
     vector<int64_t>  _inputInstances;
-    int64_t         _instanceParse;
-    int64_t         _linesPerChunk;
-    bool            _linesPerChunkSet;
-    int64_t         _bufferSize;
-    bool            _bufferSizeSet;
-    int64_t         _sourceInstanceId;
-    bool            _sourceInstanceIdSet;
-    char            _delimiter;
-    bool            _delimiterSet;
-    int64_t         _header;
-    bool            _headerSet;
+    int64_t          _instanceParse;
+    int64_t          _linesPerChunk;
+    bool             _linesPerChunkSet;
+    int64_t          _bufferSize;
+    bool             _bufferSizeSet;
+    char             _delimiter;
+    bool             _delimiterSet;
+    int64_t          _header;
+    bool             _headerSet;
 
 public:
     static const size_t MAX_PARAMETERS = 7;
@@ -61,15 +68,13 @@ public:
                  bool logical,
                  shared_ptr<Query>& query):
        _singlepath(false),
-	   _multiplepath(false),
-	   _instanceParse(-1),
+       _multiplepath(false),
        _inputFilePath(""),
+       _instanceParse(-1),
        _linesPerChunk(1000000),
        _linesPerChunkSet(false),
        _bufferSize(10*1024*1024),
        _bufferSizeSet(false),
-       _sourceInstanceId(0),
-       _sourceInstanceIdSet(false),
        _delimiter('\n'),
        _delimiterSet(false),
        _header(0),
@@ -80,10 +85,10 @@ public:
         string const inputInstancesHeader       = "instances=";
         string const linesPerChunkHeader        = "lines_per_chunk=";
         string const bufferSizeHeader           = "buffer_size=";
-        string const sourceInstanceIdHeader     = "source_instance_id=";
         string const delimiterHeader            = "delimiter=";
         string const headerHeader               = "header=";
 
+        int64_t const myInstanceId = query->getInstanceID();
         size_t const nParams = operatorParameters.size();
         if (nParams > MAX_PARAMETERS)
         {   //assert-like exception. Caller should have taken care of this!
@@ -103,56 +108,50 @@ public:
             }
             if      (starts_with(parameterString, inputFilePathHeader))
             {
-
                 if (_inputFilePath != "")
                 {
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set the input file path multiple times";
                 }
-
                 string paramContent = parameterString.substr(inputFilePathHeader.size());
-                trim(paramContent);
+                boost::algorithm::trim(paramContent);
                 _singlepath = true;
                 _inputFilePath = paramContent;
+                _instanceParse = 0;
             }
             else if  (starts_with(parameterString, inputPathsHeader))
             {
-            	if (_inputPaths.size() > 0)
-            	{
-            		throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set the input file path multiple times";
-            	}
-
-            	string paramContent = parameterString.substr(inputPathsHeader.size());
-            	trim(paramContent);
-            	char delimiter=';';
-            	vector<string> internal;
-            	stringstream ss(paramContent); // Turn the string into a stream.
-            	string tok;
-
+                if (_inputPaths.size() > 0)
+                {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set the input file paths multiple times";
+                }
+                string paramContent = parameterString.substr(inputPathsHeader.size());
+                boost::algorithm::trim(paramContent);
+                char delimiter=';';
+                vector<string> internal;
+                stringstream ss(paramContent); // Turn the string into a stream.
+                string tok;
                 _multiplepath = true;
-            	  while(getline(ss, tok, delimiter)) {
-            		  _inputPaths.push_back(tok);
-            	  }
-
+                while(getline(ss, tok, delimiter)) 
+                {
+                    _inputPaths.push_back(tok);
+                }
             }
             else if  (starts_with(parameterString, inputInstancesHeader))
             {
-            	if (_inputInstances.size() > 0)
-            	{
-            		throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set the input file path multiple times";
-            	}
-
-            	string paramContent = parameterString.substr(inputInstancesHeader.size());
-            	trim(paramContent);
-
-            	char delimiter=';';
-            	vector<string> internal;
-            	stringstream ss(paramContent); // Turn the string into a stream.
-            	string tok;
-
-            	  while(getline(ss, tok, delimiter)) {
-            		  _inputInstances.push_back(lexical_cast<int64_t>(tok));
-            	  }
-
+                if (_inputInstances.size() > 0)
+                {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set the input instances multiple times";
+                }
+                string paramContent = parameterString.substr(inputInstancesHeader.size());
+                boost::algorithm::trim(paramContent);
+                char delimiter=';';
+                vector<string> internal;
+                stringstream ss(paramContent); // Turn the string into a stream.
+                string tok;
+                while(getline(ss, tok, delimiter)) 
+                {
+                    _inputInstances.push_back(lexical_cast<int64_t>(tok));
+                }
             }
             else if (starts_with(parameterString, headerHeader))
             {
@@ -161,7 +160,7 @@ public:
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set the header multiple times";
                 }
                 string paramContent = parameterString.substr(headerHeader.size());
-                trim(paramContent);
+                boost::algorithm::trim(paramContent);
                 _header = lexical_cast<int64_t>(paramContent);
                 _headerSet = true;
             }
@@ -172,7 +171,7 @@ public:
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set lines_per_chunk multiple times";
                 }
                 string paramContent = parameterString.substr(linesPerChunkHeader.size());
-                trim(paramContent);
+                boost::algorithm::trim(paramContent);
                 try
                 {
                     _linesPerChunk = lexical_cast<int64_t>(paramContent);
@@ -194,7 +193,7 @@ public:
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set buffer_size multiple times";
                 }
                 string paramContent = parameterString.substr(bufferSizeHeader.size());
-                trim(paramContent);
+                boost::algorithm::trim(paramContent);
                 try
                 {
                     _bufferSize = lexical_cast<int64_t>(paramContent);
@@ -209,28 +208,6 @@ public:
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse buffer_size";
                 }
             }
-            else if (starts_with (parameterString, sourceInstanceIdHeader))
-            {
-                if(_sourceInstanceIdSet)
-                {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set source_instance_id multiple times";
-                }
-                string paramContent = parameterString.substr(sourceInstanceIdHeader.size());
-                trim(paramContent);
-                try
-                {
-                    _sourceInstanceId = lexical_cast<int64_t>(paramContent);
-                    if(_sourceInstanceId != 0)
-                    {
-                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "source_instance_id may only be 0 (for now)";
-                    }
-                    _sourceInstanceIdSet = true;
-                }
-                catch (bad_lexical_cast const& exn)
-                {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse source_instance_id";
-                }
-            }
             else if (starts_with(parameterString, delimiterHeader))
             {
                 if(_delimiterSet)
@@ -238,7 +215,7 @@ public:
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set delimiter multiple times";
                 }
                 string paramContent = parameterString.substr(delimiterHeader.size());
-                trim(paramContent);
+                boost::algorithm::trim(paramContent);
                 if (paramContent == "\\t")
                 {
                     _delimiter = '\t';
@@ -275,140 +252,66 @@ public:
                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set the input file path multiple times";
                 }
                 string path = parameterString;
-                trim(path);
+                boost::algorithm::trim(path);
                 _singlepath     = true;
                 _inputFilePath  = path;
+                _instanceParse  = 0;
             }
         }
-
-        //LOG4CXX_DEBUG(logger, "Beginning of multiplepath: "<< "1");
 
         if(_multiplepath)
         {
-        	if(_inputInstances.size() != _inputPaths.size())
-        	{
-        		throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Number of paths do not equal the number of instances.";
+            if(_inputInstances.size() != _inputPaths.size())
+            {
+                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Number of paths do not equal the number of instances.";
             }
-
-        	set<string>uniqueInstances;
-        	std::set<int64_t> s(_inputInstances.begin(), _inputInstances.end());
-        	LOG4CXX_DEBUG(logger, "multiplepath:Unique "<< s.size() << " " << _inputPaths.size());
-        	if(s.size() !=  _inputPaths.size())
-        	{
-        		throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Input instances were not unique.";
-        	}
-
-        	if (_singlepath == true)
-        	{
-        		throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Both single path and multiple path were declared.";
-        	}
-        	int64_t instanceid = query->getInstanceID();
-
-        	//if "paths=" specifies an absolute path...
-        	std::vector<int64_t>::iterator itrel = std::find(_inputInstances.begin(), _inputInstances.end(), -1);
-        	//only take a -1 relative path if every instance is set to do this.
-        	if((_inputInstances.size()==1) && (itrel != _inputInstances.end()))
-        	{
-
-        		bool relfilefound = false; // bool to answer, did we find a relative path file?
-        		int64_t index = std::distance(_inputInstances.begin(), itrel);
-
-        		string relinputpath  = _inputPaths[index];
-        		_sourceInstanceId    = query->getInstanceID();
-        		_sourceInstanceIdSet = true;
-        		_instanceParse       = query->getInstanceID();
-        		try
-        		{
-        			path p (relinputpath);
-        			directory_iterator end_itr;
-        			// cycle through the directory
-        			for (directory_iterator itr(p); itr != end_itr; ++itr)
-        			{
-        				// If it's not a directory, list it. If you want to list directories too, just remove this check.
-        				if (is_regular_file(itr->path()))
-        				{
-        					//use the first file found in directory
-        					relfilefound    = true;
-        					_inputFilePath  = itr->path().string();
-        					LOG4CXX_DEBUG(logger, "relative path file:"<< _inputFilePath << ";");
-        					break;
-        				}
-        			}
-        		}
-        		catch(std::exception const&  ex)
-        		{
-        			throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Directory specified is not a directory or other boost path related error:" << ex.what();
-        		}
-
-        		if(relfilefound == false)
-        		{
-        			LOG4CXX_DEBUG(logger, "relative path file was not found in the directory:"<< relinputpath << ";");
-        			_inputFilePath = "";
-        			_instanceParse = -1;
-
-        			//set instance to -1 because it will not be reading a file, but will be taking part in the redistribute
-        		}
-
-        	}
-        	else
-        	{
-        		/*if((_inputInstances.size() > 1) && (itrel != _inputInstances.end()))
-        		{
-        			throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Relative path specified with list of absolute paths";
-        		}
-                */
-
-        		int numinstances = query->getInstancesCount()-1;
-        		if (std::find_if (_inputInstances.begin(), _inputInstances.end() , bind2nd(greater<int64_t>(),numinstances)) != _inputInstances.end())
-        		{
-        		   // yes, it contains at least one number greater than numinstaces
-        			throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "instance specified that is greater than numinstances for abs path";
-        		}
-        		if (std::find_if (_inputInstances.begin(), _inputInstances.end() , bind2nd(less<int64_t>(),0)) != _inputInstances.end())
-        		{
-        			// yes, it contains at least one number greater than numinstaces
-        			throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "instance specified that is less than 0 for abs path";
-        		}
-
-
-        		std::vector<int64_t>::iterator it = std::find(_inputInstances.begin(), _inputInstances.end(), instanceid);
-        		/*for (std::vector<string>::const_iterator i = _inputInstances.begin(); i != _inputInstances.end(); ++i)
-        		   LOG4CXX_DEBUG(logger, "multiplepath:inputInstances "<< *i << " ");
-        	       LOG4CXX_DEBUG(logger, "multiplepath:FIND "<< instanceid << " ");
-        		 */
-
-        		if (it == _inputInstances.end())
-        		{
-        			//Instance not in the input vector
-        			_instanceParse = -1;
-        			LOG4CXX_DEBUG(logger, "_inputInstance - Instance not in the input vector - setting -1");
-        		}
-        		else
-        		{
-        			int64_t index = std::distance(_inputInstances.begin(), it);
-
-        			_instanceParse       = boost::lexical_cast<int64_t>(*it);
-        			_inputFilePath       = _inputPaths[index];
-
-        			if (is_regular_file(_inputFilePath)!= true)
-        			{
-        				throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "A folder was specified and not a file for absolute path";
-        			}
-
-        			_sourceInstanceId    =  query->getInstanceID();
-        			_sourceInstanceIdSet = true;
-        			LOG4CXX_DEBUG(logger, "multiplepath:Log file: " << _instanceParse << "" << _inputFilePath << "sourceinstanceid" << _sourceInstanceId);
-        		}
-        	}//if paths are relative or absolute
-        	//LOG4CXX_DEBUG(logger, "multiplepath:For "<< "1");
-        }//if "paths=" is defined as an arguments, multiplepath = true
-        //LOG4CXX_DEBUG(logger, "End of multiplepath: "<< "1");
+            std::set<string>uniqueInstances;
+            std::set<int64_t> s(_inputInstances.begin(), _inputInstances.end()); 
+            if(s.size() !=  _inputPaths.size())
+            {
+               throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Input instances were not unique.";
+            }
+            if (_singlepath == true)
+            {
+                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Both single path and multiple path were declared.";
+            }
+            std::vector<int64_t>::iterator itrel = std::find(_inputInstances.begin(), _inputInstances.end(), -1);
+            if((_inputInstances.size()==1) && (itrel != _inputInstances.end()))
+            {
+                 string relinputpath  = _inputPaths[0];
+                 _inputFilePath  = relinputpath;  
+                 _instanceParse  = myInstanceId;
+            }
+            else
+            {
+                int const numinstances = query->getInstancesCount()-1;
+                if (std::find_if (_inputInstances.begin(), _inputInstances.end() , bind2nd(greater<int64_t>(),numinstances)) != _inputInstances.end())
+                {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "instance specified that is greater than numinstances";
+                }
+                if (std::find_if (_inputInstances.begin(), _inputInstances.end() , bind2nd(less<int64_t>(),0)) != _inputInstances.end())
+                {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "instance specified that is less than 0";
+                }
+                std::vector<int64_t>::iterator it = std::find(_inputInstances.begin(), _inputInstances.end(), myInstanceId);
+                if (it != _inputInstances.end())
+                {
+                    int64_t index = std::distance(_inputInstances.begin(), it);
+                    _instanceParse       = myInstanceId;
+                    _inputFilePath       = _inputPaths[index];
+                }
+            }
+        }
+        else if (_inputInstances.size() > 0)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "The instances argument is not used with a single file path";
+        }
     }
 
     int64_t const& getParseInstance() const
-        {
-            return _instanceParse;
-        }
+    {
+        return _instanceParse;
+    }
 
     string const& getInputFilePath() const
     {
@@ -423,11 +326,6 @@ public:
     size_t getBufferSize() const
     {
         return _bufferSize;
-    }
-
-    int64_t getSourceInstanceId() const
-    {
-        return _sourceInstanceId;
     }
 
     char getDelimiter() const

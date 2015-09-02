@@ -23,15 +23,30 @@ endif
 
 # Debug:
 #CFLAGS=-pedantic -W -Wextra -Wall -Wno-variadic-macros -Wno-strict-aliasing -Wno-long-long -Wno-unused-parameter -fPIC -D_STDC_FORMAT_MACROS -Wno-system-headers -isystem -g -ggdb3  -D_STDC_LIMIT_MACROS
-CFLAGS=-pedantic -W -Wextra -Wall -Wno-variadic-macros -Wno-strict-aliasing -Wno-long-long -Wno-unused-parameter -fPIC -D_STDC_FORMAT_MACROS -Wno-system-headers -isystem -O3 -g -DNDEBUG -D_STDC_LIMIT_MACROS
+CFLAGS=-W -Wextra -Wall -Wno-unused-parameter -Wno-variadic-macros -Wno-strict-aliasing -Wno-long-long -Wno-unused -fPIC -D_STDC_FORMAT_MACROS -Wno-system-headers -isystem -O3 -g -DNDEBUG -D_STDC_LIMIT_MACROS
 INC=-I. -DPROJECT_ROOT="\"$(SCIDB)\"" -I"$(SCIDB_THIRDPARTY_PREFIX)/3rdparty/boost/include/" -I"$(SCIDB)/include"
-LIBS=-shared -Wl,-soname,libload_tools.so -L. -L"$(SCIDB_THIRDPARTY_PREFIX)/3rdparty/boost/lib" -L"$(SCIDB)/lib" -Wl,-rpath,$(SCIDB)/lib:$(RPATH) -lm
+LIBS=-shared -Wl,-soname,libaccelerated_load_tools.so -L. -L"$(SCIDB_THIRDPARTY_PREFIX)/3rdparty/boost/lib" -L"$(SCIDB)/lib" -Wl,-rpath,$(SCIDB)/lib:$(RPATH) -lm
+
+# Compiler settings for SciDB version >= 15.7
+ifneq ("$(wildcard /usr/bin/g++-4.9)","")
+  CC := "/usr/bin/gcc-4.9"
+  CXX := "/usr/bin/g++-4.9"
+  CFLAGS+=-std=c++11 -DCPP11
+else
+  ifneq ("$(wildcard /opt/rh/devtoolset-3/root/usr/bin/gcc)","")
+   CC := "/opt/rh/devtoolset-3/root/usr/bin/gcc"
+   CXX := "/opt/rh/devtoolset-3/root/usr/bin/g++"
+   CFLAGS+=-std=c++11 -DCPP11
+  endif
+endif
+
+#$(CXX) $(CFLAGS) $(INC) -o libmultisplit.so plugin.cpp LogicalSplit.cpp PhysicalSplit.cpp Functions.cpp $(LIBS)
 
 all:
 	@if test ! -d "$(SCIDB)"; then echo  "Error. Try:\n\nmake SCIDB=<PATH TO SCIDB INSTALL PATH>"; exit 1; fi
-	$(CXX) $(CFLAGS) $(INC) -o libmultisplit.so plugin.cpp LogicalSplit.cpp PhysicalSplit.cpp Functions.cpp $(LIBS)
+	$(CXX) $(CFLAGS) $(INC) -o libaccelerated_load_tools.so plugin.cpp LogicalSplit.cpp PhysicalSplit.cpp Functions.cpp $(LIBS)
 	@echo "Now copy *.so to your SciDB lib/scidb/plugins directory and run"
-	@echo "iquery -aq \"load_library('load_tools')\" # to load the plugin."
+	@echo "iquery -aq \"load_library('accelerated_load_tools')\" # to load the plugin."
 	@echo
 	@echo "Re-start SciDB if the plugin was already loaded previously."
 	@echo "Remember to copy the plugin to all your nodes in the cluster."
