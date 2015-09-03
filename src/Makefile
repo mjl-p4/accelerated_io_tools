@@ -44,7 +44,7 @@ endif
 
 all:
 	@if test ! -d "$(SCIDB)"; then echo  "Error. Try:\n\nmake SCIDB=<PATH TO SCIDB INSTALL PATH>"; exit 1; fi
-	$(CXX) $(CFLAGS) $(INC) -o libaccelerated_load_tools.so plugin.cpp LogicalSplit.cpp PhysicalSplit.cpp Functions.cpp $(LIBS)
+	$(CXX) $(CFLAGS) $(INC) -o libaccelerated_load_tools.so plugin.cpp LogicalSplit.cpp PhysicalSplit.cpp LogicalParse.cpp PhysicalParse.cpp Functions.cpp $(LIBS)
 	@echo "Now copy *.so to your SciDB lib/scidb/plugins directory and run"
 	@echo "iquery -aq \"load_library('accelerated_load_tools')\" # to load the plugin."
 	@echo
