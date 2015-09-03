@@ -1,5 +1,7 @@
 #!/bin/bash
 
+rm -rf test.out
+
 iquery -anq "remove(zero_to_255)"                > /dev/null 2>&1
 iquery -anq "remove(minus_128_to_127)"           > /dev/null 2>&1
 iquery -anq "remove(zero_to_65536)"              > /dev/null 2>&1
@@ -90,4 +92,58 @@ time iquery -aq "aggregate(apply(big_n_wild, v2, dcast(val, float(null))), avg(v
 time iquery -aq "aggregate(apply(big_n_wild, v2, dcast(val, double(null))), avg(v2), count(v2), count(*))"             >> test.out
 
 time iquery -aq "aggregate(apply(filter(apply(big_n_wild, v2, dcast(val, bool(null))), v2 is not null), v3, iif(v2, 1, 0)), sum(v3), count(*))" >> test.out
+
+
+rm -rf /tmp/load_tools_test
+mkdir /tmp/load_tools_test
+touch /tmp/load_tools_test/empty_file
+touch /tmp/load_tools_test/file1
+echo 'col1    col2    col3
+"alex"	1	3.5
+"b"ob"	2	4.8
+jake	4.0
+random	3.1	"extra stuff"
+bill 	abc	9
+alice	4	not_a_number' >> /tmp/load_tools_test/file1
+touch /tmp/load_tools_test/file2
+echo '"",1
+"abc",2
+"def",3
+null,4
+xyz,4.5' >> /tmp/load_tools_test/file2
+ln -s /tmp/load_tools_test/file1 /tmp/load_tools_test/symlink1
+mkfifo /tmp/load_tools_test/fifo1
+mkdir /tmp/load_tools_test/directory
+
+iquery -aq "split('/tmp/load_tools_test/file1', 'lines_per_chunk=3')" >> test.out
+iquery -aq "split('/tmp/load_tools_test/file1', 'lines_per_chunk=1')" >> test.out
+iquery -aq "split('/tmp/load_tools_test/file1')"                      >> test.out
+iquery -aq "split(
+            'paths=/tmp/load_tools_test/file1;/tmp/load_tools_test/symlink1',
+            'instances=1;2',
+            'header=1',
+            'lines_per_chunk=2'
+            )" >> test.out
+cat /tmp/load_tools_test/file2 > /tmp/load_tools_test/fifo1 &
+iquery -aq "split(
+            'paths=/tmp/load_tools_test/file1;/tmp/load_tools_test/symlink1;/tmp/load_tools_test/fifo1',
+            'instances=1;2;0',
+            'header=1',
+            'lines_per_chunk=2'
+            )" >> test.out
+iquery -aq "split(
+            'paths=/tmp/load_tools_test/file1;/tmp/load_tools_test/file2;/tmp/load_tools_test/directory',
+            'instances=1;2;0',
+            'lines_per_chunk=2', 
+            'delimiter=,'
+            )" >> test.out
+
+iquery -anq "remove(foo)" > /dev/null 2>&1
+iquery -anq "remove(bar)" > /dev/null 2>&1
+
+iquery -anq "store(build(<val:double> [x=1:8000000,1000000,0], random()), foo)" > /dev/null
+iquery -anq "save(foo, 'foo.tsv', -1, 'tsv')" > /dev/null
+time iquery -anq "store(project(filter(apply(parse(split('paths=foo.tsv', 'instances=-1'), 'num_attributes=1'), v, dcast(a0, double(null))), v is not null), v), bar)" > /dev/null 
+iquery -aq "op_count(bar)" >> test.out
+
 diff test.out test.expected
