@@ -46,42 +46,44 @@ namespace scidb
 
 using namespace scidb;
 
+
 class OutputWriter : public boost::noncopyable
 {
 private:
     shared_ptr<Array> const _output;
     Coordinates _outputPosition;
     size_t const _numLiveAttributes;
-    char _lineDelimiter;
-    char _attributeDelimiter;
     size_t const _outputLineSize;
-    vector<Value> _outputLine;
     size_t const _outputChunkSize;
     vector<shared_ptr<ArrayIterator> > _outputArrayIterators;
     vector<shared_ptr<ChunkIterator> > _outputChunkIterators;
     bool _splitOnDimension;
+    size_t _outputColumn;
+    char const _attributeDelimiter;
+    ostringstream _errorBuf;
+    Value _buf;
 
 public:
-    OutputWriter(ArrayDesc const& schema, shared_ptr<Query>& query, char lineDelimiter, char attributeDelimiter, bool splitOnDimension):
+    OutputWriter(ArrayDesc const& schema, shared_ptr<Query>& query, bool splitOnDimension, char const attDelimiter):
         _output(make_shared<MemArray>(schema,query)),
         _outputPosition( splitOnDimension ? 4 : 3, 0),
         _numLiveAttributes(schema.getAttributes(true).size()),
-        _lineDelimiter(lineDelimiter),
-        _attributeDelimiter(attributeDelimiter),
         _outputLineSize(splitOnDimension ? schema.getDimensions()[3].getChunkInterval() : _numLiveAttributes),
-        _outputLine(_outputLineSize),
         _outputChunkSize(schema.getDimensions()[2].getChunkInterval()),
         _outputArrayIterators(_numLiveAttributes),
         _outputChunkIterators(_numLiveAttributes),
-        _splitOnDimension(splitOnDimension)
+        _splitOnDimension(splitOnDimension),
+        _outputColumn(0),
+        _attributeDelimiter(attDelimiter)
     {
+
         for(AttributeID i =0; i<_numLiveAttributes; ++i)
         {
             _outputArrayIterators[i] = _output->getIterator(i);
         }
     }
 
-    void processChunk(Coordinates const& inputChunkPosition, Value const& value, shared_ptr<Query>& query)
+    void newChunk (Coordinates const& inputChunkPosition, shared_ptr<Query>& query)
     {
         _outputPosition[0] = inputChunkPosition[0];
         _outputPosition[1] = inputChunkPosition[1];
@@ -92,99 +94,112 @@ public:
         }
         for(AttributeID i =0; i<_numLiveAttributes; ++i)
         {
+            if(_outputChunkIterators[i].get())
+            {
+                _outputChunkIterators[i]->flush();
+            }
             _outputChunkIterators[i] = _outputArrayIterators[i]->newChunk(_outputPosition).getIterator(query,
                 i == 0 ? ChunkIterator::SEQUENTIAL_WRITE : ChunkIterator::SEQUENTIAL_WRITE | ChunkIterator::NO_EMPTY_CHECK);
         }
-        const char *data = value.getString();
-        if(data[ value.size() - 1] != 0)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Encountered a string that is not null-terminated; bailing";
-        }
-        string input(data);
-        vector <string> lines;
-        split(lines, input, is_from_range(_lineDelimiter, _lineDelimiter));
-        size_t const nLines = lines.size();
-        if (nLines > _outputChunkSize)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Encountered a string with more lines than the chunk size; bailing";
-        }
-        for ( size_t l = 0; l<nLines; ++l)
-        {
-            string const& line = lines[l];
-            parseLine(line);
-            if(_splitOnDimension)
-            {
-                _outputPosition[3] = 0;
-            }
-            for(AttributeID i =0; i<_outputLineSize; ++i)
-            {
-               _outputChunkIterators[ _splitOnDimension ? 0 : i]->setPosition(_outputPosition);
-               _outputChunkIterators[ _splitOnDimension ? 0 : i]->writeItem(_outputLine[i]);
-               if(_splitOnDimension)
-               {
-                   ++(_outputPosition[3]);
-               }
-            }
-            ++(_outputPosition[2]);
-        }
-        for(AttributeID i =0; i<_numLiveAttributes; ++i)
-        {
-            _outputChunkIterators[i]->flush();
-            _outputChunkIterators[i].reset();
-        }
     }
 
-    /**
-     * Flush the last chunk and return the resulting array object. After this, the class is invalidated.
-     * @return the output array
-     */
+    void writeValue (char const* start, char const* end)
+    {
+        if(_outputColumn < _outputLineSize - 1)
+        {
+            _buf.setSize(end - start + 1);
+            char* d = _buf.getData<char>();
+            memcpy(d, start, end-start);
+            d[(end-start)]=0;
+
+            //_buf.setString(value);
+            if(_splitOnDimension)
+            {
+                _outputChunkIterators[0] -> setPosition(_outputPosition);
+                _outputChunkIterators[0] -> writeItem(_buf);
+                ++(_outputPosition[3]);
+            }
+            else
+            {
+                _outputChunkIterators[_outputColumn] -> setPosition(_outputPosition);
+                _outputChunkIterators[_outputColumn] -> writeItem(_buf);
+            }
+        }
+        else if (_outputColumn == _outputLineSize - 1)
+        {
+            string value(start, end-start);
+            _errorBuf << "long" << _attributeDelimiter << value;
+        }
+        else
+        {
+            string value(start, end-start);
+            _errorBuf << _attributeDelimiter << value;
+        }
+        ++_outputColumn;
+    }
+
+    void endLine()
+    {
+        if(_outputColumn < _outputLineSize - 1)
+        {
+            _buf.setNull();
+            if(_splitOnDimension)
+            {
+                while (_outputColumn < _outputLineSize - 1)
+                {
+                    _outputChunkIterators[0] -> setPosition(_outputPosition);
+                    _outputChunkIterators[0] -> writeItem(_buf);
+                    ++(_outputPosition[3]);
+                    ++_outputColumn;
+                }
+            }
+            else
+            {
+                while (_outputColumn < _outputLineSize - 1)
+                {
+                    _outputChunkIterators[_outputColumn] -> setPosition(_outputPosition);
+                    _outputChunkIterators[_outputColumn] -> writeItem(_buf);
+                    ++_outputColumn;
+                }
+            }
+            _errorBuf << "short";
+        }
+        if(_errorBuf.str().size())
+        {
+            _buf.setString(_errorBuf.str());
+        }
+        else
+        {
+            _buf.setNull();
+        }
+        if(_splitOnDimension)
+        {
+            _outputChunkIterators[0] -> setPosition(_outputPosition);
+            _outputChunkIterators[0] -> writeItem(_buf);
+            _outputPosition[3] = 0;
+        }
+        else
+        {
+            _outputChunkIterators[_outputLineSize - 1] -> setPosition(_outputPosition);
+            _outputChunkIterators[_outputLineSize - 1] -> writeItem(_buf);
+        }
+        ++(_outputPosition[2]);
+        _errorBuf.str("");
+        _outputColumn = 0;
+    }
+
     shared_ptr<Array> finalize()
     {
         for(AttributeID i =0; i<_numLiveAttributes; ++i)
         {
+            if(_outputChunkIterators[i].get())
+            {
+                _outputChunkIterators[i]->flush();
+            }
             _outputChunkIterators[i].reset();
             _outputArrayIterators[i].reset();
         }
         return _output;
-    }
-
-
-private:
-    void parseLine(string const& line)
-    {
-        vector<string> tokens;
-        split(tokens, line, is_from_range(_attributeDelimiter, _attributeDelimiter));
-        size_t const nTokens = tokens.size();
-        //set the error string
-        if(nTokens < _outputLineSize -1 )
-        {
-            _outputLine[_outputLineSize-1].setString("short");
-        }
-        else if (nTokens >_outputLineSize -1 )
-        {
-            ostringstream error;
-            error<<"long";
-            for(size_t t = _outputLineSize - 1; t<nTokens; ++t)
-            {
-                error << _attributeDelimiter << tokens[t];
-            }
-            _outputLine[_outputLineSize-1].setString(error.str().c_str());
-        }
-        else
-        {
-            _outputLine[_outputLineSize-1].setNull();
-        }
-        for(size_t t= 0; t<_outputLineSize -1; ++t)
-        {
-            if(t<nTokens)
-            {
-                _outputLine[t].setString(tokens[t].c_str());
-            }
-            else
-            {
-                _outputLine[t].setNull();
-            }
-        }
     }
 };
 
@@ -218,17 +233,55 @@ public:
     shared_ptr< Array> execute(std::vector< shared_ptr< Array> >& inputArrays, shared_ptr<Query> query)
     {
         ParseSettings settings (_parameters, false, query);
-        OutputWriter writer(_schema, query, settings.getLineDelimiter(), settings.getAttributeDelimiter(), settings.getSplitOnDimension());
+        OutputWriter writer(_schema, query, settings.getSplitOnDimension(), settings.getAttributeDelimiter());
         shared_ptr<Array>& input = inputArrays[0];
         shared_ptr<ConstArrayIterator> inputIterator = input->getConstIterator(0);
+        size_t const outputChunkSize = _schema.getDimensions()[2].getChunkInterval();
+        char const attDelim = settings.getAttributeDelimiter();
+        char const lineDelim = settings.getLineDelimiter();
         while(!inputIterator-> end())
         {
             Coordinates const& pos = inputIterator->getPosition();
             shared_ptr<ConstChunkIterator> inputChunkIterator = inputIterator->getChunk().getConstIterator();
             if(!inputChunkIterator->end()) //just 1 value in chunk
             {
+                size_t nLines =0;
+                writer.newChunk(inputIterator->getPosition(), query);
                 Value const& v = inputChunkIterator->getItem();
-                writer.processChunk(pos, v, query);
+                const char *data = v.getString();
+                if(data[ v.size() - 1] != 0)
+                {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Encountered a string that is not null-terminated; bailing";
+                }
+                const char* start = data;
+                const char* end = start;
+                bool finished = false;
+                while (!finished)
+                {
+                    while( (*end)!=attDelim && (*end)!=lineDelim && (*end)!=0)
+                    {
+                        ++end;
+                    }
+                    writer.writeValue(start, end);
+                    if((*end) == lineDelim || (*end) == 0 )
+                    {
+                        writer.endLine();
+                        ++nLines;
+                        if (nLines > outputChunkSize)
+                        {
+                            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Encountered a string with more lines than the chunk size; bailing";
+                        }
+                        if((*end) == 0)
+                        {
+                            finished = true;
+                        }
+                    }
+                    if ((*end) !=0)
+                    {
+                        start = end+1;
+                        end   = end+1;
+                    }
+                }
             }
             ++(*inputIterator);
         }
