@@ -27,16 +27,19 @@ CFLAGS=-W -Wextra -Wall -Wno-unused-parameter -Wno-variadic-macros -Wno-strict-a
 INC=-I. -DPROJECT_ROOT="\"$(SCIDB)\"" -I"$(SCIDB_THIRDPARTY_PREFIX)/3rdparty/boost/include/" -I"$(SCIDB)/include"
 LIBS=-shared -Wl,-soname,libaccelerated_load_tools.so -L. -L"$(SCIDB_THIRDPARTY_PREFIX)/3rdparty/boost/lib" -L"$(SCIDB)/lib" -Wl,-rpath,$(SCIDB)/lib:$(RPATH) -lm
 
+SRCS=plugin.cpp LogicalSplit.cpp PhysicalSplit.cpp LogicalParse.cpp PhysicalParse.cpp Functions.cpp
 # Compiler settings for SciDB version >= 15.7
 ifneq ("$(wildcard /usr/bin/g++-4.9)","")
   CC := "/usr/bin/gcc-4.9"
   CXX := "/usr/bin/g++-4.9"
   CFLAGS+=-std=c++11 -DCPP11
+  SRCS+=LogicalUberLoad.cpp PhysicalUberLoad.cpp
 else
   ifneq ("$(wildcard /opt/rh/devtoolset-3/root/usr/bin/gcc)","")
    CC := "/opt/rh/devtoolset-3/root/usr/bin/gcc"
    CXX := "/opt/rh/devtoolset-3/root/usr/bin/g++"
    CFLAGS+=-std=c++11 -DCPP11
+   SRCS+=LogicalUberLoad.cpp PhysicalUberLoad.cpp
   endif
 endif
 
@@ -44,7 +47,7 @@ endif
 
 all:
 	@if test ! -d "$(SCIDB)"; then echo  "Error. Try:\n\nmake SCIDB=<PATH TO SCIDB INSTALL PATH>"; exit 1; fi
-	$(CXX) $(CFLAGS) $(INC) -o libaccelerated_load_tools.so plugin.cpp LogicalSplit.cpp PhysicalSplit.cpp LogicalParse.cpp PhysicalParse.cpp Functions.cpp $(LIBS)
+	$(CXX) $(CFLAGS) $(INC) -o libaccelerated_load_tools.so $(SRCS) $(LIBS)
 	@echo "Now copy *.so to your SciDB lib/scidb/plugins directory and run"
 	@echo "iquery -aq \"load_library('accelerated_load_tools')\" # to load the plugin."
 	@echo

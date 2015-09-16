@@ -1,18 +1,19 @@
 #!/bin/bash
 #Quick restart script for dev use
-iquery -aq "unload_library('multisplit')" > /dev/null 2>&1
+iquery -aq "unload_library('accelerated_load_tools')" > /dev/null 2>&1
 set -e
 
 DBNAME="mydb"
+#This is easily sym-linkable: ~/scidb
+SCIDB_INSTALL=`dirname ~/.`"/scidb"
+export SCIDB_THIRDPARTY_PREFIX="/opt/scidb/15.7"
+
 mydir=`dirname $0`
 pushd $mydir
-
-SCIDB_INSTALL="/development/scidbtrunk/stage/install/"
-make SCIDB_3RDPARTY="/opt/scidb/14.12"
+make SCIDB=$SCIDB_INSTALL
 
 scidb.py stopall $DBNAME 
-cp libmultisplit.so ${SCIDB_INSTALL}/lib/scidb/plugins/
+cp libaccelerated_load_tools.so ${SCIDB_INSTALL}/lib/scidb/plugins/
 scidb.py startall $DBNAME 
 
-
-iquery -aq "load_library('multisplit')"
+iquery -aq "load_library('accelerated_load_tools')"
