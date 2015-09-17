@@ -407,68 +407,142 @@ public:
         return RedistributeContext(psUndefined);
     }
 
+    shared_ptr<Array> makeSupplement(shared_ptr<Array>& afterSplit, shared_ptr<Query>& query, shared_ptr<UberLoadSettings>& settings)
+    {
+        char const lineDelim = settings->getLineDelimiter();
+        shared_ptr<Array> supplement(new MemArray(getSplitSchema(), query));
+        shared_ptr<ConstArrayIterator> srcArrayIter = afterSplit->getConstIterator(0);
+        shared_ptr<ArrayIterator> dstArrayIter = supplement->getIterator(0);
+        shared_ptr<ChunkIterator> dstChunkIter;
+        while(!srcArrayIter->end())
+        {
+           Coordinates supplementCoords = srcArrayIter->getPosition();
+           if(supplementCoords[1] != 0)
+           {
+               shared_ptr<ConstChunkIterator> srcChunkIter = srcArrayIter->getChunk().getConstIterator();
+               Value const& v= srcChunkIter->getItem();
+               supplementCoords[1]--;
+               char const* start = static_cast<char const*>(v.data());
+               char const* end = start;
+               char const* lim = start + v.size();
+               while( end != lim && (*end) != lineDelim)
+               {
+                   ++end;
+               }
+               if(end == lim)
+               {
+                   throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Encountered a whole block without line delim characters; Sorry! You need to increase the block size.";
+               }
+               Value firstLine;
+               firstLine.setSize(end-start);
+               memcpy(firstLine.data(), start, end-start);
+               dstChunkIter = dstArrayIter->newChunk(supplementCoords).getIterator(query,  ChunkIterator::SEQUENTIAL_WRITE);
+               dstChunkIter->writeItem(firstLine);
+               dstChunkIter->flush();
+           }
+           ++(*srcArrayIter);
+        }
+        return supplement;
+    }
+
     shared_ptr< Array> execute(std::vector< shared_ptr< Array> >& inputArrays, shared_ptr<Query> query)
     {
         shared_ptr<UberLoadSettings> settings (new UberLoadSettings(_parameters, false, query));
-        uint64_t chunkCount = 0;
-
-        ArrayDesc splitSchema = getSplitSchema();
-        shared_ptr<Array> res;
+        shared_ptr<Array> splitData;
         if(settings->getParseInstance() == static_cast<int64_t>(query->getInstanceID()))
         {
-            res = shared_ptr<BinFileSplitArray>(new BinFileSplitArray(splitSchema, query, settings));
+            splitData = shared_ptr<BinFileSplitArray>(new BinFileSplitArray(getSplitSchema(), query, settings));
         }
         else
         {
-            res = shared_ptr<BinEmptySinglePass>(new BinEmptySinglePass(splitSchema));
+            splitData = shared_ptr<BinEmptySinglePass>(new BinEmptySinglePass(getSplitSchema()));
         }
-        res = redistributeToRandomAccess(res, query, defaultPartitioning(),
+        splitData = redistributeToRandomAccess(splitData, query, defaultPartitioning(),
                                                  ALL_INSTANCE_MASK,
                                                  std::shared_ptr<CoordinateTranslator>(),
                                                  0,
                                                  std::shared_ptr<PartitioningSchemaData>());
-        shared_ptr<Array> supplement(new MemArray(splitSchema, query));
-        shared_ptr<ConstArrayIterator> srcArrayIter = res->getConstIterator(0);
-        shared_ptr<ArrayIterator> dstArrayIter = res->getIterator(0);
-        shared_ptr<ChunkIterator> dstChunkIter;
-        while(!srcArrayIter->end())
+        shared_ptr<Array> supplement = makeSupplement(splitData, query, settings);
+        supplement = redistributeToRandomAccess(supplement, query, defaultPartitioning(),
+                                                ALL_INSTANCE_MASK,
+                                                std::shared_ptr<CoordinateTranslator>(),
+                                                0,
+                                                std::shared_ptr<PartitioningSchemaData>());
+        shared_ptr<ConstArrayIterator> inputIterator = splitData->getConstIterator(0);
+        shared_ptr<ConstArrayIterator> supplementIter = supplement->getConstIterator(0);
+        size_t const outputChunkSize = _schema.getDimensions()[2].getChunkInterval();
+        char const attDelim = settings->getAttributeDelimiter();
+        char const lineDelim = settings->getLineDelimiter();
+        OutputWriter writer(_schema, query, settings->getSplitOnDimension(), settings->getAttributeDelimiter());
+        while(!inputIterator-> end())
         {
-            Coordinates supplementCoords = srcArrayIter->getPosition();
-            if(supplementCoords[1] != 0)
+            Coordinates const& pos = inputIterator->getPosition();
+            shared_ptr<ConstChunkIterator> inputChunkIterator = inputIterator->getChunk().getConstIterator();
+            if(!inputChunkIterator->end()) //just 1 value in chunk
             {
-                shared_ptr<ConstChunkIterator> srcChunkIter = srcArrayIter->getChunk().getConstIterator();
-                Value const& v= srcChunkIter->getItem();
-                chunkCount += v.size();
-                supplementCoords[1]--;
-                char const* start = static_cast<char const*>(v.data());
-                char const* end = start;
-                char const* lim = start + v.size();
-                while( end != lim && (*end) != '\n')
+                size_t nLines =0;
+                writer.newChunk(pos, query);
+                Value const& v = inputChunkIterator->getItem();
+                char* sourceStart = (char*) v.data();
+                size_t sourceSize = v.size();
+                if(pos[1]!=0)
                 {
-                    ++end;
+                    while((*sourceStart)!=lineDelim)
+                    {
+                        sourceStart ++;
+                    }
+                    sourceSize = sourceSize - (sourceStart - ((char*)v.data()));
                 }
-                if(end == lim)
+                bool haveSupplement = supplementIter->setPosition(pos);
+                vector<char>buf;
+                if(haveSupplement)
                 {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Encountered a block without newline characters; Sorry! You need to increase the block size.";
+                    shared_ptr<ConstChunkIterator> supplementChunkIterator = supplementIter->getChunk().getConstIterator();
+                    Value const &s = supplementChunkIterator->getItem();
+                    buf.resize(sourceSize+s.size());
+                    memcpy(&buf[0], sourceStart, sourceSize);
+                    memcpy(&buf[0]+v.size(), s.data(), s.size());
                 }
-                Value newBuf;
-                newBuf.setSize(end-start);
-                memcpy(newBuf.data(), start, end-start);
+                else
+                {
+                    buf.resize(sourceSize);
+                    memcpy(&buf[0], sourceStart, sourceSize);
+                }
+                const char *data = &buf[0];
+                const char* start = data;
+                const char* end = start;
+                const char* terminus = start + buf.size();
+                bool finished = false;
+                while (!finished)
+                {
+                    while( (*end)!=attDelim && (*end)!=lineDelim && end != terminus)
+                    {
+                        ++end;
+                    }
+                    writer.writeValue(start, end);
+                    if((*end) == lineDelim || end == terminus)
+                    {
+                        writer.endLine();
+                        ++nLines;
+                        if (nLines > outputChunkSize)
+                        {
+                            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Encountered a string with more lines than the chunk size; bailing";
+                        }
+                        if(end == terminus)
+                        {
+                            finished = true;
+                        }
+                    }
+                    if ((*end) !=0)
+                    {
+                        start = end+1;
+                        end   = end+1;
+                    }
+                }
             }
-            ++(*srcArrayIter);
+            ++(*inputIterator);
         }
-        OutputWriter wr(_schema, query, settings->getSplitOnDimension(), settings->getAttributeDelimiter());
-        Coordinates outputPosition(2);
-        outputPosition[0] = query->getInstanceID();
-        outputPosition[1] = 0;
-        wr.newChunk(outputPosition, query);
-        ostringstream resStream;
-        resStream << chunkCount;
-        char const* resStr = resStream.str().c_str();
-        char const* resStrEnd = resStr + strlen(resStr);
-        wr.writeValue(resStr, resStrEnd);
-        wr.endLine();
-        return wr.finalize();
+        return writer.finalize();
     }
 };
 
