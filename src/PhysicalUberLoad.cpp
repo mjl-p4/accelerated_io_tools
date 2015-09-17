@@ -113,7 +113,7 @@ public:
             {
                 return false;
             }
-            if(numBytes > 8)
+            if(numBytes > sizeof(int64_t))
             {
                 _buffer.setSize(numBytes);
             }
@@ -491,6 +491,7 @@ public:
                     {
                         sourceStart ++;
                     }
+                    sourceStart ++;
                     sourceSize = sourceSize - (sourceStart - ((char*)v.data()));
                 }
                 bool haveSupplement = supplementIter->setPosition(pos);
@@ -501,7 +502,7 @@ public:
                     Value const &s = supplementChunkIterator->getItem();
                     buf.resize(sourceSize+s.size());
                     memcpy(&buf[0], sourceStart, sourceSize);
-                    memcpy(&buf[0]+v.size(), s.data(), s.size());
+                    memcpy(&buf[0]+ sourceSize, s.data(), s.size());
                 }
                 else
                 {
@@ -515,12 +516,12 @@ public:
                 bool finished = false;
                 while (!finished)
                 {
-                    while( (*end)!=attDelim && (*end)!=lineDelim && end != terminus)
+                    while( end != terminus && (*end)!=attDelim && (*end)!=lineDelim )
                     {
                         ++end;
                     }
                     writer.writeValue(start, end);
-                    if((*end) == lineDelim || end == terminus)
+                    if(end == terminus || (*end) == lineDelim )
                     {
                         writer.endLine();
                         ++nLines;
@@ -533,7 +534,7 @@ public:
                             finished = true;
                         }
                     }
-                    if ((*end) !=0)
+                    if (end != terminus)
                     {
                         start = end+1;
                         end   = end+1;
