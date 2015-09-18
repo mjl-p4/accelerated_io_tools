@@ -86,6 +86,6 @@ public:
     }
 };
 
-REGISTER_LOGICAL_OPERATOR_FACTORY(LogicalUberLoad, "uber_load");
+REGISTER_LOGICAL_OPERATOR_FACTORY(LogicalUberLoad, "proto_load");
 
 } // emd namespace scidb

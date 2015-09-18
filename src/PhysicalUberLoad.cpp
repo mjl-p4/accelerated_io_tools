@@ -35,6 +35,8 @@
 
 #include "UberLoadSettings.h"
 
+#include <fcntl.h>
+
 using std::make_shared;
 
 using boost::algorithm::is_from_range;
@@ -110,7 +112,7 @@ public:
         _fileBlockSize(settings->getBlockSize()),
         _chunkOverheadSize( getChunkOverheadSize() ),
         _endOfFile(false),
-        _inputFile(0)
+        _inputFile(NULL)
     {
         super::setEnforceHorizontalIteration(true);
         _chunkAddress.coords[0] = settings->getParseInstance();
@@ -165,7 +167,7 @@ public:
 
     virtual ~BinFileSplitArray()
     {
-        if(_inputFile!=0)
+        if(_inputFile!=NULL)
         {
             fclose(_inputFile);
         }
@@ -187,7 +189,7 @@ public:
         {
             _endOfFile = true;
             fclose(_inputFile);
-            _inputFile = 0;
+            _inputFile = NULL;
             if(numBytes == 0)
             {
                 return false;
@@ -577,7 +579,7 @@ public:
     }
 };
 
-REGISTER_PHYSICAL_OPERATOR_FACTORY(PhysicalUberLoad, "uber_load", "PhysicalUberLoad");
+REGISTER_PHYSICAL_OPERATOR_FACTORY(PhysicalUberLoad, "proto_load", "PhysicalUberLoad");
 
 
 } // end namespace scidb
