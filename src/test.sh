@@ -146,4 +146,32 @@ iquery -anq "save(foo, 'foo.tsv', -1, 'tsv')" > /dev/null
 time iquery -anq "store(project(filter(apply(parse(split('paths=foo.tsv', 'instances=-1'), 'num_attributes=1'), v, dcast(a0, double(null))), v is not null), v), bar)" > /dev/null 
 iquery -aq "op_count(bar)" >> test.out
 
+iquery -aq "uber_load('/tmp/load_tools_test/file1', 'num_attributes=3')" >> test.out
+iquery -aq "uber_load('/tmp/load_tools_test/file1', 'num_attributes=3', 'buffer_size=40')" >> test.out
+iquery -aq "uber_load(
+            'paths=/tmp/load_tools_test/file1;/tmp/load_tools_test/symlink1',
+            'instances=1;2',
+            'header=1',
+            'num_attributes=2',
+            'buffer_size=31'
+            )" >> test.out
+cat /tmp/load_tools_test/file2 > /tmp/load_tools_test/fifo1 &
+iquery -aq "uber_load(
+            'paths=/tmp/load_tools_test/file1;/tmp/load_tools_test/symlink1;/tmp/load_tools_test/fifo1',
+            'instances=1;2;0',
+            'header=1',
+            'num_attributes=1'
+            )" >> test.out
+iquery -aq "uber_load(
+            'paths=/tmp/load_tools_test/file1;/tmp/load_tools_test/file2;/tmp/load_tools_test/directory',
+            'instances=1;2;0',
+            'buffer_size=41', 
+            'attribute_delimiter=,',
+            'num_attributes=3'
+            )" >> test.out
+
+iquery -anq "remove(bar)" > /dev/null 2>&1
+time iquery -anq "store(project(filter(apply(uber_load('paths=foo.tsv', 'instances=-1', 'num_attributes=1'), v, dcast(a0, double(null))), v is not null), v), bar)" > /dev/null
+iquery -aq "op_count(bar)" >> test.out
+
 diff test.out test.expected

@@ -80,7 +80,7 @@ public:
        _attributeDelimiter('\t'),
        _attributeDelimiterSet(false),
        _numAttributes(0),
-       _chunkSize(10000000),
+       _chunkSize(_bufferSize),
        _chunkSizeSet(false),
        _splitOnDimension(false),
        _splitOnDimensionSet(false)
@@ -186,6 +186,10 @@ public:
                     if(_bufferSize<=8)
                     {
                         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "buffer_size must be greater than 8";
+                    }
+                    if(_bufferSize>= 1024*1024*1024)
+                    {
+                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "buffer_size must be under 1GB";
                     }
                     _bufferSizeSet = true;
                 }
@@ -395,6 +399,10 @@ public:
         if (_numAttributes == 0)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "num_attributes was not provided";
+        }
+        if (_bufferSizeSet && !_chunkSizeSet)
+        {
+            _chunkSize = _bufferSize;
         }
     }
 

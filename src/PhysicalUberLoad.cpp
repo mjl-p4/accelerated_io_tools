@@ -29,9 +29,12 @@
 #include <array/Tile.h>
 #include <array/TileIteratorAdaptors.h>
 #include <system/Sysinfo.h>
-#include "UberLoadSettings.h"
+#include <log4cxx/logger.h>
+#include <util/Network.h>
 
 #include <boost/algorithm/string.hpp>
+
+#include "UberLoadSettings.h"
 
 using std::make_shared;
 
@@ -40,18 +43,20 @@ using boost::algorithm::is_from_range;
 namespace scidb
 {
 
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("alt.uber_load"));
+
 using namespace scidb;
 
-/**
- * A wrapper around an open file (or pipe) that may iterate over the data once and split it into blocks, each
- * block containing a number of lines. Returns one block at a time.
- */
+
 class BinaryFileSplitter
 {
 private:
-    size_t       _bufferSize;
-    Value        _buffer;
+    size_t const _fileBlockSize;
+    size_t const _chunkOverheadSize;
+    vector<char> _buffer;
     bool         _endOfFile;
+    char*        _bufPointer;
+    uint32_t*    _sizePointer;
     FILE*        _inputFile;
 
 public:
@@ -59,18 +64,40 @@ public:
                        size_t bufferSize,
                        int64_t header,
                        char lineDelimiter):
-        _bufferSize(bufferSize),
+        _fileBlockSize(bufferSize),
+        _chunkOverheadSize(  sizeof(ConstRLEPayload::Header) +
+                             2 * sizeof(ConstRLEPayload::Segment) +
+                             sizeof(varpart_offset_t) + 5),
         _endOfFile(false),
         _inputFile(0)
     {
         try
         {
-            _buffer.setSize(_bufferSize);
+            _buffer.resize(_chunkOverheadSize + _fileBlockSize);
         }
         catch(...)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "FileSplitter() cannot allocate memory";
         }
+        _bufPointer = &(_buffer[0]);
+        ConstRLEPayload::Header* hdr = (ConstRLEPayload::Header*) _bufPointer;
+        hdr->_magic = RLE_PAYLOAD_MAGIC;
+        hdr->_nSegs = 1;
+        hdr->_elemSize = 0;
+        hdr->_dataSize = _fileBlockSize + 5 + sizeof(varpart_offset_t);
+        hdr->_varOffs = sizeof(varpart_offset_t);
+        hdr->_isBoolean = 0;
+        ConstRLEPayload::Segment* seg = (ConstRLEPayload::Segment*) (hdr+1);
+        *seg =  ConstRLEPayload::Segment(0,0,false,false);
+        ++seg;
+        *seg =  ConstRLEPayload::Segment(1,0,false,false);
+        varpart_offset_t* vp =  (varpart_offset_t*) (seg+1);
+        *vp = 0;
+        uint8_t* sizeFlag = (uint8_t*) (vp+1);
+        *sizeFlag =0;
+        _sizePointer = (uint32_t*) (sizeFlag + 1);
+        *_sizePointer = (uint32_t) _fileBlockSize;
+        _bufPointer = (char*) (_sizePointer+1);
         _inputFile = fopen(filePath.c_str(), "r");
         if (_inputFile == NULL)
         {
@@ -103,8 +130,8 @@ public:
         {
             return false;
         }
-        size_t numBytes = fread(_buffer.data(), 1, _bufferSize, _inputFile);
-        if(numBytes != _bufferSize)
+        size_t numBytes = fread(_bufPointer, 1, _fileBlockSize, _inputFile);
+        if(numBytes != _fileBlockSize)
         {
             _endOfFile = true;
             fclose(_inputFile);
@@ -113,26 +140,18 @@ public:
             {
                 return false;
             }
-            if(numBytes > sizeof(int64_t))
-            {
-                _buffer.setSize(numBytes);
-            }
-            else
-            {
-                vector<char>bb(numBytes, 0);
-                memcpy(&(bb[0]), _buffer.data(), numBytes);
-                _buffer.setSize(numBytes);
-                memcpy(_buffer.data(), &(bb[0]), numBytes);
-            }
+            *_sizePointer = (uint32_t) numBytes;
         }
         return true;
     }
 
-    Value const& getBuffer()
+    char const* grabChunk(size_t &totalSize)
     {
-        return _buffer;
+        totalSize = _chunkOverheadSize + _fileBlockSize;
+        return &_buffer[0];
     }
 };
+
 
 class BinEmptySinglePass : public SinglePassArray
 {
@@ -214,9 +233,10 @@ public:
         _chunkAddress.coords[1] = _rowIndex  -1;
         shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         _chunk.initialize(this, &super::getArrayDesc(), _chunkAddress, 0);
-        shared_ptr<ChunkIterator> chunkIt = _chunk.getIterator(query, ChunkIterator::SEQUENTIAL_WRITE | ChunkIterator::NO_EMPTY_CHECK);
-        chunkIt->writeItem(_splitter.getBuffer());
-        chunkIt->flush();
+        size_t bufSize;
+        char const* buf = _splitter.grabChunk(bufSize);
+        _chunk.allocate(bufSize);
+        memcpy(_chunk.getData(),buf, bufSize);
         return _chunk;
     }
 };
@@ -285,8 +305,6 @@ public:
             char* d = _buf.getData<char>();
             memcpy(d, start, end-start);
             d[(end-start)]=0;
-
-            //_buf.setString(value);
             if(_splitOnDimension)
             {
                 _outputChunkIterators[0] -> setPosition(_outputPosition);
@@ -407,7 +425,7 @@ public:
         return RedistributeContext(psUndefined);
     }
 
-    shared_ptr<Array> makeSupplement(shared_ptr<Array>& afterSplit, shared_ptr<Query>& query, shared_ptr<UberLoadSettings>& settings)
+    shared_ptr<Array> makeSupplement(shared_ptr<Array>& afterSplit, shared_ptr<Query>& query, shared_ptr<UberLoadSettings>& settings, vector<Coordinate>& lastBlocks)
     {
         char const lineDelim = settings->getLineDelimiter();
         shared_ptr<Array> supplement(new MemArray(getSplitSchema(), query));
@@ -417,14 +435,21 @@ public:
         while(!srcArrayIter->end())
         {
            Coordinates supplementCoords = srcArrayIter->getPosition();
+           Coordinate iid   = supplementCoords[0];
+           Coordinate block = supplementCoords[1];
+           if(lastBlocks[iid] < block)
+           {
+               lastBlocks[iid] = block;
+           }
            if(supplementCoords[1] != 0)
            {
-               shared_ptr<ConstChunkIterator> srcChunkIter = srcArrayIter->getChunk().getConstIterator();
+               ConstChunk const& ch = srcArrayIter->getChunk();
+               shared_ptr<ConstChunkIterator> srcChunkIter = ch.getConstIterator();
                Value const& v= srcChunkIter->getItem();
                supplementCoords[1]--;
                char const* start = static_cast<char const*>(v.data());
-               char const* end = start;
                char const* lim = start + v.size();
+               char const* end = start;
                while( end != lim && (*end) != lineDelim)
                {
                    ++end;
@@ -445,6 +470,43 @@ public:
         return supplement;
     }
 
+    void exchangeLastBlocks(vector<Coordinate> &myLastBlocks, shared_ptr<Query>& query)
+    {
+        InstanceID const myId = query->getInstanceID();
+        size_t const numInstances = query->getInstancesCount();
+        size_t const vectorSize = numInstances *  sizeof(Coordinate);
+        shared_ptr<SharedBuffer> buf(new MemoryBuffer( &(myLastBlocks[0]), vectorSize));
+        for(InstanceID i = 0; i<numInstances; ++i)
+        {
+            if (i == myId)
+            {
+                continue;
+            }
+            BufSend(i, buf, query);
+        }
+        for(InstanceID i = 0; i<numInstances; ++i)
+        {
+            if (i == myId)
+            {
+                continue;
+            }
+            buf = BufReceive(i, query);
+            vector<Coordinate> otherLastBlocks(numInstances);
+            memcpy(&otherLastBlocks[0], buf->getData(), vectorSize);
+            for(size_t j =0; j<numInstances; ++j)
+            {
+                if(otherLastBlocks[j] > myLastBlocks[j])
+                {
+                    myLastBlocks[j] = otherLastBlocks[j];
+                }
+            }
+        }
+        for(InstanceID i = 0; i<numInstances; ++i)
+        {
+            LOG4CXX_DEBUG(logger, "Last blocks instance "<<i<<" max "<<myLastBlocks[i]);
+        }
+    }
+
     shared_ptr< Array> execute(std::vector< shared_ptr< Array> >& inputArrays, shared_ptr<Query> query)
     {
         shared_ptr<UberLoadSettings> settings (new UberLoadSettings(_parameters, false, query));
@@ -462,7 +524,9 @@ public:
                                                  std::shared_ptr<CoordinateTranslator>(),
                                                  0,
                                                  std::shared_ptr<PartitioningSchemaData>());
-        shared_ptr<Array> supplement = makeSupplement(splitData, query, settings);
+        vector<Coordinate> lastBlocks(query->getInstancesCount(), -1);
+        shared_ptr<Array> supplement = makeSupplement(splitData, query, settings, lastBlocks);
+        exchangeLastBlocks(lastBlocks, query);
         supplement = redistributeToRandomAccess(supplement, query, defaultPartitioning(),
                                                 ALL_INSTANCE_MASK,
                                                 std::shared_ptr<CoordinateTranslator>(),
@@ -477,68 +541,77 @@ public:
         while(!inputIterator-> end())
         {
             Coordinates const& pos = inputIterator->getPosition();
+            bool const lastBlock = (lastBlocks[ pos[0] ] == pos[1]);
             shared_ptr<ConstChunkIterator> inputChunkIterator = inputIterator->getChunk().getConstIterator();
-            if(!inputChunkIterator->end()) //just 1 value in chunk
+            if(inputChunkIterator->end()) //just 1 value in chunk
             {
-                size_t nLines =0;
-                writer.newChunk(pos, query);
-                Value const& v = inputChunkIterator->getItem();
-                char* sourceStart = (char*) v.data();
-                size_t sourceSize = v.size();
-                if(pos[1]!=0)
+                ++(*inputIterator);
+                continue;
+            }
+            size_t nLines =0;
+            Value const& v = inputChunkIterator->getItem();
+            char* sourceStart = (char*) v.data();
+            size_t sourceSize = v.size();
+            if(pos[1]!=0)
+            {
+                while((*sourceStart)!=lineDelim)
                 {
-                    while((*sourceStart)!=lineDelim)
-                    {
-                        sourceStart ++;
-                    }
                     sourceStart ++;
-                    sourceSize = sourceSize - (sourceStart - ((char*)v.data()));
                 }
-                bool haveSupplement = supplementIter->setPosition(pos);
-                vector<char>buf;
-                if(haveSupplement)
+                sourceStart ++;
+                sourceSize = sourceSize - (sourceStart - ((char*)v.data()));
+            }
+            bool haveSupplement = supplementIter->setPosition(pos);
+            vector<char>buf;
+            if(haveSupplement)
+            {
+                shared_ptr<ConstChunkIterator> supplementChunkIterator = supplementIter->getChunk().getConstIterator();
+                Value const &s = supplementChunkIterator->getItem();
+                buf.resize(sourceSize+s.size());
+                memcpy(&buf[0], sourceStart, sourceSize);
+                memcpy(&buf[0]+ sourceSize, s.data(), s.size());
+            }
+            else
+            {
+                buf.resize(sourceSize);
+                memcpy(&buf[0], sourceStart, sourceSize);
+            }
+            LOG4CXX_DEBUG(logger, "Pos "<<CoordsToStr(pos) <<" lb "<< lastBlock << " s "<< buf.size());
+            if(lastBlock && buf.size() <= 1)
+            {
+                ++(*inputIterator);
+                continue;
+            }
+            const char *data = &buf[0];
+            const char* start = data;
+            const char* end = start;
+            const char* terminus = start + buf.size();
+            bool finished = false;
+            writer.newChunk(pos, query);
+            while (!finished)
+            {
+                while( end != terminus && (*end)!=attDelim && (*end)!=lineDelim )
                 {
-                    shared_ptr<ConstChunkIterator> supplementChunkIterator = supplementIter->getChunk().getConstIterator();
-                    Value const &s = supplementChunkIterator->getItem();
-                    buf.resize(sourceSize+s.size());
-                    memcpy(&buf[0], sourceStart, sourceSize);
-                    memcpy(&buf[0]+ sourceSize, s.data(), s.size());
+                    ++end;
                 }
-                else
+                writer.writeValue(start, end);
+                if(end == terminus || (*end) == lineDelim )
                 {
-                    buf.resize(sourceSize);
-                    memcpy(&buf[0], sourceStart, sourceSize);
+                    writer.endLine();
+                    ++nLines;
+                    if (nLines > outputChunkSize)
+                    {
+                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Encountered a string with more lines than the chunk size; bailing";
+                    }
+                    if(end == terminus || (lastBlock && end == terminus-1))
+                    {
+                        finished = true;
+                    }
                 }
-                const char *data = &buf[0];
-                const char* start = data;
-                const char* end = start;
-                const char* terminus = start + buf.size();
-                bool finished = false;
-                while (!finished)
+                if (end != terminus)
                 {
-                    while( end != terminus && (*end)!=attDelim && (*end)!=lineDelim )
-                    {
-                        ++end;
-                    }
-                    writer.writeValue(start, end);
-                    if(end == terminus || (*end) == lineDelim )
-                    {
-                        writer.endLine();
-                        ++nLines;
-                        if (nLines > outputChunkSize)
-                        {
-                            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Encountered a string with more lines than the chunk size; bailing";
-                        }
-                        if(end == terminus)
-                        {
-                            finished = true;
-                        }
-                    }
-                    if (end != terminus)
-                    {
-                        start = end+1;
-                        end   = end+1;
-                    }
+                    start = end+1;
+                    end   = end+1;
                 }
             }
             ++(*inputIterator);
