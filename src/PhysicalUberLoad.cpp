@@ -29,7 +29,6 @@
 #include <array/Tile.h>
 #include <array/TileIteratorAdaptors.h>
 #include <system/Sysinfo.h>
-#include <log4cxx/logger.h>
 #include <util/Network.h>
 
 #include <boost/algorithm/string.hpp>
@@ -43,118 +42,19 @@ using boost::algorithm::is_from_range;
 namespace scidb
 {
 
-static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("alt.uber_load"));
-
 using namespace scidb;
 
-
-class BinaryFileSplitter
+static size_t getChunkOverheadSize()
 {
-private:
-    size_t const _fileBlockSize;
-    size_t const _chunkOverheadSize;
-    vector<char> _buffer;
-    bool         _endOfFile;
-    char*        _bufPointer;
-    uint32_t*    _sizePointer;
-    FILE*        _inputFile;
+    return             (  sizeof(ConstRLEPayload::Header) +
+                                 2 * sizeof(ConstRLEPayload::Segment) +
+                                 sizeof(varpart_offset_t) + 5);
+}
 
-public:
-    BinaryFileSplitter(string const& filePath,
-                       size_t bufferSize,
-                       int64_t header,
-                       char lineDelimiter,
-                       shared_ptr<Query>const& query):
-        _fileBlockSize(bufferSize),
-        _chunkOverheadSize(  sizeof(ConstRLEPayload::Header) +
-                             2 * sizeof(ConstRLEPayload::Segment) +
-                             sizeof(varpart_offset_t) + 5),
-        _endOfFile(false),
-        _inputFile(0)
-    {
-        try
-        {
-            _buffer.resize(_chunkOverheadSize + _fileBlockSize);
-        }
-        catch(...)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "FileSplitter() cannot allocate memory";
-        }
-        _bufPointer = &(_buffer[0]);
-        ConstRLEPayload::Header* hdr = (ConstRLEPayload::Header*) _bufPointer;
-        hdr->_magic = RLE_PAYLOAD_MAGIC;
-        hdr->_nSegs = 1;
-        hdr->_elemSize = 0;
-        hdr->_dataSize = _fileBlockSize + 5 + sizeof(varpart_offset_t);
-        hdr->_varOffs = sizeof(varpart_offset_t);
-        hdr->_isBoolean = 0;
-        ConstRLEPayload::Segment* seg = (ConstRLEPayload::Segment*) (hdr+1);
-        *seg =  ConstRLEPayload::Segment(0,0,false,false);
-        ++seg;
-        *seg =  ConstRLEPayload::Segment(1,0,false,false);
-        varpart_offset_t* vp =  (varpart_offset_t*) (seg+1);
-        *vp = 0;
-        uint8_t* sizeFlag = (uint8_t*) (vp+1);
-        *sizeFlag =0;
-        _sizePointer = (uint32_t*) (sizeFlag + 1);
-        *_sizePointer = (uint32_t) _fileBlockSize;
-        _bufPointer = (char*) (_sizePointer+1);
-        _inputFile = fopen(filePath.c_str(), "r");
-        if (_inputFile == NULL)
-        {
-            ostringstream errorMsg;
-            errorMsg<<"cannot open file '"<<filePath<<"' on instance "<<query->getInstanceID();
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << errorMsg.str().c_str();
-        }
-        if(header>0)
-        {
-            char *line = NULL;
-            size_t linesize = 0;
-            ssize_t nread = 0;
-            for(int64_t j=0; j<header && nread>=0; ++j)
-            {
-                nread = getdelim(&line, &linesize, (int)lineDelimiter, _inputFile);
-            }
-            free(line);
-        }
-    }
-
-    ~BinaryFileSplitter()
-    {
-        if(_inputFile!=0)
-        {
-            fclose(_inputFile);
-        }
-    }
-
-    bool readMore()
-    {
-        if(_endOfFile)
-        {
-            return false;
-        }
-        size_t numBytes = fread(_bufPointer, 1, _fileBlockSize, _inputFile);
-        if(numBytes != _fileBlockSize)
-        {
-            _endOfFile = true;
-            fclose(_inputFile);
-            _inputFile = 0;
-            if(numBytes == 0)
-            {
-                return false;
-            }
-            *_sizePointer = (uint32_t) numBytes;
-        }
-        return true;
-    }
-
-    char const* grabChunk(size_t &totalSize)
-    {
-        totalSize = _chunkOverheadSize + _fileBlockSize;
-        return &_buffer[0];
-    }
-};
-
+static size_t getSizeOffset()
+{
+    return getChunkOverheadSize()-4;
+}
 
 class BinEmptySinglePass : public SinglePassArray
 {
@@ -192,9 +92,12 @@ private:
     Address _chunkAddress;
     MemChunk _chunk;
     weak_ptr<Query> _query;
-    BinaryFileSplitter _splitter;
-    char const*  _buffer;
-    size_t _bufferSize;
+    size_t const _fileBlockSize;
+    size_t const _chunkOverheadSize;
+    bool         _endOfFile;
+    char*        _bufPointer;
+    uint32_t*    _sizePointer;
+    FILE*        _inputFile;
 
 public:
     BinFileSplitArray(ArrayDesc const& schema,
@@ -204,18 +107,69 @@ public:
         _rowIndex(0),
         _chunkAddress(0, Coordinates(2,0)),
         _query(query),
-        _splitter(settings->getInputFilePath(),
-                  settings->getBlockSize(),
-                  settings->getHeader(),
-                  settings->getLineDelimiter(),
-                  query)
+        _fileBlockSize(settings->getBlockSize()),
+        _chunkOverheadSize( getChunkOverheadSize() ),
+        _endOfFile(false),
+        _inputFile(0)
     {
         super::setEnforceHorizontalIteration(true);
         _chunkAddress.coords[0] = settings->getParseInstance();
+        try
+        {
+            _chunk.allocate(_chunkOverheadSize + _fileBlockSize);
+        }
+        catch(...)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "File splitter cannot allocate memory";
+        }
+        _bufPointer = (char*) _chunk.getData();
+        ConstRLEPayload::Header* hdr = (ConstRLEPayload::Header*) _bufPointer;
+        hdr->_magic = RLE_PAYLOAD_MAGIC;
+        hdr->_nSegs = 1;
+        hdr->_elemSize = 0;
+        hdr->_dataSize = _fileBlockSize + 5 + sizeof(varpart_offset_t);
+        hdr->_varOffs = sizeof(varpart_offset_t);
+        hdr->_isBoolean = 0;
+        ConstRLEPayload::Segment* seg = (ConstRLEPayload::Segment*) (hdr+1);
+        *seg =  ConstRLEPayload::Segment(0,0,false,false);
+        ++seg;
+        *seg =  ConstRLEPayload::Segment(1,0,false,false);
+        varpart_offset_t* vp =  (varpart_offset_t*) (seg+1);
+        *vp = 0;
+        uint8_t* sizeFlag = (uint8_t*) (vp+1);
+        *sizeFlag =0;
+        _sizePointer = (uint32_t*) (sizeFlag + 1);
+        *_sizePointer = (uint32_t) _fileBlockSize;
+        _bufPointer = (char*) (_sizePointer+1);
+        string const& filePath = settings->getInputFilePath();
+        _inputFile = fopen(filePath.c_str(), "r");
+        if (_inputFile == NULL)
+        {
+            ostringstream errorMsg;
+            errorMsg<<"cannot open file '"<<filePath<<"' on instance "<<query->getInstanceID();
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << errorMsg.str().c_str();
+        }
+        int const header = settings->getHeader();
+        if(header>0)
+        {
+            char *line = NULL;
+            size_t linesize = 0;
+            ssize_t nread = 0;
+            for(int64_t j=0; j<header && nread>=0; ++j)
+            {
+                nread = getdelim(&line, &linesize, (int)settings->getLineDelimiter(), _inputFile);
+            }
+            free(line);
+        }
     }
 
     virtual ~BinFileSplitArray()
-    {}
+    {
+        if(_inputFile!=0)
+        {
+            fclose(_inputFile);
+        }
+    }
 
     size_t getCurrentRowIndex() const
     {
@@ -224,12 +178,24 @@ public:
 
     bool moveNext(size_t rowIndex)
     {
-        bool res = _splitter.readMore();
-        if (res)
+        if(_endOfFile)
         {
-            ++_rowIndex;
+            return false;
         }
-        return res;
+        size_t numBytes = fread(_bufPointer, 1, _fileBlockSize, _inputFile);
+        if(numBytes != _fileBlockSize)
+        {
+            _endOfFile = true;
+            fclose(_inputFile);
+            _inputFile = 0;
+            if(numBytes == 0)
+            {
+                return false;
+            }
+            *_sizePointer = (uint32_t) numBytes;
+        }
+        ++_rowIndex;
+        return true;
     }
 
     ConstChunk const& getChunk(AttributeID attr, size_t rowIndex)
@@ -237,14 +203,9 @@ public:
         _chunkAddress.coords[1] = _rowIndex  -1;
         shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         _chunk.initialize(this, &super::getArrayDesc(), _chunkAddress, 0);
-        size_t bufSize;
-        char const* buf = _splitter.grabChunk(bufSize);
-        _chunk.allocate(bufSize);
-        memcpy(_chunk.getData(),buf, bufSize);
         return _chunk;
     }
 };
-
 
 class OutputWriter : public boost::noncopyable
 {
@@ -448,11 +409,10 @@ public:
            if(supplementCoords[1] != 0)
            {
                ConstChunk const& ch = srcArrayIter->getChunk();
-               shared_ptr<ConstChunkIterator> srcChunkIter = ch.getConstIterator();
-               Value const& v= srcChunkIter->getItem();
+               char* start = ((char*) ch.getData()) + getChunkOverheadSize();
+               uint32_t const sourceSize = *((uint32_t*)(((char*) ch.getData()) + getSizeOffset()));
                supplementCoords[1]--;
-               char const* start = static_cast<char const*>(v.data());
-               char const* lim = start + v.size();
+               char const* lim = start + sourceSize;
                char const* end = start;
                while( end != lim && (*end) != lineDelim)
                {
@@ -505,10 +465,6 @@ public:
                 }
             }
         }
-        for(InstanceID i = 0; i<numInstances; ++i)
-        {
-            LOG4CXX_DEBUG(logger, "Last blocks instance "<<i<<" max "<<myLastBlocks[i]);
-        }
     }
 
     shared_ptr< Array> execute(std::vector< shared_ptr< Array> >& inputArrays, shared_ptr<Query> query)
@@ -546,16 +502,14 @@ public:
         {
             Coordinates const& pos = inputIterator->getPosition();
             bool const lastBlock = (lastBlocks[ pos[0] ] == pos[1]);
-            shared_ptr<ConstChunkIterator> inputChunkIterator = inputIterator->getChunk().getConstIterator();
-            if(inputChunkIterator->end()) //just 1 value in chunk
+            ConstChunk const& chunk =  inputIterator->getChunk();
+            char* sourceStart = ((char*) chunk.getData()) + getChunkOverheadSize();
+            uint32_t sourceSize = *((uint32_t*)(((char*) chunk.getData()) + getSizeOffset()));
+            if(sourceSize == 0)
             {
-                ++(*inputIterator);
-                continue;
+                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "[defensive] encountered a chunk with no data.";
             }
             size_t nLines =0;
-            Value const& v = inputChunkIterator->getItem();
-            char* sourceStart = (char*) v.data();
-            size_t sourceSize = v.size();
             if(pos[1]!=0)
             {
                 while((*sourceStart)!=lineDelim)
@@ -563,7 +517,7 @@ public:
                     sourceStart ++;
                 }
                 sourceStart ++;
-                sourceSize = sourceSize - (sourceStart - ((char*)v.data()));
+                sourceSize = sourceSize - (sourceStart - (((char*) chunk.getData()) + getChunkOverheadSize()));
             }
             bool haveSupplement = supplementIter->setPosition(pos);
             vector<char>buf;
@@ -580,7 +534,6 @@ public:
                 buf.resize(sourceSize);
                 memcpy(&buf[0], sourceStart, sourceSize);
             }
-            LOG4CXX_DEBUG(logger, "Pos "<<CoordsToStr(pos) <<" lb "<< lastBlock << " s "<< buf.size());
             if(lastBlock && buf.size() <= 1)
             {
                 ++(*inputIterator);
