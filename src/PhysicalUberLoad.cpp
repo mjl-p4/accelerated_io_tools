@@ -63,7 +63,8 @@ public:
     BinaryFileSplitter(string const& filePath,
                        size_t bufferSize,
                        int64_t header,
-                       char lineDelimiter):
+                       char lineDelimiter,
+                       shared_ptr<Query>const& query):
         _fileBlockSize(bufferSize),
         _chunkOverheadSize(  sizeof(ConstRLEPayload::Header) +
                              2 * sizeof(ConstRLEPayload::Segment) +
@@ -101,7 +102,9 @@ public:
         _inputFile = fopen(filePath.c_str(), "r");
         if (_inputFile == NULL)
         {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "FileSplitter() cannot open file";
+            ostringstream errorMsg;
+            errorMsg<<"cannot open file '"<<filePath<<"' on instance "<<query->getInstanceID();
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << errorMsg.str().c_str();
         }
         if(header>0)
         {
@@ -204,7 +207,8 @@ public:
         _splitter(settings->getInputFilePath(),
                   settings->getBlockSize(),
                   settings->getHeader(),
-                  settings->getLineDelimiter())
+                  settings->getLineDelimiter(),
+                  query)
     {
         super::setEnforceHorizontalIteration(true);
         _chunkAddress.coords[0] = settings->getParseInstance();

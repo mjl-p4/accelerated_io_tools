@@ -336,7 +336,9 @@ public:
             {
                 if (_inputFilePath != "")
                 {
-                   throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set the input file path multiple times";
+                   ostringstream errorMsg;
+                   errorMsg << "unrecognized parameter: "<< parameterString;
+                   throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << errorMsg.str().c_str();
                 }
                 string path = parameterString;
                 trim(path);
