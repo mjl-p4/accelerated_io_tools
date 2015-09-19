@@ -411,6 +411,7 @@ public:
            if(supplementCoords[1] != 0)
            {
                ConstChunk const& ch = srcArrayIter->getChunk();
+               PinBuffer pinScope(ch);
                char* start = ((char*) ch.getData()) + getChunkOverheadSize();
                uint32_t const sourceSize = *((uint32_t*)(((char*) ch.getData()) + getSizeOffset()));
                supplementCoords[1]--;
@@ -505,6 +506,7 @@ public:
             Coordinates const& pos = inputIterator->getPosition();
             bool const lastBlock = (lastBlocks[ pos[0] ] == pos[1]);
             ConstChunk const& chunk =  inputIterator->getChunk();
+            PinBuffer pinScope(chunk);
             char* sourceStart = ((char*) chunk.getData()) + getChunkOverheadSize();
             uint32_t sourceSize = *((uint32_t*)(((char*) chunk.getData()) + getSizeOffset()));
             if(sourceSize == 0)
