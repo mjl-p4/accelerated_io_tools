@@ -80,7 +80,7 @@ public:
        _attributeDelimiter('\t'),
        _attributeDelimiterSet(false),
        _numAttributes(0),
-       _chunkSize(_bufferSize),
+       _chunkSize(10000000),
        _chunkSizeSet(false),
        _splitOnDimension(false),
        _splitOnDimensionSet(false)
