@@ -33,13 +33,13 @@ ifneq ("$(wildcard /usr/bin/g++-4.9)","")
   CC := "/usr/bin/gcc-4.9"
   CXX := "/usr/bin/g++-4.9"
   CFLAGS+=-std=c++11 -DCPP11
-  SRCS+=LogicalUberLoad.cpp PhysicalUberLoad.cpp
+  SRCS+=LogicalUberLoad.cpp PhysicalUberLoad.cpp LogicalAltSave.cpp PhysicalAltSave.cpp
 else
   ifneq ("$(wildcard /opt/rh/devtoolset-3/root/usr/bin/gcc)","")
    CC := "/opt/rh/devtoolset-3/root/usr/bin/gcc"
    CXX := "/opt/rh/devtoolset-3/root/usr/bin/g++"
    CFLAGS+=-std=c++11 -DCPP11
-   SRCS+=LogicalUberLoad.cpp PhysicalUberLoad.cpp
+   SRCS+=LogicalUberLoad.cpp PhysicalUberLoad.cpp LogicalAltSave.cpp PhysicalAltSave.cpp
   endif
 endif
 

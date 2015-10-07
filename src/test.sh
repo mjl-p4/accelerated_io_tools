@@ -174,4 +174,11 @@ iquery -anq "remove(bar)" > /dev/null 2>&1
 time iquery -anq "store(project(filter(apply(proto_load('paths=foo.tsv', 'instances=-1', 'num_attributes=1'), v, dcast(a0, double(null))), v is not null), v), bar)" > /dev/null
 iquery -aq "op_count(bar)" >> test.out
 
+iquery -naq "remove(foo)" > /dev/null 2>&1
+iquery -naq "store(apply(build(<v1:float null>[i=1:50,10,0], iif(i%2=0,null,i)), v2, double(i/10.4), v3, 'abcdef'), foo)" > /dev/null
+iquery -anq "alt_save(foo, 'file=/tmp/load_tools_test/foo', 'format=tdv', 'cells_per_chunk=8')" >> test.out
+iquery -aq "sort(input(foo, '/tmp/load_tools_test/foo', 0, 'tsv'), v2)" >> test.out
+iquery -anq "alt_save(foo, 'file=/tmp/load_tools_test/foo', 'format=(float null, double, string)', 'cells_per_chunk=8')" >> test.out
+iquery -aq "sort(input(foo, '/tmp/load_tools_test/foo', 0, '(float null, double, string)'), v2)" >> test.out
+
 diff test.out test.expected
