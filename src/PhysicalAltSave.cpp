@@ -72,126 +72,82 @@ static void EXCEPTION_ASSERT(bool cond)
     }
 }
 
-class MemArrayAppender
+static size_t chunkDataOffset()
+{
+    return (sizeof(ConstRLEPayload::Header) + 2 * sizeof(ConstRLEPayload::Segment) + sizeof(varpart_offset_t) + 5);
+}
+
+static size_t chunkSizeOffset()
+{
+    return (sizeof(ConstRLEPayload::Header) + 2 * sizeof(ConstRLEPayload::Segment) + sizeof(varpart_offset_t) + 1);
+}
+
+class SaveArrayBuilder
 {
 private:
-    std::shared_ptr<Query> const&      _query;
-    size_t const                       _nAttrs;
-    size_t const                       _chunkSize;
-    Coordinates                        _cellPos;
-    Coordinates                        _chunkPos;
-    std::vector<std::shared_ptr<ArrayIterator> > _aiters;
-    std::vector<std::shared_ptr<ChunkIterator> > _citers;
-    Value _buf;
-
-    void advance()
-    {
-        ++_cellPos[1];
-        if (_cellPos[1] % _chunkSize == 0)
-        {
-            if (_citers[0])
-            {
-                for(size_t i=0; i<_nAttrs; ++i)
-                {
-                    _citers[i]->flush();
-                }
-            }
-             _chunkPos[1] += 1;
-            _citers[0]=_aiters[0] ->newChunk(_chunkPos).getIterator(_query, ChunkIterator::SEQUENTIAL_WRITE);
-            for(size_t i=1; i<_nAttrs; ++i)
-            {
-                _citers[i] =_aiters[i] ->newChunk(_chunkPos).getIterator(_query, ChunkIterator::SEQUENTIAL_WRITE |
-                                                                                 ChunkIterator::NO_EMPTY_CHECK);
-            }
-        }
-        for(size_t i=0; i<_nAttrs; ++i)
-        {
-            _citers[i] ->setPosition(_cellPos);
-        }
-    }
+    shared_ptr<MemArray>          _out;
+    Coordinates                   _chunkPos;
+    shared_ptr<Query> const&      _query;
+    size_t const                  _chunkOverheadSize;
+    shared_ptr<ArrayIterator>     _aiter;
 
 public:
-     MemArrayAppender(std::shared_ptr<MemArray> inArray,
-                      std::shared_ptr<Query> const& query ):
-       _query(query),
-       _nAttrs(inArray->getArrayDesc().getAttributes(true).size()),
-       _chunkSize(inArray->getArrayDesc().getDimensions()[0].getChunkInterval()),
-       _cellPos(2,0),
-       _chunkPos(2,0),
-       _aiters(_nAttrs),
-       _citers(_nAttrs)
-    {
-
-    	 LOG4CXX_DEBUG(logger, "FOOBAR: MemArray Appender constructor");
-    	_cellPos[0]  = query->getInstanceID();
-    	_chunkPos[0] = _cellPos[0];
-    	_cellPos[1]  = -1;
-    	_chunkPos[1] = _cellPos[1];
-    	std::string cell1 = std::to_string(_cellPos[0]);
-    	std::string cell2 = std::to_string(_cellPos[1]);
-    	LOG4CXX_DEBUG(logger, "FOOBAR: MemArray Appender constructor- set Positions:" << cell1 << ":" << cell2);
-    	for (AttributeID i = 0; i<_nAttrs; ++i)
-        {
-            _aiters[i] = inArray->getIterator(i);
-
-        }
-    	LOG4CXX_DEBUG(logger, "FOOBAR: MemArray Appender constructor- geIterator");
-    }
-
-
-    void addValues(Value const& v0)
-    {
-        EXCEPTION_ASSERT(_nAttrs==1);
-        advance();
-        _citers[0]->writeItem(v0);
-    }
-
-    void release()
-    {
-        if (_citers[0])
-        {
-            for(size_t i=0; i<_nAttrs; ++i)
-            {
-                _citers[i]->flush();
-                _citers[i].reset();
-            }
-        }
-        for(size_t i=0; i<_nAttrs; ++i)
-        {
-            _aiters[i].reset();
-        }
-    }
-};
-
-class MemArrayBuilder
-{
-private:
-    std::shared_ptr<MemArray>          _out;
-    MemArrayAppender                   _appender;
-
-public:
-    MemArrayBuilder (ArrayDesc const& schema,
+    SaveArrayBuilder (ArrayDesc const& schema,
                      std::shared_ptr<Query> const& query):
         _out(new MemArray(schema, query)),
-        _appender(_out, query)
-    {}
-
-
-    void addValues(Value const& v0)
+        _chunkPos(2,0),
+        _query(query),
+        _chunkOverheadSize( sizeof(ConstRLEPayload::Header) +
+                            2 * sizeof(ConstRLEPayload::Segment) +
+                            sizeof(varpart_offset_t) + 5)
     {
-        _appender.addValues(v0);
+        _chunkPos[0]  = query->getInstanceID();
+        _chunkPos[1] = -1;
+        _aiter = _out->getIterator(0);
+    }
+
+    void addValue(Value const& v0)
+    {
+        _chunkPos[1] += 1;
+//        shared_ptr<ChunkIterator> citer = _aiter->newChunk(_chunkPos).getIterator(_query, ChunkIterator::SEQUENTIAL_WRITE);
+//        citer ->setPosition(_chunkPos);
+//        citer ->writeItem(v0);
+//        citer ->flush();
+        size_t const valSize = v0.size();
+        Chunk& newChunk = _aiter->newChunk(_chunkPos);
+        PinBuffer pinScope(newChunk);
+        newChunk.allocate(_chunkOverheadSize + valSize);
+        char* bufPointer = (char*) newChunk.getData();
+        ConstRLEPayload::Header* hdr = (ConstRLEPayload::Header*) bufPointer;
+        hdr->_magic = RLE_PAYLOAD_MAGIC;
+        hdr->_nSegs = 1;
+        hdr->_elemSize = 0;
+        hdr->_dataSize = valSize + 5 + sizeof(varpart_offset_t);
+        hdr->_varOffs = sizeof(varpart_offset_t);
+        hdr->_isBoolean = 0;
+        ConstRLEPayload::Segment* seg = (ConstRLEPayload::Segment*) (hdr+1);
+        *seg =  ConstRLEPayload::Segment(0,0,false,false);
+        ++seg;
+        *seg =  ConstRLEPayload::Segment(1,0,false,false);
+        varpart_offset_t* vp =  (varpart_offset_t*) (seg+1);
+        *vp = 0;
+        uint8_t* sizeFlag = (uint8_t*) (vp+1);
+        *sizeFlag =0;
+        uint32_t* sizePointer = (uint32_t*) (sizeFlag + 1);
+        *sizePointer = (uint32_t) valSize;
+        bufPointer = (char*) (sizePointer+1);
+        memcpy(bufPointer, v0.data(), valSize);
     }
 
     std::shared_ptr<Array> finalize()
     {
-    	_appender.release();
         return _out;
     }
 };
 
 std::shared_ptr< Array> convertToTDV(shared_ptr<Array> const& inputArray,
                                      AltSaveSettings const& settings,
-                                     MemArrayBuilder& outputwriter)
+                                     SaveArrayBuilder& outputwriter)
 {
     size_t linesperchunk = settings.getLinesPerChunk();
     ArrayDesc const& desc = inputArray->getArrayDesc();
@@ -272,7 +228,7 @@ std::shared_ptr< Array> convertToTDV(shared_ptr<Array> const& inputArray,
             if(lineCounter >= linesperchunk)
             {
                 insertBuf.setString(outputBuf.str());
-                outputwriter.addValues(insertBuf);
+                outputwriter.addValue(insertBuf);
                 lineCounter = 0;
                 outputBuf.str("");
             }
@@ -286,7 +242,7 @@ std::shared_ptr< Array> convertToTDV(shared_ptr<Array> const& inputArray,
     if(lineCounter)
     {
         insertBuf.setString(outputBuf.str());
-        outputwriter.addValues(insertBuf);
+        outputwriter.addValue(insertBuf);
     }
     std::shared_ptr<Array> outarray = outputwriter.finalize();
     return outarray;
@@ -298,9 +254,56 @@ static inline size_t skip_bytes(ExchangeTemplate::Column const& c)
     return (c.fixedSize ? c.fixedSize : sizeof(uint32_t)) + c.nullable;
 }
 
+class GrowingBuffer
+{
+private:
+    vector<char> _data;
+    size_t       _allocSize;
+    char*        _writePointer;
+    char*        _startPointer;
+
+public:
+    static const size_t startingSize = 20*1024*1024;
+
+    GrowingBuffer():
+        _data(startingSize),
+        _allocSize(startingSize),
+        _writePointer(&_data[0]),
+        _startPointer(&_data[0])
+    {}
+
+    ~GrowingBuffer()
+    {}
+
+    inline char* getData() const
+    {
+        return _startPointer;
+    }
+
+    inline size_t getSize() const
+    {
+        return _writePointer - _startPointer;
+    }
+
+    inline void addData(char* data, size_t const size)
+    {
+        if( getSize() + size > _allocSize)
+        {
+            size_t const mySize = getSize();
+            _allocSize = _allocSize * 2;
+            _data.resize(_allocSize);
+            _startPointer = &_data[0];
+            _writePointer = _startPointer + mySize;
+        }
+        memcpy(_writePointer, data, size);
+        _writePointer += size;
+    }
+};
+
+
 std::shared_ptr< Array>  convertToBinary(shared_ptr<Array> const& inputArray,
         AltSaveSettings const& settings,
-        MemArrayBuilder& outputWriter)
+        SaveArrayBuilder& outputWriter)
 {
     ArrayDesc const& desc = inputArray->getArrayDesc();
     ExchangeTemplate templ = TemplateParser::parse(desc, settings.getBinaryFormatString(), false);
@@ -312,7 +315,7 @@ std::shared_ptr< Array>  convertToBinary(shared_ptr<Array> const& inputArray,
     vector< Value > cnvValues(N_ATTRS);
     vector< char > padBuffer(sizeof(uint64_t) + 1, '\0'); // Big enuf for all nullable built-ins
     vector< char > chunkBuffer;
-    chunkBuffer.reserve(10 * 1024 * 1024);
+    chunkBuffer.reserve(40 * 1024 * 1024);
     size_t nMissingReasonOverflows = 0;
     Value insertBuf;
     for (size_t c = 0, i = 0; c < N_COLUMNS; ++c)
@@ -422,7 +425,7 @@ std::shared_ptr< Array>  convertToBinary(shared_ptr<Array> const& inputArray,
                 if(nCells>settings.getLinesPerChunk())
                 {
                     insertBuf.setData((char *)&(chunkBuffer[0]), chunkBuffer.size());
-                    outputWriter.addValues(insertBuf);
+                    outputWriter.addValue(insertBuf);
                     chunkBuffer.clear();
                     nCells = 0;
                 }
@@ -436,7 +439,7 @@ std::shared_ptr< Array>  convertToBinary(shared_ptr<Array> const& inputArray,
     if(nCells)
     {
         insertBuf.setData((char *)&(chunkBuffer[0]), chunkBuffer.size());
-        outputWriter.addValues(insertBuf);
+        outputWriter.addValue(insertBuf);
     }
     return outputWriter.finalize();
 }
@@ -455,6 +458,7 @@ uint64_t saveToDisk(shared_ptr<Array> const& array,
 {
     ArrayDesc const& desc = array->getArrayDesc();
     const size_t N_ATTRS = desc.getAttributes(true).size();
+    EXCEPTION_ASSERT(N_ATTRS==1);
     FILE* f;
     if (file == "console" || file == "stdout")
     {
@@ -485,47 +489,25 @@ uint64_t saveToDisk(shared_ptr<Array> const& array,
     }
     try
     {
-        vector< std::shared_ptr<ConstArrayIterator> > arrayIterators(N_ATTRS);
-        for (size_t i = 0; i < N_ATTRS; i++)
+        shared_ptr<ConstArrayIterator> arrayIter = array->getConstIterator(0);
+        for (size_t n = 0; !arrayIter->end(); n++)
         {
-            arrayIterators[i] = array->getConstIterator(i);
-        }
-        vector< std::shared_ptr<ConstChunkIterator> > chunkIterators(N_ATTRS);
-        vector< Value > cnvValues(N_ATTRS);
-        uint64_t nCells = 0;    // aka number of tuples written
-        for (size_t n = 0; !arrayIterators[0]->end(); n++)
-        {
-            for (size_t i = 0; i < N_ATTRS; i++)
+            ConstChunk const& ch = arrayIter->getChunk();
+            PinBuffer scope(ch);
+            uint32_t* sizePointer = (uint32_t*) (((char*)ch.getData()) + chunkSizeOffset());
+            uint32_t size = *sizePointer;
+            if (!isBinary)
             {
-                chunkIterators[i] = arrayIterators[i]->getChunk().getConstIterator( ConstChunkIterator::IGNORE_OVERLAPS | ConstChunkIterator::IGNORE_EMPTY_CELLS);
+                //strip away the terminating null character
+                size = size-1;
             }
-            while (!chunkIterators[0]->end())
+            char* data = ((char*)ch.getData() + chunkDataOffset());
+            if (fwrite(data, 1, size, f) != size)
             {
-                ++nCells;
-                int i = 0;
-                Value const* v = &chunkIterators[i]->getItem();
-                if (v->size() > numeric_limits<uint32_t>::max())
-                {
-                    throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_TRUNCATION) << v->size() << numeric_limits<uint32_t>::max();
-                }
-                uint32_t size = (uint32_t)v->size();
-                if (!isBinary)
-                {
-                    //strip away the terminating null character
-                    size = size-1;
-                }
-                if (fwrite(v->data(), 1, size, f) != size)
-                {
-                    int err = errno ? errno : EIO;
-                    throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR) << ::strerror(err) << err;
-                }
-                ++(*chunkIterators[i]);
-                ++i;
+                int err = errno ? errno : EIO;
+                throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR) << ::strerror(err) << err;
             }
-            for (size_t i = 0; i < N_ATTRS; i++)
-            {
-                ++(*arrayIterators[i]);
-            }
+            ++(*arrayIter);
         }
     }
     catch (AwIoError& e)
@@ -588,7 +570,7 @@ public:
     std::shared_ptr< Array> execute(std::vector< std::shared_ptr< Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         AltSaveSettings settings (_parameters, false, query);
-        MemArrayBuilder writer(_schema, query);
+        SaveArrayBuilder writer(_schema, query);
         shared_ptr<Array>& input = inputArrays[0];
         shared_ptr< Array> outArray;
         if(settings.isBinaryFormat())

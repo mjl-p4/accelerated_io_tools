@@ -66,7 +66,7 @@ public:
 #endif
         vector<AttributeDesc> attributes;
         attributes.push_back(AttributeDesc((AttributeID)0, "val", TID_STRING, AttributeDesc::IS_NULLABLE, 0));
-        attributes = addEmptyTagAttribute(attributes);
+        //attributes = addEmptyTagAttribute(attributes);
 
 #ifdef CPP11
         return ArrayDesc("alt_save", attributes, dimensions, defaultPartitioning());
