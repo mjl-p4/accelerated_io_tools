@@ -82,6 +82,57 @@ static size_t chunkSizeOffset()
     return (sizeof(ConstRLEPayload::Header) + 2 * sizeof(ConstRLEPayload::Segment) + sizeof(varpart_offset_t) + 1);
 }
 
+class GrowingBuffer
+{
+private:
+    vector<char> _data;
+    size_t       _allocSize;
+    char*        _writePointer;
+    char*        _startPointer;
+
+public:
+    static const size_t startingSize = 20*1024*1024;
+
+    GrowingBuffer():
+        _data(startingSize),
+        _allocSize(startingSize),
+        _writePointer(&_data[0]),
+        _startPointer(&_data[0])
+    {}
+
+    ~GrowingBuffer()
+    {}
+
+    inline char* getData() const
+    {
+        return _startPointer;
+    }
+
+    inline size_t getSize() const
+    {
+        return _writePointer - _startPointer;
+    }
+
+    inline void addData(char* data, size_t const size)
+    {
+        if( getSize() + size > _allocSize)
+        {
+            size_t const mySize = getSize();
+            _allocSize = _allocSize * 2;
+            _data.resize(_allocSize);
+            _startPointer = &_data[0];
+            _writePointer = _startPointer + mySize;
+        }
+        memcpy(_writePointer, data, size);
+        _writePointer += size;
+    }
+
+    inline void clear()
+    {
+        _writePointer = _startPointer;
+    }
+};
+
 class SaveArrayBuilder
 {
 private:
@@ -137,6 +188,35 @@ public:
         *sizePointer = (uint32_t) valSize;
         bufPointer = (char*) (sizePointer+1);
         memcpy(bufPointer, v0.data(), valSize);
+    }
+
+    void addBuffer(GrowingBuffer const& b)
+    {
+        _chunkPos[1] += 1;
+       size_t const valSize = b.getSize();
+       Chunk& newChunk = _aiter->newChunk(_chunkPos);
+       PinBuffer pinScope(newChunk);
+       newChunk.allocate(_chunkOverheadSize + valSize);
+       char* bufPointer = (char*) newChunk.getData();
+       ConstRLEPayload::Header* hdr = (ConstRLEPayload::Header*) bufPointer;
+       hdr->_magic = RLE_PAYLOAD_MAGIC;
+       hdr->_nSegs = 1;
+       hdr->_elemSize = 0;
+       hdr->_dataSize = valSize + 5 + sizeof(varpart_offset_t);
+       hdr->_varOffs = sizeof(varpart_offset_t);
+       hdr->_isBoolean = 0;
+       ConstRLEPayload::Segment* seg = (ConstRLEPayload::Segment*) (hdr+1);
+       *seg =  ConstRLEPayload::Segment(0,0,false,false);
+       ++seg;
+       *seg =  ConstRLEPayload::Segment(1,0,false,false);
+       varpart_offset_t* vp =  (varpart_offset_t*) (seg+1);
+       *vp = 0;
+       uint8_t* sizeFlag = (uint8_t*) (vp+1);
+       *sizeFlag =0;
+       uint32_t* sizePointer = (uint32_t*) (sizeFlag + 1);
+       *sizePointer = (uint32_t) valSize;
+       bufPointer = (char*) (sizePointer+1);
+       memcpy(bufPointer, b.getData(), valSize);
     }
 
     std::shared_ptr<Array> finalize()
@@ -254,53 +334,6 @@ static inline size_t skip_bytes(ExchangeTemplate::Column const& c)
     return (c.fixedSize ? c.fixedSize : sizeof(uint32_t)) + c.nullable;
 }
 
-class GrowingBuffer
-{
-private:
-    vector<char> _data;
-    size_t       _allocSize;
-    char*        _writePointer;
-    char*        _startPointer;
-
-public:
-    static const size_t startingSize = 20*1024*1024;
-
-    GrowingBuffer():
-        _data(startingSize),
-        _allocSize(startingSize),
-        _writePointer(&_data[0]),
-        _startPointer(&_data[0])
-    {}
-
-    ~GrowingBuffer()
-    {}
-
-    inline char* getData() const
-    {
-        return _startPointer;
-    }
-
-    inline size_t getSize() const
-    {
-        return _writePointer - _startPointer;
-    }
-
-    inline void addData(char* data, size_t const size)
-    {
-        if( getSize() + size > _allocSize)
-        {
-            size_t const mySize = getSize();
-            _allocSize = _allocSize * 2;
-            _data.resize(_allocSize);
-            _startPointer = &_data[0];
-            _writePointer = _startPointer + mySize;
-        }
-        memcpy(_writePointer, data, size);
-        _writePointer += size;
-    }
-};
-
-
 std::shared_ptr< Array>  convertToBinary(shared_ptr<Array> const& inputArray,
         AltSaveSettings const& settings,
         SaveArrayBuilder& outputWriter)
@@ -314,10 +347,8 @@ std::shared_ptr< Array>  convertToBinary(shared_ptr<Array> const& inputArray,
     vector< std::shared_ptr<ConstChunkIterator> > chunkIterators(N_ATTRS);
     vector< Value > cnvValues(N_ATTRS);
     vector< char > padBuffer(sizeof(uint64_t) + 1, '\0'); // Big enuf for all nullable built-ins
-    vector< char > chunkBuffer;
-    chunkBuffer.reserve(40 * 1024 * 1024);
+    GrowingBuffer chunkBuffer;
     size_t nMissingReasonOverflows = 0;
-    Value insertBuf;
     for (size_t c = 0, i = 0; c < N_COLUMNS; ++c)
     {
         ExchangeTemplate::Column const& column = templ.columns[c];
@@ -360,7 +391,7 @@ std::shared_ptr< Array>  convertToBinary(shared_ptr<Array> const& inputArray,
                 {
                     size_t pad = skip_bytes(column);
                     SCIDB_ASSERT(padBuffer.size() >= pad);
-                    chunkBuffer.insert (chunkBuffer.end(), padBuffer.begin(), padBuffer.end());
+                    chunkBuffer.addData(&(padBuffer[0]), padBuffer.size());
                 }
                 else
                 {
@@ -373,7 +404,7 @@ std::shared_ptr< Array>  convertToBinary(shared_ptr<Array> const& inputArray,
                             nMissingReasonOverflows += 1;
                         }
                         int8_t missingReason = (int8_t)v->getMissingReason();
-                        chunkBuffer.insert (chunkBuffer.end(), &missingReason, &missingReason + sizeof(missingReason));
+                        chunkBuffer.addData( (char*) (&missingReason), sizeof(missingReason));
                     }
                     if (v->isNull())
                     {
@@ -384,7 +415,7 @@ std::shared_ptr< Array>  convertToBinary(shared_ptr<Array> const& inputArray,
                         // for varying size type write 4-bytes counter
                         size_t size = column.fixedSize ? column.fixedSize : sizeof(uint32_t);
                         SCIDB_ASSERT(padBuffer.size() >= size);
-                        chunkBuffer.insert (chunkBuffer.end(), padBuffer.begin(), padBuffer.begin() + size);
+                        chunkBuffer.addData( &(padBuffer[0]), size);
                     }
                     else
                     {
@@ -400,8 +431,8 @@ std::shared_ptr< Array>  convertToBinary(shared_ptr<Array> const& inputArray,
                         uint32_t size = (uint32_t)v->size();
                         if (column.fixedSize == 0)
                         { // varying size type
-                            chunkBuffer.insert (chunkBuffer.end(), (char *) &size,    (char *) &size + sizeof(size));
-                            chunkBuffer.insert (chunkBuffer.end(), (char *)v->data(), (char *)v->data() + size);
+                            chunkBuffer.addData( (char*) (&size), sizeof(size));
+                            chunkBuffer.addData( (char*) v->data(), size);
                         }
                         else
                         {
@@ -409,12 +440,12 @@ std::shared_ptr< Array>  convertToBinary(shared_ptr<Array> const& inputArray,
                             {
                                 throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_TRUNCATION) << size << column.fixedSize;
                             }
-                            chunkBuffer.insert (chunkBuffer.end(), (char *)v->data(), (char *)v->data() + size);
+                            chunkBuffer.addData( (char*) v->data(), size);
                             if (size < column.fixedSize)
                             {
                                 size_t padSize = column.fixedSize - size;
                                 assert(padSize <= padBuffer.size());
-                                chunkBuffer.insert (chunkBuffer.end(), padBuffer.begin(), padBuffer.begin() + padSize);
+                                chunkBuffer.addData(&(padBuffer[0]), padSize);
                             }
                         }
                     }
@@ -424,8 +455,7 @@ std::shared_ptr< Array>  convertToBinary(shared_ptr<Array> const& inputArray,
                 ++nCells;
                 if(nCells>settings.getLinesPerChunk())
                 {
-                    insertBuf.setData((char *)&(chunkBuffer[0]), chunkBuffer.size());
-                    outputWriter.addValue(insertBuf);
+                    outputWriter.addBuffer(chunkBuffer);
                     chunkBuffer.clear();
                     nCells = 0;
                 }
@@ -438,8 +468,7 @@ std::shared_ptr< Array>  convertToBinary(shared_ptr<Array> const& inputArray,
     }
     if(nCells)
     {
-        insertBuf.setData((char *)&(chunkBuffer[0]), chunkBuffer.size());
-        outputWriter.addValue(insertBuf);
+        outputWriter.addBuffer(chunkBuffer);
     }
     return outputWriter.finalize();
 }
