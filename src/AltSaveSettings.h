@@ -51,9 +51,13 @@ private:
     bool         _binaryFormat;
     string       _binaryFormatString;
     bool         _formatSet;
+    bool         _push;
+    bool         _pushSet;
+    bool         _materialize;
+    bool         _materializeSet;
 
 public:
-    static const size_t MAX_PARAMETERS = 5;
+    static const size_t MAX_PARAMETERS = 6;
 
     AltSaveSettings(vector<shared_ptr<OperatorParam> > const& operatorParameters,
                     bool logical,
@@ -69,13 +73,19 @@ public:
                 _filePathSet(false),
                 _binaryFormat(false),
                 _binaryFormatString(""),
-                _formatSet(false)
+                _formatSet(false),
+                _push(false),
+                _pushSet(false),
+                _materialize(false),
+                _materializeSet(false)
     {
     	string const cellsPerChunkHeader           = "cells_per_chunk=";
     	string const attributeDelimiterHeader      = "attribute_delimiter=";
     	string const lineDelimiterHeader           = "line_delimiter=";
     	string const filePathHeader                = "file=";
     	string const formatHeader                  = "format=";
+    	string const pushHeader                    = "push=";
+    	string const materializeHeader             = "materialize=";
     	size_t const nParams = operatorParameters.size();
     	if (nParams > MAX_PARAMETERS)
     	{   //assert-like exception. Caller should have taken care of this!
@@ -222,6 +232,50 @@ public:
                 }
                 _formatSet=true;
             }
+            else if (starts_with (parameterString, pushHeader))
+            {
+                if(_pushSet)
+                {
+                   throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set push multiple times";
+                }
+                string paramContent = parameterString.substr(pushHeader.size());
+                trim(paramContent);
+                if(paramContent == "1")
+                {
+                    _push=true;
+                }
+                else if(paramContent=="0")
+                {
+                    _push=false;
+                }
+                else
+                {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "push can only be 0 or 1";
+                }
+                _pushSet=true;
+            }
+            else if (starts_with (parameterString, materializeHeader))
+            {
+               if(_materializeSet)
+               {
+                  throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set materialize multiple times";
+               }
+               string paramContent = parameterString.substr(materializeHeader.size());
+               trim(paramContent);
+               if(paramContent == "1")
+               {
+                   _materialize=true;
+               }
+               else if(paramContent=="0")
+               {
+                   _materialize=false;
+               }
+               else
+               {
+                   throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "materialize can only be 0 or 1";
+               }
+               _materializeSet=true;
+            }
     		else
     		{
     			ostringstream err;
@@ -272,6 +326,16 @@ public:
     string const& getBinaryFormatString() const
     {
         return _binaryFormatString;
+    }
+
+    bool push() const
+    {
+        return _push;
+    }
+
+    bool materialize() const
+    {
+        return _materialize;
     }
 };
 
