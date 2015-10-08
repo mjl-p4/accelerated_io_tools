@@ -22,9 +22,8 @@
 
 #include <boost/algorithm/string.hpp>
 
-#include "UberLoadSettings.h"
-
 #include <fcntl.h>
+#include "AioInputSettings.h"
 
 using std::make_shared;
 
@@ -351,7 +350,7 @@ public:
     }
 };
 
-class PhysicalUberLoad : public PhysicalOperator
+class PhysicalAioInput : public PhysicalOperator
 {
 public:
     static ArrayDesc getSplitSchema()
@@ -361,10 +360,10 @@ public:
         dimensions[1] = DimensionDesc("block_no",           0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
         vector<AttributeDesc> attributes;
         attributes.push_back(AttributeDesc((AttributeID)0, "value",  TID_BINARY, 0, 0));
-        return ArrayDesc("uber_load", attributes, dimensions, defaultPartitioning());
+        return ArrayDesc("aio_input", attributes, dimensions, defaultPartitioning());
     }
 
-    PhysicalUberLoad(std::string const& logicalName,
+    PhysicalAioInput(std::string const& logicalName,
                      std::string const& physicalName,
                      Parameters const& parameters,
                      ArrayDesc const& schema):
@@ -570,7 +569,7 @@ public:
     }
 };
 
-REGISTER_PHYSICAL_OPERATOR_FACTORY(PhysicalUberLoad, "proto_load", "PhysicalUberLoad");
-
+REGISTER_PHYSICAL_OPERATOR_FACTORY(PhysicalAioInput, "proto_load", "PhysicalAioInput");
+//TODO: rename soon REGISTER_PHYSICAL_OPERATOR_FACTORY(PhysicalAioInput, "aio_input",  "PhysicalAioInput");
 
 } // end namespace scidb

@@ -8,15 +8,16 @@
 */
 
 #include <query/Operator.h>
-#include "UberLoadSettings.h"
+
+#include "AioInputSettings.h"
 
 namespace scidb
 {
 
-class LogicalUberLoad : public  LogicalOperator
+class LogicalAioInput : public  LogicalOperator
 {
 public:
-    LogicalUberLoad(const std::string& logicalName, const std::string& alias):
+    LogicalAioInput(const std::string& logicalName, const std::string& alias):
         LogicalOperator(logicalName, alias)
     {
         ADD_PARAM_VARIES();
@@ -67,13 +68,14 @@ public:
         }
         attributes = addEmptyTagAttribute(attributes);
 #ifdef CPP11
-        return ArrayDesc("uber_load", attributes, dimensions, defaultPartitioning());
+        return ArrayDesc("aio_input", attributes, dimensions, defaultPartitioning());
 #else
-        return ArrayDesc("uber_load", attributes, dimensions);
+        return ArrayDesc("aio_input", attributes, dimensions);
 #endif
     }
 };
 
-REGISTER_LOGICAL_OPERATOR_FACTORY(LogicalUberLoad, "proto_load");
+REGISTER_LOGICAL_OPERATOR_FACTORY(LogicalAioInput, "proto_load");
+//TODO: rename soon REGISTER_LOGICAL_OPERATOR_FACTORY(LogicalAioInput, "aio_input");
 
 } // emd namespace scidb
