@@ -85,7 +85,7 @@ public:
        _splitOnDimension(false),
        _splitOnDimensionSet(false)
     {
-        string const inputFilePathHeader        = "input_file_path=";
+        string const inputFilePathHeader        = "path=";
         string const inputPathsHeader           = "paths=";
         string const inputInstancesHeader       = "instances=";
         string const bufferSizeHeader           = "buffer_size=";
@@ -118,7 +118,7 @@ public:
             {
                 if (_inputFilePath != "")
                 {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set the input file path multiple times";
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set the path multiple times";
                 }
                 string paramContent = parameterString.substr(inputFilePathHeader.size());
                 trim(paramContent);
@@ -130,7 +130,7 @@ public:
             {
                 if (_inputPaths.size() > 0)
                 {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set the input file paths multiple times";
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set the paths multiple times";
                 }
                 string paramContent = parameterString.substr(inputPathsHeader.size());
                 trim(paramContent);
@@ -169,8 +169,19 @@ public:
                 }
                 string paramContent = parameterString.substr(headerHeader.size());
                 trim(paramContent);
-                _header = lexical_cast<int64_t>(paramContent);
-                _headerSet = true;
+                try
+                {
+                    _header = lexical_cast<int64_t>(paramContent);
+                    if(_header<=0)
+                   {
+                       throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "header must be positive";
+                   }
+                    _headerSet = true;
+                }
+                catch (bad_lexical_cast const& exn)
+                {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse header";
+                }
             }
             else if (starts_with(parameterString, bufferSizeHeader))
             {
@@ -334,14 +345,23 @@ public:
             }
             else
             {
-                if (_inputFilePath != "")
+                string path = parameterString;
+                trim(path);
+                bool containsStrangeCharacters = false;
+                for(size_t i=0; i<path.size(); ++i)
+                {
+                    if(path[i] == '=' || path[i] == ' ')
+                    {
+                        containsStrangeCharacters=true;
+                        break;
+                    }
+                }
+                if (_inputFilePath != "" || containsStrangeCharacters)
                 {
                    ostringstream errorMsg;
                    errorMsg << "unrecognized parameter: "<< parameterString;
                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << errorMsg.str().c_str();
                 }
-                string path = parameterString;
-                trim(path);
                 _singlepath     = true;
                 _inputFilePath  = path;
                 _instanceParse  = 0;

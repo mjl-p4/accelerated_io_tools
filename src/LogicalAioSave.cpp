@@ -21,15 +21,15 @@
 
 #include <query/Operator.h>
 
-#include "AltSaveSettings.h"
+#include "AioSaveSettings.h"
 
 namespace scidb
 {
 
-class LogicalAltSave : public  LogicalOperator
+class LogicalAioSave : public  LogicalOperator
 {
 public:
-    LogicalAltSave(const std::string& logicalName, const std::string& alias):
+    LogicalAioSave(const std::string& logicalName, const std::string& alias):
         LogicalOperator(logicalName, alias)
     {
         ADD_PARAM_INPUT();
@@ -42,7 +42,7 @@ public:
     {
         std::vector<shared_ptr<OperatorParamPlaceholder> > res;
         res.push_back(END_OF_VARIES_PARAMS());
-        if (_parameters.size() < AltSaveSettings::MAX_PARAMETERS)
+        if (_parameters.size() < AioSaveSettings::MAX_PARAMETERS)
         {
             res.push_back(PARAM_CONSTANT("string"));
         }
@@ -54,7 +54,7 @@ public:
         ArrayDesc const& inputSchema = schemas[0];
         Attributes inputAttributes   = inputSchema.getAttributes(true);
 
-        AltSaveSettings settings (_parameters, true, query);
+        AioSaveSettings settings (_parameters, true, query);
         vector<DimensionDesc> dimensions(2);
 
 #ifdef CPP11
@@ -69,13 +69,13 @@ public:
         //attributes = addEmptyTagAttribute(attributes);
 
 #ifdef CPP11
-        return ArrayDesc("alt_save", attributes, dimensions, defaultPartitioning());
+        return ArrayDesc("aio_save", attributes, dimensions, defaultPartitioning());
 #else
-        return ArrayDesc("alt_save", attributes, dimensions);
+        return ArrayDesc("aio_save", attributes, dimensions);
 #endif
     }
 };
 
-REGISTER_LOGICAL_OPERATOR_FACTORY(LogicalAltSave, "alt_save");
+REGISTER_LOGICAL_OPERATOR_FACTORY(LogicalAioSave, "aio_save");
 
 } // emd namespace scidb

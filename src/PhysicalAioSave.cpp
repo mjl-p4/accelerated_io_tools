@@ -46,7 +46,8 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/unordered_map.hpp>
-#include "AltSaveSettings.h"
+
+#include "AioSaveSettings.h"
 
 #ifdef CPP11
 using std::make_shared;
@@ -252,7 +253,6 @@ public:
     }
 };
 
-
 class BinaryConvertedArray : public SinglePassArray
 {
 private:
@@ -279,7 +279,7 @@ public:
     BinaryConvertedArray(ArrayDesc const& schema,
                          shared_ptr<Array>& inputArray,
                          shared_ptr<Query>& query,
-                         AltSaveSettings const& settings):
+                         AioSaveSettings const& settings):
         super(schema),
         _rowIndex(0),
         _chunkAddress(0, Coordinates(2,0)),
@@ -437,7 +437,7 @@ public:
     TextConvertedArray(ArrayDesc const& schema,
                        shared_ptr<Array>& inputArray,
                        shared_ptr<Query>& query,
-                       AltSaveSettings const& settings):
+                       AioSaveSettings const& settings):
         super(schema),
         _rowIndex(0),
         _chunkAddress(0, Coordinates(2,0)),
@@ -630,10 +630,10 @@ uint64_t saveToDisk(shared_ptr<Array> const& array,
 }
 
 
-class PhysicalAltSave : public PhysicalOperator
+class PhysicalAioSave : public PhysicalOperator
 {
 public:
-    PhysicalAltSave(std::string const& logicalName,
+    PhysicalAioSave(std::string const& logicalName,
                   std::string const& physicalName,
                   Parameters const& parameters,
                    ArrayDesc const& schema):
@@ -659,7 +659,7 @@ public:
 
     std::shared_ptr< Array> execute(std::vector< std::shared_ptr< Array> >& inputArrays, std::shared_ptr<Query> query)
     {
-        AltSaveSettings settings (_parameters, false, query);
+        AioSaveSettings settings (_parameters, false, query);
         shared_ptr<Array>& input = inputArrays[0];
         shared_ptr< Array> outArray;
         if(settings.isBinaryFormat())
@@ -676,32 +676,19 @@ public:
         InstanceID const saveInstanceID = settings.getSaveInstanceId();
         const Attributes& attribs = inputArrayDesc.getAttributes();
         LOG4CXX_DEBUG(logger, "ALT_SAVE>> Starting SG")
-        if(settings.push() == false)
-        {
-            tmpRedistedInput = pullRedistribute(outArray,
-                                                query,
-                                                psLocalInstance,
-                                                saveInstanceID,
-                                                std::shared_ptr<CoordinateTranslator>(),
-                                                0,
-                                                std::shared_ptr<PartitioningSchemaData>());
-        }
-        else
-        {
-            tmpRedistedInput = redistributeToRandomAccess(outArray,
-                                                           query,
-                                                           psLocalInstance,
-                                                           saveInstanceID,
-                                                           std::shared_ptr<CoordinateTranslator>(),
-                                                           0,
-                                                           std::shared_ptr<PartitioningSchemaData>());
-        }
+        tmpRedistedInput = pullRedistribute(outArray,
+                                            query,
+                                            psLocalInstance,
+                                            saveInstanceID,
+                                            std::shared_ptr<CoordinateTranslator>(),
+                                            0,
+                                            std::shared_ptr<PartitioningSchemaData>());
         bool const wasConverted = (tmpRedistedInput != outArray) ;
         if (saveInstanceID == myInstanceID)
         {
             saveToDisk(tmpRedistedInput, settings.getFilePath(), query, settings.isBinaryFormat(), false);
         }
-        if (settings.push() == false && wasConverted)
+        if (wasConverted)
         {
             SynchableArray* syncArray = safe_dynamic_cast<SynchableArray*>(tmpRedistedInput.get());
             syncArray->sync();
@@ -710,7 +697,7 @@ public:
     }
 };
 
-REGISTER_PHYSICAL_OPERATOR_FACTORY(PhysicalAltSave, "alt_save", "PhysicalAltSave");
+REGISTER_PHYSICAL_OPERATOR_FACTORY(PhysicalAioSave, "aio_save", "PhysicalAioSave");
 
 
 } // end namespace scidb

@@ -36,7 +36,7 @@ using namespace std;
 namespace scidb
 {
 
-class AltSaveSettings
+class AioSaveSettings
 {
 private:
 	int64_t      _cellsPerChunk;
@@ -46,20 +46,18 @@ private:
     char         _lineDelimiter;
     bool         _lineDelimiterSet;
     InstanceID   _saveInstanceId;
+    size_t const _numInstances;
+    bool         _instanceSet;
     string       _filePath;
     bool         _filePathSet;
     bool         _binaryFormat;
     string       _binaryFormatString;
     bool         _formatSet;
-    bool         _push;
-    bool         _pushSet;
-    bool         _materialize;
-    bool         _materializeSet;
 
 public:
     static const size_t MAX_PARAMETERS = 6;
 
-    AltSaveSettings(vector<shared_ptr<OperatorParam> > const& operatorParameters,
+    AioSaveSettings(vector<shared_ptr<OperatorParam> > const& operatorParameters,
                     bool logical,
                     shared_ptr<Query>& query):
 				_cellsPerChunk(1000000),
@@ -69,23 +67,20 @@ public:
                 _lineDelimiter('\n'),
                 _lineDelimiterSet(false),
                 _saveInstanceId(0),
+                _numInstances(query->getInstancesCount()),
+                _instanceSet(false),
                 _filePath(""),
                 _filePathSet(false),
                 _binaryFormat(false),
                 _binaryFormatString(""),
-                _formatSet(false),
-                _push(false),
-                _pushSet(false),
-                _materialize(false),
-                _materializeSet(false)
+                _formatSet(false)
     {
     	string const cellsPerChunkHeader           = "cells_per_chunk=";
     	string const attributeDelimiterHeader      = "attribute_delimiter=";
     	string const lineDelimiterHeader           = "line_delimiter=";
-    	string const filePathHeader                = "file=";
+    	string const filePathHeader                = "path=";
     	string const formatHeader                  = "format=";
-    	string const pushHeader                    = "push=";
-    	string const materializeHeader             = "materialize=";
+    	string const instanceHeader                = "instance=";
     	size_t const nParams = operatorParameters.size();
     	if (nParams > MAX_PARAMETERS)
     	{   //assert-like exception. Caller should have taken care of this!
@@ -232,55 +227,50 @@ public:
                 }
                 _formatSet=true;
             }
-            else if (starts_with (parameterString, pushHeader))
+            else if (starts_with (parameterString, instanceHeader))
             {
-                if(_pushSet)
+                if(_instanceSet)
                 {
-                   throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set push multiple times";
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set instance multiple times";
                 }
-                string paramContent = parameterString.substr(pushHeader.size());
+                string paramContent = parameterString.substr(instanceHeader.size());
                 trim(paramContent);
-                if(paramContent == "1")
+                try
                 {
-                    _push=true;
+                    int64_t iid = lexical_cast<int64_t>(paramContent);
+                    if(iid<0 || ((uint64_t)iid) >= _numInstances)
+                    {
+                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "header must be positive";
+                    }
+                    _saveInstanceId = iid;
+                    _instanceSet = true;
                 }
-                else if(paramContent=="0")
+                catch (bad_lexical_cast const& exn)
                 {
-                    _push=false;
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse header";
                 }
-                else
-                {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "push can only be 0 or 1";
-                }
-                _pushSet=true;
             }
-            else if (starts_with (parameterString, materializeHeader))
-            {
-               if(_materializeSet)
-               {
-                  throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set materialize multiple times";
-               }
-               string paramContent = parameterString.substr(materializeHeader.size());
-               trim(paramContent);
-               if(paramContent == "1")
-               {
-                   _materialize=true;
-               }
-               else if(paramContent=="0")
-               {
-                   _materialize=false;
-               }
-               else
-               {
-                   throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "materialize can only be 0 or 1";
-               }
-               _materializeSet=true;
-            }
-    		else
+            else
     		{
-    			ostringstream err;
-    			err<<"Unrecognized parameter: "<<parameterString;
-    			throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << err.str();
+                string path = parameterString;
+                trim(path);
+                bool containsStrangeCharacters = false;
+                for(size_t i=0; i<path.size(); ++i)
+                {
+                   if(path[i] == '=' || path[i] == ' ')
+                   {
+                       containsStrangeCharacters=true;
+                       break;
+                   }
+                }
+                if (_filePathSet || containsStrangeCharacters)
+                {
+                  ostringstream errorMsg;
+                  errorMsg << "unrecognized parameter: "<< parameterString;
+                  throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << errorMsg.str().c_str();
+                }
+                _filePath = path;
+                _filePathSet = true;
     		}
     	}
     	if(!_filePathSet)
@@ -326,16 +316,6 @@ public:
     string const& getBinaryFormatString() const
     {
         return _binaryFormatString;
-    }
-
-    bool push() const
-    {
-        return _push;
-    }
-
-    bool materialize() const
-    {
-        return _materialize;
     }
 };
 
