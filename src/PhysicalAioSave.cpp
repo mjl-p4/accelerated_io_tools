@@ -292,7 +292,7 @@ public:
         _cnvValues(_nAttrs),
         _padBuffer(sizeof(uint64_t) + 1, '\0')
     {
-        _chunkAddress.coords[0] = query->getInstanceID();
+        _chunkAddress.coords[1] = query->getInstanceID();
     }
 
     virtual ~BinaryConvertedArray()
@@ -409,7 +409,7 @@ public:
 
     ConstChunk const& getChunk(AttributeID attr, size_t rowIndex)
     {
-        _chunkAddress.coords[1] = _rowIndex  -1;
+        _chunkAddress.coords[0] = _rowIndex  -1;
         shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         MemChunk& ch = _chunkBuilder.getChunk();
         ch.initialize(this, &super::getArrayDesc(), _chunkAddress, 0);
@@ -464,7 +464,7 @@ public:
                     false);
             }
         }
-        _chunkAddress.coords[0] = query->getInstanceID();
+        _chunkAddress.coords[1] = query->getInstanceID();
     }
 
     virtual ~TextConvertedArray()
@@ -524,7 +524,7 @@ public:
 
     ConstChunk const& getChunk(AttributeID attr, size_t rowIndex)
     {
-        _chunkAddress.coords[1] = _rowIndex  -1;
+        _chunkAddress.coords[0] = _rowIndex  -1;
         shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         MemChunk& ch = _chunkBuilder.getChunk();
         ch.initialize(this, &super::getArrayDesc(), _chunkAddress, 0);

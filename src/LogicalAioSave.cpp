@@ -52,27 +52,13 @@ public:
     ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, shared_ptr< Query> query)
     {
         ArrayDesc const& inputSchema = schemas[0];
-        Attributes inputAttributes   = inputSchema.getAttributes(true);
-
         AioSaveSettings settings (_parameters, true, query);
         vector<DimensionDesc> dimensions(2);
-
-#ifdef CPP11
-        dimensions[0] = DimensionDesc("source_instance_id", 0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
-        dimensions[1] = DimensionDesc("chunk_no",    0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
-#else
-        dimensions[0] = DimensionDesc("source_instance_id", 0, 0, MAX_COORDINATE, MAX_COORDINATE, 1, 0);
-        dimensions[1] = DimensionDesc("chunk_no",           0, 0, MAX_COORDINATE, MAX_COORDINATE, 1, 0);
-#endif
+        dimensions[0] = DimensionDesc("chunk_no",    0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
+        dimensions[1] = DimensionDesc("source_instance_id", 0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
         vector<AttributeDesc> attributes;
         attributes.push_back(AttributeDesc((AttributeID)0, "val", TID_STRING, AttributeDesc::IS_NULLABLE, 0));
-        //attributes = addEmptyTagAttribute(attributes);
-
-#ifdef CPP11
         return ArrayDesc("aio_save", attributes, dimensions, defaultPartitioning());
-#else
-        return ArrayDesc("aio_save", attributes, dimensions);
-#endif
     }
 };
 
