@@ -75,7 +75,6 @@ public:
     }
 };
 
-REGISTER_LOGICAL_OPERATOR_FACTORY(LogicalAioInput, "proto_load");
-//TODO: rename soon REGISTER_LOGICAL_OPERATOR_FACTORY(LogicalAioInput, "aio_input");
+REGISTER_LOGICAL_OPERATOR_FACTORY(LogicalAioInput, "aio_input");
 
 } // emd namespace scidb

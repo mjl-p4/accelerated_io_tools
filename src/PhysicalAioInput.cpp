@@ -569,7 +569,6 @@ public:
     }
 };
 
-REGISTER_PHYSICAL_OPERATOR_FACTORY(PhysicalAioInput, "proto_load", "PhysicalAioInput");
-//TODO: rename soon REGISTER_PHYSICAL_OPERATOR_FACTORY(PhysicalAioInput, "aio_input",  "PhysicalAioInput");
+REGISTER_PHYSICAL_OPERATOR_FACTORY(PhysicalAioInput, "aio_input", "PhysicalAioInput");
 
 } // end namespace scidb
