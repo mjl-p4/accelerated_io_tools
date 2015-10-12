@@ -70,9 +70,9 @@ Returned array:
 
 
 
-Example: loading from a single file with buffer_size set to 20MB:
+Example: loading from a single file:
 ```
-$ iquery -aq "proto_load('/tmp/foo.tsv', 'num_attributes=2', 'buffer_size=20000000')"
+$ iquery -aq "proto_load('/tmp/foo.tsv', 'num_attributes=2')"
 {source_instance_id,chunk_no,line_no} a0,a1,error
 {0,0,0} 'a','0',null
 {0,0,1} 'b','1',null
@@ -104,4 +104,48 @@ $ iquery -aq "proto_load('paths=/tmp/foo.tsv;/tmp/foo2.tsv', 'instances=1;2', 'n
 {2,0,7} 'p','14',null
 {2,0,8} 'q','15',null
 {2,0,9} 'r','16',null
+```
+
+## aio_save
+This operator replaces the existing save functionality, for binary and tab-delimited formats. Works as follows:
+```
+aio_save(array, 'parameter1=value1', 'parameter2=value2',...)
+
+Parameters are as follows:
+ path=/path/to/file                 :: the location to save the file; required
+                                    :: if the operator enocunters a string parameter without '=', it assumes 
+                                    :: that to be the path
+ instance=I                         :: the instance to save the file on. Default is 0.
+ format=F                           :: the format string, may be either 'tdv' (token-delimited values) or a 
+                                    :: scidb-style binary format spec like '(jnt64, double null,...)'
+ attributes_delimiter=A             :: the character to write between array attributes. Default is a tab.
+ line_delimiter=L                   :: the character to write between array cells. Default is a newline.
+ cells_per_chunk=C                  :: the number of array cells to place in a chunk before saving to disk.
+                                    :: Default is 1,000,000.
+Returned array:
+ The schema is always <val:string null> [chunk_no=0:*,1,0, source_instance_id=0:*,1,0]
+ The returned array is always empty as the operator's objective is to export the data.
+```
+
+Example save to a binary file:
+```
+iquery -anq "save( bar, '/tmp/bar.out', 'format=(int64, double null, string null)')"
+```
+
+Note: the order of the returned data is arbitrary by default. If the client requires data in specific order, they must:
+ 1. add a sort operator
+ 2. make sure the sort chunk size (1M default) matches the aio_save cells_per_chunk (also 1M default)
+ 3. add an explicit sg between the sort and the save - with round-robin distribution
+
+For example:
+```
+aio_save(
+ _sg(
+  sort(bar, attribute, 100000),
+  1, -1
+ ),
+ '/path/to/file',
+ 'format=tdv',
+ 'cells_per_chunk=100000'
+)
 ```
