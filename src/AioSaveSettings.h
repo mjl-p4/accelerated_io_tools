@@ -212,7 +212,7 @@ public:
                 }
                 string paramContent = parameterString.substr(formatHeader.size());
                 trim(paramContent);
-                if(paramContent == "tdv")
+                if(paramContent == "tdv" || paramContent == "tsv")
                 {
                     _binaryFormat = false;
                 }

@@ -1,6 +1,6 @@
 #!/bin/bash
 #Quick restart script for dev use
-iquery -aq "unload_library('accelerated_load_tools')" > /dev/null 2>&1
+iquery -aq "unload_library('accelerated_io_tools')" > /dev/null 2>&1
 set -e
 
 DBNAME="mydb"
@@ -13,7 +13,7 @@ pushd $mydir
 make SCIDB=$SCIDB_INSTALL
 
 scidb.py stopall $DBNAME 
-cp libaccelerated_load_tools.so ${SCIDB_INSTALL}/lib/scidb/plugins/
+cp libaccelerated_io_tools.so ${SCIDB_INSTALL}/lib/scidb/plugins/
 scidb.py startall $DBNAME 
 
-iquery -aq "load_library('accelerated_load_tools')"
+iquery -aq "load_library('accelerated_io_tools')"
