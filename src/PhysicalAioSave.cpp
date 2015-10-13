@@ -136,7 +136,10 @@ public:
         if( getTotalSize() + size > _allocSize)
         {
             size_t const mySize = getTotalSize();
-            _allocSize = _allocSize * 2;
+            while (mySize + size > _allocSize)
+            {
+                _allocSize = _allocSize * 2;
+            }
             _chunk.allocate(_allocSize);
             _chunkStartPointer = (char*) _chunk.getData();
             _dataStartPointer = _chunkStartPointer + chunkDataOffset();
