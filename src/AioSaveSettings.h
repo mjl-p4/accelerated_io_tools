@@ -39,20 +39,13 @@ namespace scidb
 class AioSaveSettings
 {
 private:
-	int64_t      _cellsPerChunk;
-	bool         _cellsPerChunkSet;
-    char         _attributeDelimiter;
-    bool         _attributeDelimiterSet;
-    char         _lineDelimiter;
-    bool         _lineDelimiterSet;
-    InstanceID   _saveInstanceId;
-    size_t const _numInstances;
-    bool         _instanceSet;
-    string       _filePath;
-    bool         _filePathSet;
-    bool         _binaryFormat;
-    string       _binaryFormatString;
-    bool         _formatSet;
+	int64_t                     _cellsPerChunk;
+    char                        _attributeDelimiter;
+    char                        _lineDelimiter;
+    map<InstanceID, string>     _instancesAndPaths;
+    size_t const                _numInstances;
+    bool                        _binaryFormat;
+    string                      _binaryFormatString;
 
 public:
     static const size_t MAX_PARAMETERS = 6;
@@ -61,27 +54,29 @@ public:
                     bool logical,
                     shared_ptr<Query>& query):
 				_cellsPerChunk(1000000),
-				_cellsPerChunkSet(false),
                 _attributeDelimiter('\t'),
-                _attributeDelimiterSet(false),
                 _lineDelimiter('\n'),
-                _lineDelimiterSet(false),
-                _saveInstanceId(0),
                 _numInstances(query->getInstancesCount()),
-                _instanceSet(false),
-                _filePath(""),
-                _filePathSet(false),
                 _binaryFormat(false),
-                _binaryFormatString(""),
-                _formatSet(false)
+                _binaryFormatString("")
     {
-    	string const cellsPerChunkHeader           = "cells_per_chunk=";
-    	string const attributeDelimiterHeader      = "attribute_delimiter=";
-    	string const lineDelimiterHeader           = "line_delimiter=";
-    	string const filePathHeader                = "path=";
-    	string const formatHeader                  = "format=";
-    	string const instanceHeader                = "instance=";
+        string const cellsPerChunkHeader           = "cells_per_chunk=";
+        string const attributeDelimiterHeader      = "attribute_delimiter=";
+        string const lineDelimiterHeader           = "line_delimiter=";
+        string const formatHeader                  = "format=";
+        string const filePathHeader                = "path=";
+        string const filePathsHeader               = "paths=";
+        string const instanceHeader                = "instance=";
+        string const instancesHeader               = "instances=";
     	size_t const nParams = operatorParameters.size();
+    	bool  cellsPerChunkSet      = false;
+        bool  attributeDelimiterSet = false;
+        bool  lineDelimiterSet      = false;
+        bool  formatSet             = false;
+
+        vector<string>     filePaths;
+        vector<InstanceID> instanceIds;
+
     	if (nParams > MAX_PARAMETERS)
     	{   //assert-like exception. Caller should have taken care of this!
     		throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal number of parameters passed to UnparseSettings";
@@ -100,7 +95,7 @@ public:
     		}
     		if (starts_with(parameterString, cellsPerChunkHeader))
     		{
-    			if (_cellsPerChunkSet)
+    			if (cellsPerChunkSet)
     			{
     				throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set cells_per_chunk multiple times";
     			}
@@ -121,7 +116,7 @@ public:
     		}
     		else if (starts_with(parameterString, attributeDelimiterHeader))
     		{
-    		    if (_attributeDelimiterSet)
+    		    if (attributeDelimiterSet)
                 {
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set attribute_delimiter multiple times";
                 }
@@ -154,11 +149,11 @@ public:
                         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse attribute_delimiter";
                     }
                 }
-                _attributeDelimiterSet = true;
+                attributeDelimiterSet = true;
             }
             else if (starts_with (parameterString, lineDelimiterHeader))
             {
-                if(_lineDelimiterSet)
+                if(lineDelimiterSet)
                 {
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set line_delimiter multiple times";
                 }
@@ -191,22 +186,11 @@ public:
                         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse line_delimiter";
                     }
                 }
-                _lineDelimiterSet = true;
-            }
-            else if (starts_with (parameterString, filePathHeader))
-            {
-                if(_lineDelimiterSet)
-                {
-                   throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set file_path multiple times";
-                }
-                string paramContent = parameterString.substr(filePathHeader.size());
-                trim(paramContent);
-                _filePath = paramContent;
-                _filePathSet = true;
+                lineDelimiterSet = true;
             }
             else if (starts_with (parameterString, formatHeader))
             {
-                if(_formatSet)
+                if(formatSet)
                 {
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set format multiple times";
                 }
@@ -225,11 +209,39 @@ public:
                     }
                     _binaryFormatString = paramContent;
                 }
-                _formatSet=true;
+                formatSet=true;
+            }
+            else if (starts_with (parameterString, filePathHeader))
+            {
+                if(filePaths.size())
+                {
+                   throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set path multiple times";
+                }
+                string paramContent = parameterString.substr(filePathHeader.size());
+                trim(paramContent);
+                filePaths.push_back(paramContent);
+            }
+            else if (starts_with (parameterString, filePathsHeader))
+            {
+                if(filePaths.size())
+                {
+                   throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set paths multiple times";
+                }
+                string paramContent = parameterString.substr(filePathsHeader.size());
+                trim(paramContent);
+                stringstream ss(paramContent);
+                string tok;
+                while(getline(ss, tok, ';'))
+                {
+                    if(tok.size() != 0)
+                    {
+                        filePaths.push_back(tok);
+                    }
+                }
             }
             else if (starts_with (parameterString, instanceHeader))
             {
-                if(_instanceSet)
+                if(instanceIds.size())
                 {
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set instance multiple times";
                 }
@@ -240,14 +252,40 @@ public:
                     int64_t iid = lexical_cast<int64_t>(paramContent);
                     if(iid<0 || ((uint64_t)iid) >= _numInstances)
                     {
-                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "header must be positive";
+                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "instance id must be non-negative";
                     }
-                    _saveInstanceId = iid;
-                    _instanceSet = true;
+                    instanceIds.push_back( iid);
                 }
                 catch (bad_lexical_cast const& exn)
                 {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse header";
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse instance id";
+                }
+            }
+            else if (starts_with (parameterString, instancesHeader))
+            {
+                if(instanceIds.size())
+                {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set instances multiple times";
+                }
+                string paramContent = parameterString.substr(instancesHeader.size());
+                trim(paramContent);
+                stringstream ss(paramContent);
+                string tok;
+                while(getline(ss, tok, ';'))
+                {
+                    try
+                    {
+                        int64_t iid = lexical_cast<int64_t>(tok);
+                        if(iid<0 || ((uint64_t)iid) >= _numInstances)
+                        {
+                            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "instance ids must be non-negative";
+                        }
+                        instanceIds.push_back(iid);
+                    }
+                    catch (bad_lexical_cast const& exn)
+                    {
+                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse instance id";
+                    }
                 }
             }
             else
@@ -257,27 +295,47 @@ public:
                 bool containsStrangeCharacters = false;
                 for(size_t i=0; i<path.size(); ++i)
                 {
-                   if(path[i] == '=' || path[i] == ' ')
+                   if(path[i] == '=' || path[i] == ' ' || path[i] == ';')
                    {
                        containsStrangeCharacters=true;
                        break;
                    }
                 }
-                if (_filePathSet || containsStrangeCharacters)
+                if (filePaths.size() != 0 || containsStrangeCharacters)
                 {
                   ostringstream errorMsg;
                   errorMsg << "unrecognized parameter: "<< parameterString;
                   throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << errorMsg.str().c_str();
                 }
-                _filePath = path;
-                _filePathSet = true;
+                filePaths.push_back(path);
     		}
     	}
-    	if(!_filePathSet)
+    	if(filePaths.size() == 0)
     	{
-    	    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "file_path must be provided";
+    	    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "file path(s) was not provided, or failed to parse";
     	}
-    	if(_binaryFormat && (_lineDelimiterSet || _attributeDelimiterSet))
+    	if(instanceIds.size() == 0)
+    	{
+    	    instanceIds.push_back(0);
+    	}
+    	if(filePaths.size() != instanceIds.size())
+    	{
+    	    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "the number of file paths provided does not match the number of instance IDs";
+    	}
+    	set<InstanceID> uniqueInstances;
+    	for(size_t i =0; i<instanceIds.size(); ++i)
+    	{
+    	    uniqueInstances.insert(instanceIds[i]);
+    	}
+    	if(uniqueInstances.size() < instanceIds.size())
+    	{
+    	    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "the provided instance IDs are not unique";
+    	}
+        for(size_t i=0; i< filePaths.size(); ++i)
+        {
+            _instancesAndPaths[instanceIds[i]] = filePaths[i];
+        }
+    	if(_binaryFormat && (lineDelimiterSet || attributeDelimiterSet))
     	{
     	    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "attribute_delimiter and line_delimiter are not used with the binary fomat";
     	}
@@ -298,16 +356,6 @@ public:
     	return _lineDelimiter;
     }
 
-    InstanceID getSaveInstanceId() const
-    {
-        return _saveInstanceId;
-    }
-
-    string const& getFilePath() const
-    {
-        return _filePath;
-    }
-
     bool isBinaryFormat() const
     {
         return _binaryFormat;
@@ -316,6 +364,11 @@ public:
     string const& getBinaryFormatString() const
     {
         return _binaryFormatString;
+    }
+
+    map<InstanceID, string> const& getInstanceMap() const
+    {
+        return _instancesAndPaths;
     }
 };
 

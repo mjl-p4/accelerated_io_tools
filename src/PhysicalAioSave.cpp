@@ -251,17 +251,11 @@ public:
     }
 };
 
-class BinaryConvertedArray : public SinglePassArray
+
+class BinaryChunkPopulator
 {
 private:
-    typedef SinglePassArray super;
-    size_t           _rowIndex;
-    Address          _chunkAddress;
-    ArrayCursor      _inputCursor;
-    MemChunkBuilder  _chunkBuilder;
-    weak_ptr<Query>  _query;
     ExchangeTemplate _templ;
-    size_t const     _linesPerChunk;
     size_t const     _nAttrs;
     size_t const     _nColumns;
     vector< Value >  _cnvValues;
@@ -274,72 +268,53 @@ private:
     }
 
 public:
-    BinaryConvertedArray(ArrayDesc const& schema,
-                         shared_ptr<Array>& inputArray,
-                         shared_ptr<Query>& query,
+    BinaryChunkPopulator(ArrayDesc const& inputArrayDesc,
                          AioSaveSettings const& settings):
-        super(schema),
-        _rowIndex(0),
-        _chunkAddress(0, Coordinates(2,0)),
-        _inputCursor(inputArray),
-        _query(query),
-        _templ(TemplateParser::parse(inputArray->getArrayDesc(), settings.getBinaryFormatString(), false)),
-        _linesPerChunk(settings.getLinesPerChunk()),
-        _nAttrs(_inputCursor.nAttrs()),
+        _templ(TemplateParser::parse(inputArrayDesc, settings.getBinaryFormatString(), false)),
+        _nAttrs(inputArrayDesc.getAttributes(true).size()),
         _nColumns(_templ.columns.size()),
         _cnvValues(_nAttrs),
         _padBuffer(sizeof(uint64_t) + 1, '\0')
     {
-        _chunkAddress.coords[1] = query->getInstanceID();
         for (size_t c = 0, i = 0; c < _nColumns; ++c)
         {
-           ExchangeTemplate::Column const& column = _templ.columns[c];
-           if (column.skip)
-           {
-               // Prepare to write (enough) padding.
-               size_t pad = skip_bytes(column);
-               if (pad > _padBuffer.size())
-               {
-                   _padBuffer.resize(pad, '\0');
-               }
-           }
-           else
-           {
-               if (column.converter)
-               {
-                   _cnvValues[i] = Value(column.externalType);
-               }
-               ++i;            // next attribute
-           }
+          ExchangeTemplate::Column const& column = _templ.columns[c];
+          if (column.skip)
+          {
+              // Prepare to write (enough) padding.
+              size_t pad = skip_bytes(column);
+              if (pad > _padBuffer.size())
+              {
+                  _padBuffer.resize(pad, '\0');
+              }
+          }
+          else
+          {
+              if (column.converter)
+              {
+                  _cnvValues[i] = Value(column.externalType);
+              }
+              ++i;            // next attribute
+          }
         }
     }
 
-    virtual ~BinaryConvertedArray()
+    ~BinaryChunkPopulator()
     {}
 
-    size_t getCurrentRowIndex() const
+    void populateChunk(MemChunkBuilder& builder, ArrayCursor& cursor, size_t const linesPerChunk)
     {
-        return _rowIndex;
-    }
-
-    bool moveNext(size_t rowIndex)
-    {
-        if(_inputCursor.end())
-        {
-            return false;
-        }
-        _chunkBuilder.reset();
         size_t nCells = 0;
-        while(nCells < _linesPerChunk && !_inputCursor.end())
+        while(nCells < linesPerChunk && !cursor.end())
         {
-            vector <Value const *> const& cell = _inputCursor.getCell();
+            vector <Value const *> const& cell = cursor.getCell();
             for (size_t c = 0, i = 0; c < _nColumns; ++c)
             {
                 ExchangeTemplate::Column const& column = _templ.columns[c];
                 if (column.skip)
                 {
                     size_t pad = skip_bytes(column);
-                    _chunkBuilder.addData(&(_padBuffer[0]), _padBuffer.size());
+                    builder.addData(&(_padBuffer[0]), _padBuffer.size());
                 }
                 else
                 {
@@ -351,7 +326,7 @@ public:
                             LOG4CXX_WARN(logger, "Missing reason " << v->getMissingReason() << " cannot be stored in binary file");
                         }
                         int8_t missingReason = (int8_t)v->getMissingReason();
-                        _chunkBuilder.addData( (char*) (&missingReason), sizeof(missingReason));
+                        builder.addData( (char*) (&missingReason), sizeof(missingReason));
                     }
                     if (v->isNull())
                     {
@@ -361,7 +336,7 @@ public:
                         }
                         // for varying size type write 4-bytes counter
                         size_t size = column.fixedSize ? column.fixedSize : sizeof(uint32_t);
-                        _chunkBuilder.addData( &(_padBuffer[0]), size);
+                        builder.addData( &(_padBuffer[0]), size);
                     }
                     else
                     {
@@ -377,8 +352,8 @@ public:
                         uint32_t size = (uint32_t)v->size();
                         if (column.fixedSize == 0)
                         { // varying size type
-                            _chunkBuilder.addData( (char*) (&size), sizeof(size));
-                            _chunkBuilder.addData( (char*) v->data(), size);
+                            builder.addData( (char*) (&size), sizeof(size));
+                            builder.addData( (char*) v->data(), size);
                         }
                         else
                         {
@@ -386,69 +361,43 @@ public:
                             {
                                 throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_TRUNCATION) << size << column.fixedSize;
                             }
-                            _chunkBuilder.addData( (char*) v->data(), size);
+                            builder.addData( (char*) v->data(), size);
                             if (size < column.fixedSize)
                             {
                                 size_t padSize = column.fixedSize - size;
                                 assert(padSize <= _padBuffer.size());
-                                _chunkBuilder.addData(&(_padBuffer[0]), padSize);
+                                builder.addData(&(_padBuffer[0]), padSize);
                             }
                         }
                     }
                     ++i;
                 }
             }
-            _inputCursor.advance();
+            cursor.advance();
             ++nCells;
         }
-        ++_rowIndex;
-        return true;
-    }
-
-    ConstChunk const& getChunk(AttributeID attr, size_t rowIndex)
-    {
-        _chunkAddress.coords[0] = _rowIndex  -1;
-        shared_ptr<Query> query = Query::getValidQueryPtr(_query);
-        MemChunk& ch = _chunkBuilder.getChunk();
-        ch.initialize(this, &super::getArrayDesc(), _chunkAddress, 0);
-        return ch;
     }
 };
 
-class TextConvertedArray : public SinglePassArray
+class TextChunkPopulator
 {
 private:
-    typedef SinglePassArray super;
-    size_t           _rowIndex;
-    Address          _chunkAddress;
-    ArrayCursor      _inputCursor;
-    MemChunkBuilder  _chunkBuilder;
-    weak_ptr<Query>  _query;
-    size_t const     _linesPerChunk;
-    char const       _attDelim;
-    char const       _lineDelim;
+    char const              _attDelim;
+    char const              _lineDelim;
     vector<bool>            _isString;
     vector<FunctionPointer> _converters;
     Value                   _stringBuf;
 
 public:
-    TextConvertedArray(ArrayDesc const& schema,
-                       shared_ptr<Array>& inputArray,
-                       shared_ptr<Query>& query,
+    TextChunkPopulator(ArrayDesc const& inputArrayDesc,
                        AioSaveSettings const& settings):
-        super(schema),
-        _rowIndex(0),
-        _chunkAddress(0, Coordinates(2,0)),
-        _inputCursor(inputArray),
-        _query(query),
-        _linesPerChunk(settings.getLinesPerChunk()),
-        _attDelim(settings.getAttributeDelimiter()),
-        _lineDelim(settings.getLineDelimiter()),
-        _isString(_inputCursor.nAttrs(), false),
-        _converters(_inputCursor.nAttrs(), 0)
+       _attDelim(settings.getAttributeDelimiter()),
+       _lineDelim(settings.getLineDelimiter()),
+       _isString(inputArrayDesc.getAttributes(true).size(), false),
+       _converters(inputArrayDesc.getAttributes(true).size(), 0)
     {
-        Attributes const& inputAttrs = inputArray->getArrayDesc().getAttributes(true);
-        for (size_t i = 0; i < _inputCursor.nAttrs(); ++i)
+        Attributes const& inputAttrs = inputArrayDesc.getAttributes(true);
+        for (size_t i = 0; i < inputAttrs.size(); ++i)
         {
             if(inputAttrs[i].getType() == TID_STRING)
             {
@@ -462,30 +411,19 @@ public:
                     false);
             }
         }
-        _chunkAddress.coords[1] = query->getInstanceID();
     }
 
-    virtual ~TextConvertedArray()
+    ~TextChunkPopulator()
     {}
 
-    size_t getCurrentRowIndex() const
+    void populateChunk(MemChunkBuilder& builder, ArrayCursor& cursor, size_t const linesPerChunk)
     {
-        return _rowIndex;
-    }
-
-    bool moveNext(size_t rowIndex)
-    {
-        if(_inputCursor.end())
-        {
-            return false;
-        }
-        _chunkBuilder.reset();
         size_t nCells = 0;
         ostringstream outputBuf;
-        while(nCells < _linesPerChunk && !_inputCursor.end())
+        while(nCells < linesPerChunk && !cursor.end())
         {
-            vector <Value const *> const& cell = _inputCursor.getCell();
-            for (size_t i = 0; i < _inputCursor.nAttrs(); ++i)
+            vector <Value const *> const& cell = cursor.getCell();
+            for (size_t i = 0; i < cursor.nAttrs(); ++i)
             {
                 Value const* v = cell[i];
                 if (i)
@@ -511,11 +449,73 @@ public:
                 }
             }
             outputBuf<<_lineDelim;
-            _inputCursor.advance();
+            cursor.advance();
             ++nCells;
         }
         string s = outputBuf.str();
-        _chunkBuilder.addData(s.c_str(), s.size());
+        builder.addData(s.c_str(), s.size());
+    }
+};
+
+template <class ChunkPopulator>
+class ConversionArray: public SinglePassArray
+{
+private:
+    typedef SinglePassArray super;
+    size_t                                   _rowIndex;
+    Address                                  _chunkAddress;
+    ArrayCursor                              _inputCursor;
+    MemChunkBuilder                          _chunkBuilder;
+    weak_ptr<Query>                          _query;
+    size_t const                             _linesPerChunk;
+    ChunkPopulator                           _populator;
+    map<InstanceID, string> const&           _instanceMap;
+    map<InstanceID, string>::const_iterator  _mapIter;
+
+public:
+    ConversionArray(ArrayDesc const& schema,
+                    shared_ptr<Array>& inputArray,
+                    shared_ptr<Query>& query,
+                    AioSaveSettings const& settings):
+        super(schema),
+        _rowIndex(0),
+        _chunkAddress(0, Coordinates(3,0)),
+        _inputCursor(inputArray),
+        _query(query),
+        _linesPerChunk(settings.getLinesPerChunk()),
+        _populator(inputArray->getArrayDesc(), settings),
+        _instanceMap(settings.getInstanceMap()),
+        _mapIter(_instanceMap.begin())
+    {
+
+        InstanceID const myInstanceID = query->getInstanceID();
+        _chunkAddress.coords[2] = myInstanceID;
+        //offset the first instance I send data to - for a more even distribution
+        InstanceID i =0;
+        while (i < myInstanceID)
+        {
+            ++_mapIter;
+            if(_mapIter == _instanceMap.end())
+            {
+                _mapIter = _instanceMap.begin();
+            }
+            ++i;
+        }
+    }
+
+    size_t getCurrentRowIndex() const
+    {
+        return _rowIndex;
+    }
+
+    bool moveNext(size_t rowIndex)
+    {
+        if(_inputCursor.end())
+        {
+            return false;
+        }
+        _chunkBuilder.reset();
+        _populator.populateChunk(_chunkBuilder, _inputCursor, _linesPerChunk);
         ++_rowIndex;
         return true;
     }
@@ -523,6 +523,12 @@ public:
     ConstChunk const& getChunk(AttributeID attr, size_t rowIndex)
     {
         _chunkAddress.coords[0] = _rowIndex  -1;
+        _chunkAddress.coords[1] = _mapIter->first;
+        ++_mapIter;
+        if(_mapIter == _instanceMap.end())
+        {
+            _mapIter = _instanceMap.begin();
+        }
         shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         MemChunk& ch = _chunkBuilder.getChunk();
         ch.initialize(this, &super::getArrayDesc(), _chunkAddress, 0);
@@ -530,6 +536,8 @@ public:
     }
 };
 
+typedef ConversionArray <BinaryChunkPopulator> BinaryConvertedArray;
+typedef ConversionArray <TextChunkPopulator>   TextConvertedArray;
 
 struct AwIoError
 {
@@ -671,20 +679,21 @@ public:
         ArrayDesc const& inputArrayDesc = outArray->getArrayDesc();
         shared_ptr<Array> tmpRedistedInput;
         InstanceID const myInstanceID = query->getInstanceID();
-        InstanceID const saveInstanceID = settings.getSaveInstanceId();
         const Attributes& attribs = inputArrayDesc.getAttributes();
         LOG4CXX_DEBUG(logger, "ALT_SAVE>> Starting SG")
         tmpRedistedInput = pullRedistribute(outArray,
                                             query,
-                                            psLocalInstance,
-                                            saveInstanceID,
+                                            psByCol,
+                                            ALL_INSTANCE_MASK,
                                             std::shared_ptr<CoordinateTranslator>(),
                                             0,
                                             std::shared_ptr<PartitioningSchemaData>());
         bool const wasConverted = (tmpRedistedInput != outArray) ;
-        if (saveInstanceID == myInstanceID)
+        map<InstanceID, string>::const_iterator iter = settings.getInstanceMap().find(myInstanceID);
+        if (iter != settings.getInstanceMap().end())
         {
-            saveToDisk(tmpRedistedInput, settings.getFilePath(), query, settings.isBinaryFormat(), false);
+            string const& path = iter->second;
+            saveToDisk(tmpRedistedInput, path, query, settings.isBinaryFormat(), false);
         }
         if (wasConverted)
         {

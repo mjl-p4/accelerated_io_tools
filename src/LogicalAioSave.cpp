@@ -48,9 +48,11 @@ public:
     {
         ArrayDesc const& inputSchema = schemas[0];
         AioSaveSettings settings (_parameters, true, query);
-        vector<DimensionDesc> dimensions(2);
+        vector<DimensionDesc> dimensions(3);
+        size_t const nInstances = query->getInstancesCount();
         dimensions[0] = DimensionDesc("chunk_no",    0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
-        dimensions[1] = DimensionDesc("source_instance_id", 0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
+        dimensions[1] = DimensionDesc("dest_instance_id",   0, 0, nInstances-1, nInstances-1, 1, 0);
+        dimensions[2] = DimensionDesc("source_instance_id", 0, 0, nInstances-1, nInstances-1, 1, 0);
         vector<AttributeDesc> attributes;
         attributes.push_back(AttributeDesc((AttributeID)0, "val", TID_STRING, AttributeDesc::IS_NULLABLE, 0));
         return ArrayDesc("aio_save", attributes, dimensions, defaultPartitioning());
