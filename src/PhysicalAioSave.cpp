@@ -291,6 +291,27 @@ public:
         _padBuffer(sizeof(uint64_t) + 1, '\0')
     {
         _chunkAddress.coords[1] = query->getInstanceID();
+        for (size_t c = 0, i = 0; c < _nColumns; ++c)
+        {
+           ExchangeTemplate::Column const& column = _templ.columns[c];
+           if (column.skip)
+           {
+               // Prepare to write (enough) padding.
+               size_t pad = skip_bytes(column);
+               if (pad > _padBuffer.size())
+               {
+                   _padBuffer.resize(pad, '\0');
+               }
+           }
+           else
+           {
+               if (column.converter)
+               {
+                   _cnvValues[i] = Value(column.externalType);
+               }
+               ++i;            // next attribute
+           }
+        }
     }
 
     virtual ~BinaryConvertedArray()
@@ -309,30 +330,9 @@ public:
         }
         _chunkBuilder.reset();
         size_t nCells = 0;
-        for (size_t c = 0, i = 0; c < _nColumns; ++c)
-        {
-            ExchangeTemplate::Column const& column = _templ.columns[c];
-            if (column.skip)
-            {
-                // Prepare to write (enough) padding.
-                size_t pad = skip_bytes(column);
-                if (pad > _padBuffer.size())
-                {
-                    _padBuffer.resize(pad);
-                }
-            }
-            else
-            {
-                if (column.converter)
-                {
-                    _cnvValues[i] = Value(column.externalType);
-                }
-                ++i;            // next attribute
-            }
-        }
         while(nCells < _linesPerChunk && !_inputCursor.end())
         {
-            vector <Value const *> cell = _inputCursor.getCell();
+            vector <Value const *> const& cell = _inputCursor.getCell();
             for (size_t c = 0, i = 0; c < _nColumns; ++c)
             {
                 ExchangeTemplate::Column const& column = _templ.columns[c];
@@ -484,7 +484,7 @@ public:
         ostringstream outputBuf;
         while(nCells < _linesPerChunk && !_inputCursor.end())
         {
-            vector <Value const *> cell = _inputCursor.getCell();
+            vector <Value const *> const& cell = _inputCursor.getCell();
             for (size_t i = 0; i < _inputCursor.nAttrs(); ++i)
             {
                 Value const* v = cell[i];
