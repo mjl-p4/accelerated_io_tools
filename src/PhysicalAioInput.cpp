@@ -38,6 +38,8 @@ using boost::algorithm::is_from_range;
 namespace scidb
 {
 
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.alt_load"));
+
 using namespace scidb;
 
 static size_t getChunkOverheadSize()
@@ -94,6 +96,7 @@ private:
     char*        _bufPointer;
     uint32_t*    _sizePointer;
     FILE*        _inputFile;
+    size_t const _nInstances;
 
 public:
     BinFileSplitArray(ArrayDesc const& schema,
@@ -101,15 +104,16 @@ public:
                       shared_ptr<UberLoadSettings> settings):
         super(schema),
         _rowIndex(0),
-        _chunkAddress(0, Coordinates(2,0)),
+        _chunkAddress(0, Coordinates(3,0)),
         _query(query),
         _fileBlockSize(settings->getBlockSize()),
         _chunkOverheadSize( getChunkOverheadSize() ),
         _endOfFile(false),
-        _inputFile(NULL)
+        _inputFile(NULL),
+        _nInstances(query->getInstancesCount())
     {
         super::setEnforceHorizontalIteration(true);
-        _chunkAddress.coords[0] = settings->getParseInstance();
+        _chunkAddress.coords[2] = settings->getParseInstance();
         try
         {
             _chunk.allocate(_chunkOverheadSize + _fileBlockSize);
@@ -196,14 +200,16 @@ public:
 
     ConstChunk const& getChunk(AttributeID attr, size_t rowIndex)
     {
-        _chunkAddress.coords[1] = _rowIndex  -1;
+        _chunkAddress.coords[0] = _rowIndex  - 1;
+        _chunkAddress.coords[1] = (_rowIndex  - 1 + _chunkAddress.coords[2]) % _nInstances;
         shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         _chunk.initialize(this, &super::getArrayDesc(), _chunkAddress, 0);
+        //LOG4CXX_DEBUG(logger, "ALT_LOAD emitting chunk "<<CoordsToStr(_chunkAddress.coords));
         return _chunk;
     }
 };
 
-class OutputWriter : public boost::noncopyable
+class AIOOutputWriter : public boost::noncopyable
 {
 private:
     shared_ptr<Array> const _output;
@@ -220,12 +226,12 @@ private:
     Value _buf;
 
 public:
-    OutputWriter(ArrayDesc const& schema, shared_ptr<Query>& query, bool splitOnDimension, char const attDelimiter):
+    AIOOutputWriter(ArrayDesc const& schema, shared_ptr<Query>& query, bool splitOnDimension, char const attDelimiter):
         _output(make_shared<MemArray>(schema,query)),
-        _outputPosition( splitOnDimension ? 4 : 3, 0),
+        _outputPosition( splitOnDimension ? 5 : 4, 0),
         _numLiveAttributes(schema.getAttributes(true).size()),
-        _outputLineSize(splitOnDimension ? schema.getDimensions()[3].getChunkInterval() : _numLiveAttributes),
-        _outputChunkSize(schema.getDimensions()[2].getChunkInterval()),
+        _outputLineSize(splitOnDimension ? schema.getDimensions()[4].getChunkInterval() : _numLiveAttributes),
+        _outputChunkSize(schema.getDimensions()[3].getChunkInterval()),
         _outputArrayIterators(_numLiveAttributes),
         _outputChunkIterators(_numLiveAttributes),
         _splitOnDimension(splitOnDimension),
@@ -242,10 +248,11 @@ public:
     {
         _outputPosition[0] = inputChunkPosition[0];
         _outputPosition[1] = inputChunkPosition[1];
-        _outputPosition[2] = 0;
+        _outputPosition[2] = inputChunkPosition[2];
+        _outputPosition[3] = 0;
         if(_splitOnDimension)
         {
-            _outputPosition[3] = 0;
+            _outputPosition[4] = 0;
         }
         for(AttributeID i =0; i<_numLiveAttributes; ++i)
         {
@@ -270,7 +277,7 @@ public:
             {
                 _outputChunkIterators[0] -> setPosition(_outputPosition);
                 _outputChunkIterators[0] -> writeItem(_buf);
-                ++(_outputPosition[3]);
+                ++(_outputPosition[4]);
             }
             else
             {
@@ -302,7 +309,7 @@ public:
                 {
                     _outputChunkIterators[0] -> setPosition(_outputPosition);
                     _outputChunkIterators[0] -> writeItem(_buf);
-                    ++(_outputPosition[3]);
+                    ++(_outputPosition[4]);
                     ++_outputColumn;
                 }
             }
@@ -329,14 +336,14 @@ public:
         {
             _outputChunkIterators[0] -> setPosition(_outputPosition);
             _outputChunkIterators[0] -> writeItem(_buf);
-            _outputPosition[3] = 0;
+            _outputPosition[4] = 0;
         }
         else
         {
             _outputChunkIterators[_outputLineSize - 1] -> setPosition(_outputPosition);
             _outputChunkIterators[_outputLineSize - 1] -> writeItem(_buf);
         }
-        ++(_outputPosition[2]);
+        ++(_outputPosition[3]);
         _errorBuf.str("");
         _outputColumn = 0;
     }
@@ -359,11 +366,12 @@ public:
 class PhysicalAioInput : public PhysicalOperator
 {
 public:
-    static ArrayDesc getSplitSchema()
+    static ArrayDesc getSplitSchema(size_t const nInstances)
     {
-        vector<DimensionDesc> dimensions(2);
-        dimensions[0] = DimensionDesc("source_instance_id", 0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
-        dimensions[1] = DimensionDesc("block_no",           0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
+        vector<DimensionDesc> dimensions(3);
+        dimensions[0] = DimensionDesc("chunk_no",           0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
+        dimensions[1] = DimensionDesc("dst_instance_id",    0, 0, nInstances-1, nInstances-1, 1, 0);
+        dimensions[2] = DimensionDesc("src_instance_id",    0, 0, nInstances-1, nInstances-1, 1, 0);
         vector<AttributeDesc> attributes;
         attributes.push_back(AttributeDesc((AttributeID)0, "value",  TID_BINARY, 0, 0));
         return ArrayDesc("aio_input", attributes, dimensions, defaultPartitioning());
@@ -389,26 +397,36 @@ public:
     shared_ptr<Array> makeSupplement(shared_ptr<Array>& afterSplit, shared_ptr<Query>& query, shared_ptr<UberLoadSettings>& settings, vector<Coordinate>& lastBlocks)
     {
         char const lineDelim = settings->getLineDelimiter();
-        shared_ptr<Array> supplement(new MemArray(getSplitSchema(), query));
+        shared_ptr<Array> supplement(new MemArray(getSplitSchema(query->getInstancesCount()), query));
         shared_ptr<ConstArrayIterator> srcArrayIter = afterSplit->getConstIterator(0);
         shared_ptr<ArrayIterator> dstArrayIter = supplement->getIterator(0);
         shared_ptr<ChunkIterator> dstChunkIter;
+        size_t const nInstances = query->getInstancesCount();
         while(!srcArrayIter->end())
         {
            Coordinates supplementCoords = srcArrayIter->getPosition();
-           Coordinate iid   = supplementCoords[0];
-           Coordinate block = supplementCoords[1];
-           if(lastBlocks[iid] < block)
+           Coordinate block = supplementCoords[0];
+           Coordinate dst   = supplementCoords[1];
+           Coordinate src   = supplementCoords[2];
+           if(lastBlocks[src] < block)
            {
-               lastBlocks[iid] = block;
+               lastBlocks[src] = block;
            }
-           if(supplementCoords[1] != 0)
+           if(supplementCoords[0] != 0)
            {
                ConstChunk const& ch = srcArrayIter->getChunk();
                PinBuffer pinScope(ch);
                char* start = ((char*) ch.getData()) + getChunkOverheadSize();
                uint32_t const sourceSize = *((uint32_t*)(((char*) ch.getData()) + getSizeOffset()));
-               supplementCoords[1]--;
+               supplementCoords[0]--;
+               if(dst == 0)
+               {
+                   supplementCoords[1] = nInstances-1;
+               }
+               else
+               {
+                   supplementCoords[1] = dst - 1;
+               }
                char const* lim = start + sourceSize;
                char const* end = start;
                while( end != lim && (*end) != lineDelim)
@@ -470,35 +488,37 @@ public:
         shared_ptr<Array> splitData;
         if(settings->getParseInstance() == static_cast<int64_t>(query->getInstanceID()))
         {
-            splitData = shared_ptr<BinFileSplitArray>(new BinFileSplitArray(getSplitSchema(), query, settings));
+            splitData = shared_ptr<BinFileSplitArray>(new BinFileSplitArray(getSplitSchema(query->getInstancesCount()), query, settings));
         }
         else
         {
-            splitData = shared_ptr<BinEmptySinglePass>(new BinEmptySinglePass(getSplitSchema()));
+            splitData = shared_ptr<BinEmptySinglePass>(new BinEmptySinglePass(getSplitSchema(query->getInstancesCount())));
         }
-        splitData = redistributeToRandomAccess(splitData, query, defaultPartitioning(),
-                                                 ALL_INSTANCE_MASK,
-                                                 std::shared_ptr<CoordinateTranslator>(),
-                                                 0,
-                                                 std::shared_ptr<PartitioningSchemaData>());
+        splitData = redistributeToRandomAccess(splitData, query,
+                                               psByCol,
+                                               ALL_INSTANCE_MASK,
+                                               std::shared_ptr<CoordinateTranslator>(),
+                                               0,
+                                               std::shared_ptr<PartitioningSchemaData>());
         vector<Coordinate> lastBlocks(query->getInstancesCount(), -1);
         shared_ptr<Array> supplement = makeSupplement(splitData, query, settings, lastBlocks);
         exchangeLastBlocks(lastBlocks, query);
-        supplement = redistributeToRandomAccess(supplement, query, defaultPartitioning(),
+        supplement = redistributeToRandomAccess(supplement, query,
+                                                psByCol,
                                                 ALL_INSTANCE_MASK,
                                                 std::shared_ptr<CoordinateTranslator>(),
                                                 0,
                                                 std::shared_ptr<PartitioningSchemaData>());
         shared_ptr<ConstArrayIterator> inputIterator = splitData->getConstIterator(0);
         shared_ptr<ConstArrayIterator> supplementIter = supplement->getConstIterator(0);
-        size_t const outputChunkSize = _schema.getDimensions()[2].getChunkInterval();
+        size_t const outputChunkSize = _schema.getDimensions()[3].getChunkInterval();
         char const attDelim = settings->getAttributeDelimiter();
         char const lineDelim = settings->getLineDelimiter();
-        OutputWriter writer(_schema, query, settings->getSplitOnDimension(), settings->getAttributeDelimiter());
+        AIOOutputWriter writer(_schema, query, settings->getSplitOnDimension(), settings->getAttributeDelimiter());
         while(!inputIterator-> end())
         {
             Coordinates const& pos = inputIterator->getPosition();
-            bool const lastBlock = (lastBlocks[ pos[0] ] == pos[1]);
+            bool const lastBlock = (lastBlocks[ pos[2] ] == pos[0]);
             ConstChunk const& chunk =  inputIterator->getChunk();
             PinBuffer pinScope(chunk);
             char* sourceStart = ((char*) chunk.getData()) + getChunkOverheadSize();
@@ -508,7 +528,7 @@ public:
                 throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "[defensive] encountered a chunk with no data.";
             }
             size_t nLines =0;
-            if(pos[1]!=0)
+            if(pos[0] != 0)
             {
                 while((*sourceStart)!=lineDelim)
                 {

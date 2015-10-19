@@ -46,16 +46,12 @@ public:
         UberLoadSettings settings (_parameters, true, query);
         size_t numRequestedAttributes = settings.getNumAttributes();
         size_t requestedChunkSize = settings.getChunkSize();
-        vector<DimensionDesc> dimensions(3);
-#ifdef CPP11
-        dimensions[0] = DimensionDesc("source_instance_id", 0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
-        dimensions[1] = DimensionDesc("chunk_no",    0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
-        dimensions[2] = DimensionDesc("line_no",     0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), requestedChunkSize, 0); 
-#else
-        dimensions[0] = DimensionDesc("source_instance_id", 0, 0, MAX_COORDINATE, MAX_COORDINATE, 1, 0);
-        dimensions[1] = DimensionDesc("chunk_no",           0, 0, MAX_COORDINATE, MAX_COORDINATE, 1, 0);
-        dimensions[2] = DimensionDesc("line_no",            0, 0, MAX_COORDINATE, MAX_COORDINATE, requestedChunkSize, 0);
-#endif
+        size_t const nInstances = query->getInstancesCount();
+        vector<DimensionDesc> dimensions(4);
+        dimensions[0] = DimensionDesc("chunk_no",           0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
+        dimensions[1] = DimensionDesc("dst_instance_id",    0, 0, nInstances-1, nInstances-1, 1, 0);
+        dimensions[2] = DimensionDesc("src_instance_id",    0, 0, nInstances-1, nInstances-1, 1, 0);
+        dimensions[3] = DimensionDesc("line_no",            0, 0, requestedChunkSize-1, requestedChunkSize-1, requestedChunkSize, 0);
         vector<AttributeDesc> attributes;
         if (settings.getSplitOnDimension())
         {   //add 1 for the error column
@@ -74,11 +70,7 @@ public:
             attributes.push_back(AttributeDesc((AttributeID)numRequestedAttributes, "error", TID_STRING, AttributeDesc::IS_NULLABLE, 0));
         }
         attributes = addEmptyTagAttribute(attributes);
-#ifdef CPP11
         return ArrayDesc("aio_input", attributes, dimensions, defaultPartitioning());
-#else
-        return ArrayDesc("aio_input", attributes, dimensions);
-#endif
     }
 };
 
