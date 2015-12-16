@@ -72,12 +72,12 @@ Returned array:
 
 Example: loading from a single file:
 ```
-$ iquery -aq "proto_load('/tmp/foo.tsv', 'num_attributes=2')"
+$ iquery -aq "aio_input('/tmp/foo.tsv', 'num_attributes=2')"
 ```
 
 Example: multi-path load:
 ```
-$ iquery -aq "proto_load('paths=/tmp/foo.tsv;/tmp/foo2.tsv', 'instances=1;2', 'num_attributes=2')"
+$ iquery -aq "aio_input('paths=/tmp/foo.tsv;/tmp/foo2.tsv', 'instances=1;2', 'num_attributes=2')"
 ```
 
 ## aio_save
