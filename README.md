@@ -14,35 +14,35 @@ aio_input('parameter=value', 'parameter2=value2;value3',...)
 
 One of the following path parameters must be specified:
   path=/path/to/file                    :: the absolute path to load from, will be read from instance 0 if set
-                                           if the operator encounters a string without '=' it uses that as path
-  paths=/path/to/file1;/path/to/file2   :: semicolon-seprated list of paths for loading from multiple fs devices
+                                           if the operator encounters a string without '=' it uses that as path.
+  paths=/path/to/file1;/path/to/file2   :: semicolon-seprated list of paths for loading from multiple fs devices.
 
 If "paths" is used, then "instances" must be used to specify the loading instances:
   instances=[0;1;...]                   :: semicolon-separated list of instance ids, in the same order as "paths"
-                                           by default, the file will be read from instance 0
+                                           By default, the file will be read from instance 0.
   
 File-specific settings:
-  num_attributes=N                      :: number of columns in the file (at least on the majority of the lines)
-                                           required
+  num_attributes=N                      :: number of columns in the file (at least on the majority of the lines).
+                                           Required.
   header=H                              :: an integer number of lines to skip from the file; 
-                                           if "paths" is used, applies to all files
-                                           default is 0
-  line_delimiter=L                      :: a character that separates the lines (cells) of the file
-                                           values of \t \r \n and [space] are also supported
-                                           default is \n
-  attribute_delimiter=A                 :: a character that separates the columns (attributes) of the file
-                                           values of \t \r \n and [space] are also supported
-                                           default is \t
+                                           if "paths" is used, applies to all files.
+                                           Default is 0.
+  line_delimiter=L                      :: a character that separates the lines (cells) of the file;
+                                           values of \t \r \n and [space] are also supported.
+                                           Default is \n.
+  attribute_delimiter=A                 :: a character that separates the columns (attributes) of the file;
+                                           values of \t \r \n and [space] are also supported.
+                                           Default is \t.
 
 Splitting on dimension:
  split_on_dimension=[0/1]              :: a flag that determines whether the columns are placed in SciDB 
-                                          attributes, or cells along an extra dimension
-                                          default is 0 (create attributes)
+                                          attributes, or cells along an extra dimension.
+                                          Default is 0 (create attributes).
 
 Tuning settings:
   buffer_size=B                         :: the units into which the loaded file(s) are initially split
-                                           when first redistributes across the cluster
-                                           specified in bytes; default is 8MB
+                                           when first redistributed across the cluster,
+                                           specified in bytes; default is 8MB.
   chunk_size=C                          :: the chunk size along the third dimension of the result array
                                            should not be required often as the buffer_size actually
                                            controls how much data goes in each chunk 
@@ -86,19 +86,19 @@ This operator replaces the existing save functionality, for binary and tab-delim
 aio_save(array, 'parameter1=value1', 'parameter2=value2',...)
 
 Parameters are as follows:
- path=/path/to/file                 :: the location to save the file; required
-                                       if the operator enocunters a string parameter without '=', it assumes 
-                                       that to be the path
+ path=/path/to/file                 :: the location to save the file; required.
+                                       If the operator enocunters a string parameter without '=', it assumes 
+                                       that to be the path.
  paths=/path1;/path2;..             :: multiple file paths for saving from different instances, separated by 
-                                       semicolon. must be specified along with "instances" and have an equal 
-                                       number of terms. either "path" or "paths" must be specified, but not both.
+                                       semicolon. Must be specified along with "instances" and have an equal 
+                                       number of terms. Either "path" or "paths" must be specified, but not both.
  instance=I                         :: the instance to save the file on. Default is 0.
  instances=I0;I1;..                 :: multiple instance ID's for saving from different instances, separated by 
-                                       semicolon. must be specified along with "paths" and have an equal number 
-                                       of *unique* terms. either "instance" or "instances" must be specified, but 
+                                       semicolon. Must be specified along with "paths" and have an equal number 
+                                       of *unique* terms. Either "instance" or "instances" must be specified, but 
                                        not both.
  format=F                           :: the format string, may be either 'tdv' (token-delimited values) or a 
-                                       scidb-style binary format spec like '(int64, double null,...)'
+                                       scidb-style binary format spec like '(int64, double null,...)'.
  attributes_delimiter=A             :: the character to write between array attributes. Default is a tab. 
                                        applies when fomat is set to 'tdv'. 
  line_delimiter=L                   :: the character to write between array cells. Default is a newline.
