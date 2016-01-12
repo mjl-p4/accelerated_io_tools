@@ -7,8 +7,18 @@ accelerated_io_tools is a separate .so that compiles for SciDB 15.7. The acceler
 The old split and parse operators are still available and unchanged -- if things go wrong, those can be used.
 
 ## aio_input
+This operator replaces split() and parse().
+Example: loading from a single file:
+```
+$ iquery -anq "aio_input('/tmp/foo.tsv', 'num_attributes=2')"
+```
 
-This is a new operator that replaces split and parse. The signature is as follows:
+Example: loading from multiple files:
+```
+$ iquery -anq "store(aio_input('paths=/tmp/foo.tsv;/tmp/foo2.tsv', 'instances=1;2', 'num_attributes=4'), temp)"
+```
+
+The signature is as follows:
 ```
 aio_input('parameter=value', 'parameter2=value2;value3',...)
 
@@ -43,10 +53,10 @@ Tuning settings:
   buffer_size=B                         :: the units into which the loaded file(s) are initially split
                                            when first redistributed across the cluster,
                                            specified in bytes; default is 8MB.
-  chunk_size=C                          :: the chunk size along the third dimension of the result array
-                                           should not be required often as the buffer_size actually
-                                           controls how much data goes in each chunk 
-                                           default is 10,000,000. If buffer_size is set, this value is 
+  chunk_size=C                          :: the chunk size along the third dimension of the result array.
+                                           Should not be required often as the buffer_size actually
+                                           controls how much data goes in each chunk.
+                                           Default is 10,000,000. If buffer_size is set, this value is 
                                            automatically changed to buffer_size as an over_estimate.
 Returned array:
  If split_on_dimension=0 (default), the schema is as follows
@@ -70,18 +80,13 @@ Returned array:
  The slice of the array at attribute_no=N shall contain the error attribute, populated as above.
 ```
 
-Example: loading from a single file:
-```
-$ iquery -aq "aio_input('/tmp/foo.tsv', 'num_attributes=2')"
-```
-
-Example: multi-path load:
-```
-$ iquery -aq "aio_input('paths=/tmp/foo.tsv;/tmp/foo2.tsv', 'instances=1;2', 'num_attributes=2')"
-```
-
 ## aio_save
-This operator replaces the existing save functionality, for binary and tab-delimited formats. Works as follows:
+This operator replaces the existing save functionality, for binary and tab-delimited formats. 
+Example save to a binary file:
+```
+iquery -anq "save( bar, '/tmp/bar.out', 'format=(int64, double null, string null)')"
+```
+
 ```
 aio_save(array, 'parameter1=value1', 'parameter2=value2',...)
 
@@ -108,11 +113,6 @@ Parameters are as follows:
 Returned array:
  The schema is always <val:string null> [chunk_no=0:*,1,0, source_instance_id=0:*,1,0]
  The returned array is always empty as the operator's objective is to export the data.
-```
-
-Example save to a binary file:
-```
-iquery -anq "save( bar, '/tmp/bar.out', 'format=(int64, double null, string null)')"
 ```
 
 Note: the order of the returned data is arbitrary by default. If the client requires data in specific order, they must:
