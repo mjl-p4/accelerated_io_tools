@@ -1,8 +1,7 @@
 accelerated_io_tools
 ==========
 
-A separate, privately kept library that is superior to https://github.com/paradigm4/load_tools
-accelerated_io_tools is a separate .so that compiles for SciDB 15.7. The accelerated_io_tools and regular load_tools libraries cannot coexist on the same installation; the user must load one or the other. The accelerated .so is superior in every way.
+A separate, privately kept library that is a significant improvement over the regular load_tools package. Exists as a separate .so that compiles for SciDB 15.7. The accelerated_io_tools and regular load_tools libraries cannot coexist on the same installation; the user must load one or the other. The accelerated .so is superior in every way.
 
 The old split and parse operators are still available and unchanged -- if things go wrong, those can be used.
 
