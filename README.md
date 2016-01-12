@@ -22,8 +22,8 @@ The signature is as follows:
 aio_input('parameter=value', 'parameter2=value2;value3',...)
 
 One of the following path parameters must be specified:
-  path=/path/to/file                    :: the absolute path to load from, will be read from instance 0 if set
-                                           if the operator encounters a string without '=' it uses that as path.
+  path=/path/to/file                    :: the absolute path to load from. Assumed to be on instance 0, if set.
+                                           If the operator encounters a string without '=' it uses that as path.
   paths=/path/to/file1;/path/to/file2   :: semicolon-seprated list of paths for loading from multiple fs devices.
 
 If "paths" is used, then "instances" must be used to specify the loading instances:
