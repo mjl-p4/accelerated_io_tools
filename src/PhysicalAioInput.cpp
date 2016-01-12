@@ -97,6 +97,7 @@ private:
     uint32_t*    _sizePointer;
     FILE*        _inputFile;
     size_t const _nInstances;
+    ssize_t       _chunkNo;
 
 public:
     BinFileSplitArray(ArrayDesc const& schema,
@@ -110,7 +111,8 @@ public:
         _chunkOverheadSize( getChunkOverheadSize() ),
         _endOfFile(false),
         _inputFile(NULL),
-        _nInstances(query->getInstancesCount())
+        _nInstances(query->getInstancesCount()),
+        _chunkNo(0)
     {
         super::setEnforceHorizontalIteration(true);
         _chunkAddress.coords[2] = settings->getParseInstance();
@@ -200,8 +202,12 @@ public:
 
     ConstChunk const& getChunk(AttributeID attr, size_t rowIndex)
     {
-        _chunkAddress.coords[0] = _rowIndex  - 1;
         _chunkAddress.coords[1] = (_rowIndex  - 1 + _chunkAddress.coords[2]) % _nInstances;
+        if(_chunkAddress.coords[1] == 0 && _rowIndex > 1)
+        {
+            _chunkNo++;
+        }
+        _chunkAddress.coords[0] = _chunkNo;
         shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         _chunk.initialize(this, &super::getArrayDesc(), _chunkAddress, 0);
         //LOG4CXX_DEBUG(logger, "ALT_LOAD emitting chunk "<<CoordsToStr(_chunkAddress.coords));
@@ -405,23 +411,23 @@ public:
         while(!srcArrayIter->end())
         {
            Coordinates supplementCoords = srcArrayIter->getPosition();
-           Coordinate block = supplementCoords[0];
+           Coordinate block = supplementCoords[0] * nInstances + supplementCoords[1];
            Coordinate dst   = supplementCoords[1];
            Coordinate src   = supplementCoords[2];
            if(lastBlocks[src] < block)
            {
                lastBlocks[src] = block;
            }
-           if(supplementCoords[0] != 0)
+           if(supplementCoords[0] != 0 || supplementCoords[1] != supplementCoords[2])
            {
                ConstChunk const& ch = srcArrayIter->getChunk();
                PinBuffer pinScope(ch);
                char* start = ((char*) ch.getData()) + getChunkOverheadSize();
                uint32_t const sourceSize = *((uint32_t*)(((char*) ch.getData()) + getSizeOffset()));
-               supplementCoords[0]--;
                if(dst == 0)
                {
                    supplementCoords[1] = nInstances-1;
+                   supplementCoords[0]--;
                }
                else
                {
@@ -500,7 +506,8 @@ public:
                                                std::shared_ptr<CoordinateTranslator>(),
                                                0,
                                                std::shared_ptr<PartitioningSchemaData>());
-        vector<Coordinate> lastBlocks(query->getInstancesCount(), -1);
+        size_t const nInstances = query->getInstancesCount();
+        vector<Coordinate> lastBlocks(nInstances, -1);
         shared_ptr<Array> supplement = makeSupplement(splitData, query, settings, lastBlocks);
         exchangeLastBlocks(lastBlocks, query);
         supplement = redistributeToRandomAccess(supplement, query,
@@ -518,7 +525,8 @@ public:
         while(!inputIterator-> end())
         {
             Coordinates const& pos = inputIterator->getPosition();
-            bool const lastBlock = (lastBlocks[ pos[2] ] == pos[0]);
+            Coordinate const block = pos[0] * nInstances + pos[1];
+            bool const lastBlock = (lastBlocks[ pos[2] ] == block);
             ConstChunk const& chunk =  inputIterator->getChunk();
             PinBuffer pinScope(chunk);
             char* sourceStart = ((char*) chunk.getData()) + getChunkOverheadSize();
@@ -528,7 +536,7 @@ public:
                 throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "[defensive] encountered a chunk with no data.";
             }
             size_t nLines =0;
-            if(pos[0] != 0)
+            if(pos[0] != 0 || pos[1] != pos[2])
             {
                 while((*sourceStart)!=lineDelim)
                 {
