@@ -7,12 +7,12 @@ The old split and parse operators are still available and unchanged -- if things
 
 ## aio_input
 This operator replaces split() and parse().
-Example: loading from a single file:
+Example ingest from a single file:
 ```
 $ iquery -anq "aio_input('/tmp/foo.tsv', 'num_attributes=2')"
 ```
 
-Example: loading from multiple files:
+Example ingest from multiple files:
 ```
 $ iquery -anq "store(aio_input('paths=/tmp/foo.tsv;/tmp/foo2.tsv', 'instances=1;2', 'num_attributes=4'), temp)"
 ```
