@@ -86,6 +86,7 @@ Example save to a binary file:
 iquery -anq "save( bar, '/tmp/bar.out', 'format=(int64, double null, string null)')"
 ```
 
+Supports the following options:
 ```
 aio_save(array, 'parameter1=value1', 'parameter2=value2',...)
 
