@@ -228,7 +228,6 @@ private:
     bool _splitOnDimension;
     size_t _outputColumn;
     char const _attributeDelimiter;
-    //Values in the same tuple are likely to repeat, so use a separate buffer per attribute, hoping that realloc will be less likely
     vector<Value> _buf;
     ostringstream _errorBuf;
     Value _errorBufVal;

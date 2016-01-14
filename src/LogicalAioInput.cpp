@@ -48,7 +48,7 @@ public:
         size_t requestedChunkSize = settings.getChunkSize();
         size_t const nInstances = query->getInstancesCount();
         vector<DimensionDesc> dimensions(3);
-        dimensions[0] = DimensionDesc("value_no",           0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), requestedChunkSize, 0);
+        dimensions[0] = DimensionDesc("tuple_no",           0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), requestedChunkSize, 0);
         dimensions[1] = DimensionDesc("dst_instance_id",    0, 0, nInstances-1, nInstances-1, 1, 0);
         dimensions[2] = DimensionDesc("src_instance_id",    0, 0, nInstances-1, nInstances-1, 1, 0);
         vector<AttributeDesc> attributes;
