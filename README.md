@@ -3,16 +3,15 @@ accelerated_io_tools
 
 A separate, privately kept library that is a significant improvement over the regular load_tools package. Exists as a separate .so that compiles for SciDB 15.7. The accelerated_io_tools and regular load_tools libraries cannot coexist on the same installation; the user must load one or the other. The accelerated .so is superior in every way.
 
-The old split and parse operators are still available and unchanged -- if things go wrong, those can be used.
+The old split and parse operators are still available and unchanged; those can be used if needed.
 
 ## aio_input
-This operator replaces split() and parse().
-Example ingest from a single file:
+This operator replaces split() and parse(); ingests CSV, TSV or similar text data and returns an array that contains it. The returned array can then be stored or processed further. Example simple ingest from a single file:
 ```
 $ iquery -anq "aio_input('/tmp/foo.tsv', 'num_attributes=2')"
 ```
 
-Example CSV ingest from multiple files:
+Example CSV ingest and store from multiple files:
 ```
 $ iquery -anq "store(
  aio_input(
@@ -38,7 +37,7 @@ aio_input('parameter=value', 'parameter2=value2;value3',...)
 * `paths=/path/to/file1;/path/to/file2`: semicolon-seprated list of paths for loading from multiple fs devices.
 
 If `paths` is used, then `instances` must be used to specify the loading instances:
-* `instances=0;1;...`: semicolon-separated list of instance ids, in the same order as "paths". By default, the file will be read from instance 0.
+* `instances=0;1;...`: semicolon-separated list of instance ids, in the same order as `paths`. Must match the number of `paths` and contain unique ids. By default, the file will be read from instance 0.
   
 #### File format settings:
 * `num_attributes=N`: number of columns in the file (at least on the majority of the lines). Required.
@@ -51,7 +50,7 @@ If `paths` is used, then `instances` must be used to specify the loading instanc
 
 #### Tuning settings:
 * `buffer_size=B`: the units into which the loaded file(s) are initially split when first redistributed across the cluster, specified in bytes; default is 8MB.
-* `chunk_size=C`: the chunk size along the third dimension of the result array. Should not be required often as the `buffer_size` actually controls how much data goes in each chunk. Default is 10,000,000. If `buffer_size` is set, this value is automatically changed to equal `buffer_size` as an overestimate.
+* `chunk_size=C`: the chunk size along the third dimension of the result array. Should not be required often as the `buffer_size` actually controls how much data goes in each chunk. Default is 10,000,000. If `buffer_size` is set and `chunk_size` is not set, the `chunk_size` is automatically set to equal `buffer_size` as an over-estimate.
 
 #### Returned array:
 If `split_on_dimension=0` (default), the schema of the returned array is as follows:
@@ -101,7 +100,7 @@ The `path` or `paths` must always be specified.
 #### Save to one or more files:
 By default, the file is saved to a path on node 0 by instance 0. You can distribute the IO and network load by simultaneously writing data to multiple FS devices from several different instances (one instance per path).
 * `path=/path/to/file`: the location to save the file; required. If the operator enocunters a string parameter without '=', it assumes that to be the path.
-* `paths=/path1;/path2;..`: multiple file paths for saving from different instances, separated by semicolon. Must be specified along with "instances" and have an equal number of terms. Either `path` or `paths` must be specified, but not both.
+* `paths=/path1;/path2;..`: multiple file paths for saving from different instances, separated by semicolon. Must be specified along with `instances` and have an equal number of terms. Either `path` or `paths` must be specified, but not both.
 * `instance=I`: the instance to save the file on. Default is 0.
 * `instances=0;1;..`: multiple instance ID's for saving from different instances, separated by semicolon. Must be specified along with `paths` and have an equal number of unique terms. Either `instance` or `instances` must be specified, but not both.
 
@@ -114,7 +113,8 @@ By default, the file is saved to a path on node 0 by instance 0. You can distrib
 #### Returned array:
 The schema is always `<val:string null> [chunk_no=0:*,1,0, source_instance_id=0:*,1,0]`. The returned array is always empty as the operator's objective is to export the data.
 
-Note: the order of the returned data is arbitrary by default. If the client requires data in specific order, they must:
+#### Saving data in order:
+Note that the order of the returned data is arbitrary by default. If the client requires data in specific order, they must:
  0. save from a single instance
  1. add a sort operator
  2. make sure the sort chunk size (1M default) matches the aio_save cells_per_chunk (also 1M default)
