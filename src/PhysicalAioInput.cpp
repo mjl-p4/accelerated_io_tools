@@ -228,21 +228,24 @@ private:
     bool _splitOnDimension;
     size_t _outputColumn;
     char const _attributeDelimiter;
+    //Values in the same tuple are likely to repeat, so use a separate buffer per attribute, hoping that realloc will be less likely
+    vector<Value> _buf;
     ostringstream _errorBuf;
-    Value _buf;
+    Value _errorBufVal;
 
 public:
     AIOOutputWriter(ArrayDesc const& schema, shared_ptr<Query>& query, bool splitOnDimension, char const attDelimiter):
         _output(make_shared<MemArray>(schema,query)),
-        _outputPosition( splitOnDimension ? 5 : 4, 0),
+        _outputPosition( splitOnDimension ? 4 : 3, 0),
         _numLiveAttributes(schema.getAttributes(true).size()),
-        _outputLineSize(splitOnDimension ? schema.getDimensions()[4].getChunkInterval() : _numLiveAttributes),
-        _outputChunkSize(schema.getDimensions()[3].getChunkInterval()),
+        _outputLineSize(splitOnDimension ? schema.getDimensions()[3].getChunkInterval() : _numLiveAttributes),
+        _outputChunkSize(schema.getDimensions()[0].getChunkInterval()),
         _outputArrayIterators(_numLiveAttributes),
         _outputChunkIterators(_numLiveAttributes),
         _splitOnDimension(splitOnDimension),
         _outputColumn(0),
-        _attributeDelimiter(attDelimiter)
+        _attributeDelimiter(attDelimiter),
+        _buf(_outputLineSize-1)
     {
         for(AttributeID i =0; i<_numLiveAttributes; ++i)
         {
@@ -252,13 +255,12 @@ public:
 
     void newChunk (Coordinates const& inputChunkPosition, shared_ptr<Query>& query)
     {
-        _outputPosition[0] = inputChunkPosition[0];
+        _outputPosition[0] = inputChunkPosition[0] * _outputChunkSize;
         _outputPosition[1] = inputChunkPosition[1];
         _outputPosition[2] = inputChunkPosition[2];
-        _outputPosition[3] = 0;
         if(_splitOnDimension)
         {
-            _outputPosition[4] = 0;
+            _outputPosition[3] = 0;
         }
         for(AttributeID i =0; i<_numLiveAttributes; ++i)
         {
@@ -275,20 +277,21 @@ public:
     {
         if(_outputColumn < _outputLineSize - 1)
         {
-            _buf.setSize(end - start + 1);
-            char* d = _buf.getData<char>();
+            Value& buf = _buf[_outputColumn];
+            buf.setSize(end - start + 1);
+            char* d = buf.getData<char>();
             memcpy(d, start, end-start);
             d[(end-start)]=0;
             if(_splitOnDimension)
             {
                 _outputChunkIterators[0] -> setPosition(_outputPosition);
-                _outputChunkIterators[0] -> writeItem(_buf);
-                ++(_outputPosition[4]);
+                _outputChunkIterators[0] -> writeItem(buf);
+                ++(_outputPosition[3]);
             }
             else
             {
                 _outputChunkIterators[_outputColumn] -> setPosition(_outputPosition);
-                _outputChunkIterators[_outputColumn] -> writeItem(_buf);
+                _outputChunkIterators[_outputColumn] -> writeItem(buf);
             }
         }
         else if (_outputColumn == _outputLineSize - 1)
@@ -308,14 +311,14 @@ public:
     {
         if(_outputColumn < _outputLineSize - 1)
         {
-            _buf.setNull();
+            _errorBufVal.setNull();
             if(_splitOnDimension)
             {
                 while (_outputColumn < _outputLineSize - 1)
                 {
                     _outputChunkIterators[0] -> setPosition(_outputPosition);
-                    _outputChunkIterators[0] -> writeItem(_buf);
-                    ++(_outputPosition[4]);
+                    _outputChunkIterators[0] -> writeItem(_errorBufVal);
+                    ++(_outputPosition[3]);
                     ++_outputColumn;
                 }
             }
@@ -324,7 +327,7 @@ public:
                 while (_outputColumn < _outputLineSize - 1)
                 {
                     _outputChunkIterators[_outputColumn] -> setPosition(_outputPosition);
-                    _outputChunkIterators[_outputColumn] -> writeItem(_buf);
+                    _outputChunkIterators[_outputColumn] -> writeItem(_errorBufVal);
                     ++_outputColumn;
                 }
             }
@@ -332,25 +335,25 @@ public:
         }
         if(_errorBuf.str().size())
         {
-            _buf.setString(_errorBuf.str());
+            _errorBufVal.setString(_errorBuf.str());
+            _errorBuf.str("");
         }
         else
         {
-            _buf.setNull();
+            _errorBufVal.setNull();
         }
         if(_splitOnDimension)
         {
             _outputChunkIterators[0] -> setPosition(_outputPosition);
-            _outputChunkIterators[0] -> writeItem(_buf);
-            _outputPosition[4] = 0;
+            _outputChunkIterators[0] -> writeItem(_errorBufVal);
+            _outputPosition[3] = 0;
         }
         else
         {
             _outputChunkIterators[_outputLineSize - 1] -> setPosition(_outputPosition);
-            _outputChunkIterators[_outputLineSize - 1] -> writeItem(_buf);
+            _outputChunkIterators[_outputLineSize - 1] -> writeItem(_errorBufVal);
         }
-        ++(_outputPosition[3]);
-        _errorBuf.str("");
+        ++(_outputPosition[0]);
         _outputColumn = 0;
     }
 
@@ -518,10 +521,12 @@ public:
                                                 std::shared_ptr<PartitioningSchemaData>());
         shared_ptr<ConstArrayIterator> inputIterator = splitData->getConstIterator(0);
         shared_ptr<ConstArrayIterator> supplementIter = supplement->getConstIterator(0);
-        size_t const outputChunkSize = _schema.getDimensions()[3].getChunkInterval();
+        size_t const outputChunkSize = _schema.getDimensions()[0].getChunkInterval();
         char const attDelim = settings->getAttributeDelimiter();
         char const lineDelim = settings->getLineDelimiter();
         AIOOutputWriter writer(_schema, query, settings->getSplitOnDimension(), settings->getAttributeDelimiter());
+        size_t const overheadSize = getChunkOverheadSize();
+        size_t const sizeOffset = getSizeOffset();
         while(!inputIterator-> end())
         {
             Coordinates const& pos = inputIterator->getPosition();
@@ -529,8 +534,10 @@ public:
             bool const lastBlock = (lastBlocks[ pos[2] ] == block);
             ConstChunk const& chunk =  inputIterator->getChunk();
             PinBuffer pinScope(chunk);
-            char* sourceStart = ((char*) chunk.getData()) + getChunkOverheadSize();
-            uint32_t sourceSize = *((uint32_t*)(((char*) chunk.getData()) + getSizeOffset()));
+            char* chunkData = ((char*) chunk.getData());
+            char* sourceStart = chunkData + overheadSize;
+            char* chunkBodyStart  = sourceStart;
+            uint32_t sourceSize = *((uint32_t*)(chunkData + sizeOffset));
             if(sourceSize == 0)
             {
                 throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "[defensive] encountered a chunk with no data.";
@@ -543,7 +550,7 @@ public:
                     sourceStart ++;
                 }
                 sourceStart ++;
-                sourceSize = sourceSize - (sourceStart - (((char*) chunk.getData()) + getChunkOverheadSize()));
+                sourceSize = sourceSize - (sourceStart - chunkBodyStart);
             }
             bool haveSupplement = supplementIter->setPosition(pos);
             vector<char>buf;
