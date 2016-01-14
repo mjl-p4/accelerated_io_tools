@@ -60,23 +60,28 @@ Tuning settings:
 Returned array:
  If split_on_dimension=0 (default), the schema is as follows
  <a0:string null, a1:string null, ... aN-1: string null, error:string null>
- [chunk_no           = 0:*,1,0,
-  dst_instance_id    = 0:[NUM_INSTANCES-1],1,0,
-  source_instance_id = 0:[NUM_INSTANCES-1],1,0,
-  line_no            = 0:[CS-1], [CS], 0]
- Where N is the specified num_attributes value. The error attribute is null, unless the particular line
- in the file had a number of tokens not equal to N, in which case the error attribute is set to either
- 'short' or 'long ' followed by the leftover line. In the case of a short line, the absent attributes 
- are set to null.
+ [tuple_no           = 0: *,                 CS,   0,
+  dst_instance_id    = 0: NUM_INSTANCES-1,   1,    0,
+  source_instance_id = 0: NUM_INSTANCES-1,   1,    0]
+ Where N is the specified num_attributes value, CS is the chunk size (10M default; see above) and 
+ NUM_INSTANCES is the number of SciDB instances in the cluster. The error attribute is null, unless 
+ the particular line in the file had a number of tokens not equal to N, in which case the error 
+ attribute is set to either 'short' or 'long ' followed by the leftover line. In the case of a short 
+ line, the absent attributes are set to null. 
  
- If split_on_dimension=1 the attributes are populated along a fifth dimension:
+ If split_on_dimension=1 the attributes are populated along a fourth dimension:
  <a:string null>
- [chunk_no           = 0:*,1,0,
-  dst_instance_id    = 0:[NUM_INSTANCES-1],1,0,
-  source_instance_id = 0:[NUM_INSTANCES-1],1,0,
-  line_no            = 0:[CS-1], [CS], 0]
-  attribute_no       = 0:N, N+1, 0]
+ [tuple_no           = 0: *,                 CS,   0,
+  dst_instance_id    = 0: NUM_INSTANCES-1,   1,    0,
+  source_instance_id = 0: NUM_INSTANCES-1,   1,    0,
+  attribute_no       = 0: N,                 N+1,  0]
  The slice of the array at attribute_no=N shall contain the error attribute, populated as above.
+ 
+ Other than attribute_no (when split_on_dimension=1) the dimensions are not intended to be used in
+ queries. The source_instance_id matches the instance(s) reading the data; the dst_instance_id is 
+ assigned in a round-robin fashion to successive blocks from the same source. The tuple_no starts
+ at 0 for each {dst_instance_id, source_instance_id} pair and is populated densely within the block.
+ However, each new block starts a new chunk. 
 ```
 
 ## aio_save
