@@ -1,12 +1,12 @@
 accelerated_io_tools
 ==========
 
-A separate, privately kept library that is a significant improvement over the regular load_tools package. Exists as a separate .so that compiles for SciDB 15.7. The accelerated_io_tools and regular load_tools libraries cannot coexist on the same installation; the user must load one or the other. The accelerated .so is superior in every way.
+A separate, privately kept library that is a significant improvement over the regular `load_tools` package. Exists as a separate .so that compiles for SciDB 15.7. The `accelerated_io_tools` and regular `load_tools` libraries cannot coexist on the same installation; the user must load one or the other. The accelerated .so is superior in every way.
 
-The old split and parse operators are still available and unchanged; those can be used if needed.
+The old `split` and `parse` operators are still available and unchanged; those can be used if needed.
 
 ## aio_input
-This operator replaces split() and parse(); ingests CSV, TSV or similar text data and returns an array that contains it. The returned array can then be stored or processed further. Example simple ingest from a single file:
+This operator replaces `split()` and `parse()`; ingests CSV, TSV or similar text data and returns an array that contains it. The returned array can then be stored or processed further. Example simple ingest from a single file:
 ```
 $ iquery -anq "aio_input('/tmp/foo.tsv', 'num_attributes=2')"
 ```
@@ -70,7 +70,7 @@ If `split_on_dimension=1` the attributes are populated along a fourth dimension 
   source_instance_id = 0: NUM_INSTANCES-1,   1,    0,
   attribute_no       = 0: N,                 N+1,  0]
 ```
-The slice of the array at attribute_no=N shall contain the error attribute, populated as above.
+The slice of the array at `attribute_no=N` shall contain the error attribute, populated as above.
  
 Other than `attribute_no` (when `split_on_dimension=1`) the dimensions are not intended to be used in queries. The `source_instance_id` matches the instance(s) reading the data; the `dst_instance_id` is assigned in a round-robin fashion to successive blocks from the same source. The `tuple_no` starts at 0 for each `{dst_instance_id, source_instance_id}` pair and is populated densely within the block. However, each new block starts a new chunk. 
 
