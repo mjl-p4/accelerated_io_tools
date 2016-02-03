@@ -115,6 +115,9 @@ ln -s /tmp/load_tools_test/file1 /tmp/load_tools_test/symlink1
 mkfifo /tmp/load_tools_test/fifo1
 mkdir /tmp/load_tools_test/directory
 
+#This is put here to help Jenkins configurations
+chmod -R a+rwx /tmp/load_tools_test
+
 iquery -aq "split('/tmp/load_tools_test/file1', 'lines_per_chunk=3')" >> test.out
 iquery -aq "split('/tmp/load_tools_test/file1', 'lines_per_chunk=1')" >> test.out
 iquery -aq "split('/tmp/load_tools_test/file1')"                      >> test.out
