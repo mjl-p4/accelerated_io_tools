@@ -145,8 +145,8 @@ iquery -anq "remove(foo)" > /dev/null 2>&1
 iquery -anq "remove(bar)" > /dev/null 2>&1
 
 iquery -anq "store(build(<val:double> [x=1:8000000,1000000,0], random()), foo)" > /dev/null
-iquery -anq "save(foo, 'foo.tsv', -1, 'tsv')" > /dev/null
-time iquery -anq "store(project(filter(apply(parse(split('paths=foo.tsv', 'instances=-1'), 'num_attributes=1'), v, dcast(a0, double(null))), v is not null), v), bar)" > /dev/null 
+iquery -anq "save(foo, '/tmp/load_tools_test/foo.tsv', -1, 'tsv')" > /dev/null
+time iquery -anq "store(project(filter(apply(parse(split('paths=/tmp/load_tools_test/foo.tsv', 'instances=-1'), 'num_attributes=1'), v, dcast(a0, double(null))), v is not null), v), bar)" > /dev/null 
 iquery -aq "op_count(bar)" >> test.out
 
 iquery -aq "aio_input('/tmp/load_tools_test/file1', 'num_attributes=3')" >> test.out
@@ -174,7 +174,7 @@ iquery -aq "aio_input(
             )" >> test.out
 
 iquery -anq "remove(bar)" > /dev/null 2>&1
-time iquery -anq "store(project(filter(apply(aio_input('paths=foo.tsv', 'instances=-1', 'num_attributes=1'), v, dcast(a0, double(null))), v is not null), v), bar)" > /dev/null
+time iquery -anq "store(project(filter(apply(aio_input('paths=/tmp/load_tools_test/foo.tsv', 'instances=-1', 'num_attributes=1'), v, dcast(a0, double(null))), v is not null), v), bar)" > /dev/null
 iquery -aq "op_count(bar)" >> test.out
 
 iquery -naq "remove(foo)" > /dev/null 2>&1
