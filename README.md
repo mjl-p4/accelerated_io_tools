@@ -132,3 +132,10 @@ aio_save(
  'cells_per_chunk=100000'
 )
 ```
+
+### Install
+
+You will need the `-dev` or `-devel` package of Protobuf in order to get headers. On Debian/Ubuntu:
+```
+sudo apt-get install libprotobuf-dev protobuf-compiler
+```
