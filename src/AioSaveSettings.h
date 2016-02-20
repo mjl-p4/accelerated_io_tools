@@ -46,6 +46,9 @@ private:
     size_t const                _numInstances;
     bool                        _binaryFormat;
     string                      _binaryFormatString;
+    string						_nullPrefix;
+    bool                        _printNullCode;
+    string						_nullPostfix;
 
 public:
     static const size_t MAX_PARAMETERS = 6;
@@ -58,7 +61,10 @@ public:
                 _lineDelimiter('\n'),
                 _numInstances(query->getInstancesCount()),
                 _binaryFormat(false),
-                _binaryFormatString("")
+                _binaryFormatString(""),
+				_nullPrefix("\\N"),
+				_printNullCode(false),
+				_nullPostfix("")
     {
         string const cellsPerChunkHeader           = "cells_per_chunk=";
         string const attributeDelimiterHeader      = "attribute_delimiter=";
@@ -68,15 +74,15 @@ public:
         string const filePathsHeader               = "paths=";
         string const instanceHeader                = "instance=";
         string const instancesHeader               = "instances=";
+        string const nullPatternHeader             = "null_pattern=";
     	size_t const nParams = operatorParameters.size();
     	bool  cellsPerChunkSet      = false;
         bool  attributeDelimiterSet = false;
         bool  lineDelimiterSet      = false;
         bool  formatSet             = false;
-
+        bool  nullPatternSet        = false;
         vector<string>     filePaths;
         vector<InstanceID> instanceIds;
-
     	if (nParams > MAX_PARAMETERS)
     	{   //assert-like exception. Caller should have taken care of this!
     		throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal number of parameters passed to UnparseSettings";
@@ -278,7 +284,7 @@ public:
                         int64_t iid = lexical_cast<int64_t>(tok);
                         if(iid<0 || ((uint64_t)iid) >= _numInstances)
                         {
-                            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "instance ids must be non-negative";
+                            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "instance id out of bounds";
                         }
                         instanceIds.push_back(iid);
                     }
@@ -288,6 +294,39 @@ public:
                     }
                 }
             }
+            else if (starts_with(parameterString, nullPatternHeader))
+    		{
+            	if(nullPatternSet)
+            	{
+            		throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set null_pattern multiple times";
+            	}
+            	string nullPattern = parameterString.substr(nullPatternHeader.size());
+            	_nullPrefix.resize(0);
+            	_nullPostfix.resize(0);
+            	_printNullCode = false;
+            	size_t c;
+            	for(c=0; c<nullPattern.size(); ++c)
+            	{
+            		if(nullPattern[c] != '%')
+            		{
+            			_nullPrefix.append(1, nullPattern[c]);
+            		}
+            		else
+            		{
+            			break;
+            		}
+            	}
+            	if(c<nullPattern.size() && nullPattern[c]=='%')
+            	{
+            		_printNullCode = true;
+            		++c;
+            	}
+            	for( ; c<nullPattern.size(); ++c)
+            	{
+            		_nullPostfix.append(1, nullPattern[c]);
+            	}
+            	nullPatternSet = true;
+    		}
             else
     		{
                 string path = parameterString;
@@ -335,9 +374,9 @@ public:
         {
             _instancesAndPaths[instanceIds[i]] = filePaths[i];
         }
-    	if(_binaryFormat && (lineDelimiterSet || attributeDelimiterSet))
+    	if(_binaryFormat && (lineDelimiterSet || attributeDelimiterSet || nullPatternSet))
     	{
-    	    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "attribute_delimiter and line_delimiter are not used with the binary fomat";
+    	    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "attribute_delimiter, line_delimiter and null_pattern are only used with 'format=tdv'";
     	}
     }
 
@@ -370,6 +409,20 @@ public:
     {
         return _instancesAndPaths;
     }
+
+    inline void printNull(ostringstream& output, int8_t missingReason) const
+    {
+    	output<<_nullPrefix;
+    	if(_printNullCode)
+    	{
+    		output<<(int64_t)missingReason<<_nullPostfix;
+    	}
+    	else
+    	{
+    		return;
+    	}
+    }
+
 };
 
 }

@@ -2,6 +2,17 @@
 
 rm -rf test.out
 
+iquery -aq "
+project(
+ apply(
+  op_count(list('instances')), 
+  test, iif(count<3, 
+             string(throw('This test needs more instances to run')), 
+             'Instance Count OK')
+ ), 
+ test
+)" > test.out 2>&1
+
 iquery -anq "remove(zero_to_255)"                > /dev/null 2>&1
 iquery -anq "remove(minus_128_to_127)"           > /dev/null 2>&1
 iquery -anq "remove(zero_to_65536)"              > /dev/null 2>&1
@@ -25,7 +36,7 @@ store(
  big_n_wild
 )"                                                                                                                        > /dev/null 2>&1
 
-iquery -aq "build(<val:double null> [x=0:0,1,0], dcast('127',  int8(null)))"                                           >  test.out
+iquery -aq "build(<val:double null> [x=0:0,1,0], dcast('127',  int8(null)))"                                           >> test.out
 iquery -aq "build(<val:double null> [x=0:0,1,0], dcast('128',  int8(null)))"                                           >> test.out
 iquery -aq "build(<val:double null> [x=0:0,1,0], dcast('-128', int8(null)))"                                           >> test.out
 iquery -aq "build(<val:double null> [x=0:0,1,0], dcast('-129', int8(null)))"                                           >> test.out
@@ -150,14 +161,14 @@ time iquery -anq "store(project(filter(apply(parse(split('paths=foo.tsv', 'insta
 iquery -aq "op_count(bar)" >> test.out
 
 iquery -aq "aio_input('/tmp/load_tools_test/file1', 'num_attributes=3')" >> test.out
-iquery -aq "aio_input('/tmp/load_tools_test/file1', 'num_attributes=3', 'buffer_size=40')" >> test.out
-iquery -aq "aio_input(
+iquery -aq "sort(aio_input('/tmp/load_tools_test/file1', 'num_attributes=3', 'buffer_size=40'), a0)" >> test.out
+iquery -aq "sort(aio_input(
             'paths=/tmp/load_tools_test/file1;/tmp/load_tools_test/symlink1',
             'instances=1;2',
             'header=1',
             'num_attributes=2',
             'buffer_size=31'
-            )" >> test.out
+            ),a0)" >> test.out
 cat /tmp/load_tools_test/file2 > /tmp/load_tools_test/fifo1 &
 iquery -aq "aio_input(
             'paths=/tmp/load_tools_test/file1;/tmp/load_tools_test/symlink1;/tmp/load_tools_test/fifo1',
@@ -165,13 +176,13 @@ iquery -aq "aio_input(
             'header=1',
             'num_attributes=1'
             )" >> test.out
-iquery -aq "aio_input(
+iquery -aq "sort(aio_input(
             'paths=/tmp/load_tools_test/file1;/tmp/load_tools_test/file2;/tmp/load_tools_test/directory',
             'instances=1;2;0',
             'buffer_size=41', 
             'attribute_delimiter=,',
             'num_attributes=3'
-            )" >> test.out
+            ), a0)" >> test.out
 
 iquery -anq "remove(bar)" > /dev/null 2>&1
 time iquery -anq "store(project(filter(apply(aio_input('paths=foo.tsv', 'instances=-1', 'num_attributes=1'), v, dcast(a0, double(null))), v is not null), v), bar)" > /dev/null
@@ -179,11 +190,16 @@ iquery -aq "op_count(bar)" >> test.out
 
 iquery -naq "remove(foo)" > /dev/null 2>&1
 iquery -naq "store(apply(build(<v1:float null>[i=1:50,10,0], iif(i%2=0,null,i)), v2, double(i/10.4), v3, 'abcdef'), foo)" > /dev/null
-iquery -anq "aio_save(foo, 'paths=/tmp/load_tools_test/foo;/tmp/load_tools_test/foo2', 'instances=2;3', 'format=tdv', 'cells_per_chunk=3')" >> test.out
+iquery -anq "aio_save(sort(foo,v1,v2,v3,25), 'paths=/tmp/load_tools_test/foo;/tmp/load_tools_test/foo2', 'instances=2;0', 'format=tdv', 'cells_per_chunk=3')" >> test.out
 iquery -aq "sort(input(foo, '/tmp/load_tools_test/foo',  0, 'tsv'), v2)" >> test.out
 iquery -aq "sort(input(foo, '/tmp/load_tools_test/foo2', 0, 'tsv'), v2)" >> test.out
 iquery -anq "aio_save(foo, '/tmp/load_tools_test/foo', 'format=(float null, double, string)', 'cells_per_chunk=8')" >> test.out
 iquery -aq "sort(input(foo, '/tmp/load_tools_test/foo', 0, '(float null, double, string)'), v2)" >> test.out
-
+iquery -anq "aio_save(between(sort(foo,v1,v2,v3), 0,9), 'paths=/tmp/load_tools_test/foo', 'instances=0', 'format=tdv', 'null_pattern=?%')" >> test.out
+cat /tmp/load_tools_test/foo >> test.out
+iquery -anq "aio_save(between(sort(foo,v1,v2,v3), 0,9), 'paths=/tmp/load_tools_test/foo', 'instances=0', 'format=tdv', 'null_pattern=NULL CODE %, BRUH')" >> test.out
+cat /tmp/load_tools_test/foo >> test.out
+iquery -anq "aio_save(between(sort(foo,v1,v2,v3), 0,9), 'paths=/tmp/load_tools_test/foo', 'instances=0', 'format=tdv', 'null_pattern=%, BRUH')" >> test.out
+cat /tmp/load_tools_test/foo >> test.out
 
 diff test.out test.expected

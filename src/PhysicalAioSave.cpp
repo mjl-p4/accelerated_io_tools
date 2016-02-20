@@ -387,6 +387,7 @@ private:
     vector<bool>            _isString;
     vector<FunctionPointer> _converters;
     Value                   _stringBuf;
+    AioSaveSettings const&  _settings;
 
 public:
     TextChunkPopulator(ArrayDesc const& inputArrayDesc,
@@ -394,7 +395,8 @@ public:
        _attDelim(settings.getAttributeDelimiter()),
        _lineDelim(settings.getLineDelimiter()),
        _isString(inputArrayDesc.getAttributes(true).size(), false),
-       _converters(inputArrayDesc.getAttributes(true).size(), 0)
+       _converters(inputArrayDesc.getAttributes(true).size(), 0),
+	   _settings(settings)
     {
         Attributes const& inputAttrs = inputArrayDesc.getAttributes(true);
         for (size_t i = 0; i < inputAttrs.size(); ++i)
@@ -432,8 +434,7 @@ public:
                 }
                 if(v->isNull())
                 {
-                    //TODO: print nothing for now (the TSV way). In the future - add a null representation option to settings
-                    outputBuf<<"\\N";
+                	_settings.printNull(outputBuf, v->getMissingReason());
                 }
                 else
                 {
