@@ -382,3 +382,7 @@ Query was executed successfully
 0, BRUH	1.53846	abcdef
 0, BRUH	1.73077	abcdef
 0, BRUH	1.92308	abcdef
+Query was executed successfully
+foo<v1:float NULL DEFAULT null,v2:double,v3:string> [i=1:50,10,0]	true
+Query was executed successfully
+foo<v1:float NULL DEFAULT null,v2:double,v3:string> [i=1:50,10,0]	true

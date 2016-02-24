@@ -36,6 +36,7 @@
 #include <array/Tile.h>
 #include <array/TileIteratorAdaptors.h>
 #include <util/Platform.h>
+#include <util/Network.h>
 
 #include "UnparseTemplateParser.h"
 
@@ -385,6 +386,7 @@ private:
     char const              _attDelim;
     char const              _lineDelim;
     vector<bool>            _isString;
+    vector<bool>            _isBool;
     vector<FunctionPointer> _converters;
     Value                   _stringBuf;
     AioSaveSettings const&  _settings;
@@ -395,6 +397,7 @@ public:
        _attDelim(settings.getAttributeDelimiter()),
        _lineDelim(settings.getLineDelimiter()),
        _isString(inputArrayDesc.getAttributes(true).size(), false),
+       _isBool(inputArrayDesc.getAttributes(true).size(), false),
        _converters(inputArrayDesc.getAttributes(true).size(), 0),
 	   _settings(settings)
     {
@@ -405,6 +408,10 @@ public:
             {
                 _isString[i] = true;
             }
+            else if(inputAttrs[i].getType() == TID_BOOL)
+			{
+				_isBool[i] = true;
+			}
             else
             {
                 _converters[i] = FunctionLibrary::getInstance()->findConverter(
@@ -441,6 +448,17 @@ public:
                     if(_isString[i])
                     {
                         outputBuf<<v->getString();
+                    }
+                    else if(_isBool[i])
+                    {
+                    	if(v->getBool())
+                    	{
+                    		outputBuf<<"true";
+                    	}
+                    	else
+                    	{
+                    		outputBuf<<"false";
+                    	}
                     }
                     else
                     {
@@ -664,10 +682,59 @@ public:
     }
 #endif
 
+    bool isSingleChunk(ArrayDesc const& schema)
+    {
+    	for(size_t i =0; i<schema.getDimensions().size(); ++i)
+    	{
+    		DimensionDesc const& d = schema.getDimensions()[i];
+    		if(((uint64_t) d.getChunkInterval()) != d.getLength())
+    		{
+    			return false;
+    		}
+    	}
+    	return true;
+    }
+
+    bool haveChunk(shared_ptr<Array>& input)
+    {
+    	shared_ptr<ConstArrayIterator> iter = input->getConstIterator(0);
+    	return !(iter->end());
+    }
+
+    /**
+	 * If all nodes call this with true - return true.
+	 * Otherwise, return false.
+	 */
+	bool agreeOnBoolean(bool value, shared_ptr<Query>& query)
+	{
+		std::shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, sizeof(bool)));
+		InstanceID myId = query->getInstanceID();
+		*((bool*) buf->getData()) = value;
+		for(InstanceID i=0; i<query->getInstancesCount(); i++)
+		{
+			if(i != myId)
+			{
+				BufSend(i, buf, query);
+			}
+		}
+		for(InstanceID i=0; i<query->getInstancesCount(); i++)
+		{
+			if(i != myId)
+			{
+				buf = BufReceive(i,query);
+				bool otherInstanceVal = *((bool*) buf->getData());
+				value = value && otherInstanceVal;
+			}
+		}
+		return value;
+	}
+
     std::shared_ptr< Array> execute(std::vector< std::shared_ptr< Array> >& inputArrays, std::shared_ptr<Query> query)
     {
         AioSaveSettings settings (_parameters, false, query);
         shared_ptr<Array>& input = inputArrays[0];
+        ArrayDesc const& inputSchema = input->getArrayDesc();
+        bool singleChunk = isSingleChunk(inputSchema);
         shared_ptr< Array> outArray;
         if(settings.isBinaryFormat())
         {
@@ -677,28 +744,37 @@ public:
         {
             outArray.reset(new TextConvertedArray(_schema, input, query, settings));
         }
-        ArrayDesc const& inputArrayDesc = outArray->getArrayDesc();
-        shared_ptr<Array> tmpRedistedInput;
         InstanceID const myInstanceID = query->getInstanceID();
-        const Attributes& attribs = inputArrayDesc.getAttributes();
+        map<InstanceID, string>::const_iterator iter = settings.getInstanceMap().find(myInstanceID);
+        bool thisInstanceSavesData = (iter != settings.getInstanceMap().end());
+        if(singleChunk && agreeOnBoolean((thisInstanceSavesData == haveChunk(input)), query))
+        {
+        	LOG4CXX_DEBUG(logger, "ALT_SAVE>> single-chunk path")
+        	if(thisInstanceSavesData)
+        	{
+                string const& path = iter->second;
+        		saveToDisk(outArray, path, query, settings.isBinaryFormat(), false);
+        	}
+        	return shared_ptr<Array>(new MemArray(_schema, query));
+        }
+        shared_ptr<Array> outArrayRedist;
         LOG4CXX_DEBUG(logger, "ALT_SAVE>> Starting SG")
-        tmpRedistedInput = pullRedistribute(outArray,
+        outArrayRedist = pullRedistribute(outArray,
                                             query,
                                             psByCol,
                                             ALL_INSTANCE_MASK,
                                             std::shared_ptr<CoordinateTranslator>(),
                                             0,
                                             std::shared_ptr<PartitioningSchemaData>());
-        bool const wasConverted = (tmpRedistedInput != outArray) ;
-        map<InstanceID, string>::const_iterator iter = settings.getInstanceMap().find(myInstanceID);
-        if (iter != settings.getInstanceMap().end())
+        bool const wasConverted = (outArrayRedist != outArray) ;
+        if (thisInstanceSavesData)
         {
-            string const& path = iter->second;
-            saveToDisk(tmpRedistedInput, path, query, settings.isBinaryFormat(), false);
+        	string const& path = iter->second;
+            saveToDisk(outArrayRedist, path, query, settings.isBinaryFormat(), false);
         }
         if (wasConverted)
         {
-            SynchableArray* syncArray = safe_dynamic_cast<SynchableArray*>(tmpRedistedInput.get());
+            SynchableArray* syncArray = safe_dynamic_cast<SynchableArray*>(outArrayRedist.get());
             syncArray->sync();
         }
         return shared_ptr<Array>(new MemArray(_schema, query));

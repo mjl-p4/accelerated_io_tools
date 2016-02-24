@@ -201,5 +201,9 @@ iquery -anq "aio_save(between(sort(foo,v1,v2,v3), 0,9), 'paths=/tmp/load_tools_t
 cat /tmp/load_tools_test/foo >> test.out
 iquery -anq "aio_save(between(sort(foo,v1,v2,v3), 0,9), 'paths=/tmp/load_tools_test/foo', 'instances=0', 'format=tdv', 'null_pattern=%, BRUH')" >> test.out
 cat /tmp/load_tools_test/foo >> test.out
+iquery -anq "aio_save(apply(show(foo), b, bool(true)),  'paths=/tmp/load_tools_test/foo', 'instances=0', 'format=tdv')" >> test.out
+cat /tmp/load_tools_test/foo >> test.out
+iquery -anq "aio_save(apply(show(foo), b, bool(true)),  'paths=/tmp/load_tools_test/foo', 'instances=1', 'format=tdv')" >> test.out
+cat /tmp/load_tools_test/foo >> test.out
 
 diff test.out test.expected
