@@ -39,16 +39,19 @@ namespace scidb
 class AioSaveSettings
 {
 private:
-	int64_t                     _cellsPerChunk;
+    int64_t                     _cellsPerChunk;
     char                        _attributeDelimiter;
     char                        _lineDelimiter;
     map<InstanceID, string>     _instancesAndPaths;
     size_t const                _numInstances;
     bool                        _binaryFormat;
     string                      _binaryFormatString;
-    string						_nullPrefix;
+    string                      _nullPrefix;
     bool                        _printNullCode;
-    string						_nullPostfix;
+    string                      _nullPostfix;
+    bool                        _printCoordinates;
+    bool                        _quoteStrings;
+    bool                        _writeHeader;
 
 public:
     static const size_t MAX_PARAMETERS = 6;
@@ -56,15 +59,18 @@ public:
     AioSaveSettings(vector<shared_ptr<OperatorParam> > const& operatorParameters,
                     bool logical,
                     shared_ptr<Query>& query):
-				_cellsPerChunk(1000000),
+                _cellsPerChunk(1000000),
                 _attributeDelimiter('\t'),
                 _lineDelimiter('\n'),
                 _numInstances(query->getInstancesCount()),
                 _binaryFormat(false),
                 _binaryFormatString(""),
-				_nullPrefix("\\N"),
-				_printNullCode(false),
-				_nullPostfix("")
+                _nullPrefix("\\N"),
+                _printNullCode(false),
+                _nullPostfix(""),
+                _printCoordinates(false),
+                _quoteStrings(false),
+                _writeHeader(false)
     {
         string const cellsPerChunkHeader           = "cells_per_chunk=";
         string const attributeDelimiterHeader      = "attribute_delimiter=";
@@ -75,54 +81,55 @@ public:
         string const instanceHeader                = "instance=";
         string const instancesHeader               = "instances=";
         string const nullPatternHeader             = "null_pattern=";
-    	size_t const nParams = operatorParameters.size();
-    	bool  cellsPerChunkSet      = false;
+        size_t const nParams = operatorParameters.size();
+        bool  cellsPerChunkSet      = false;
         bool  attributeDelimiterSet = false;
         bool  lineDelimiterSet      = false;
         bool  formatSet             = false;
         bool  nullPatternSet        = false;
+        bool  usingCsvPlus          = false;
         vector<string>     filePaths;
         vector<InstanceID> instanceIds;
-    	if (nParams > MAX_PARAMETERS)
-    	{   //assert-like exception. Caller should have taken care of this!
-    		throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal number of parameters passed to UnparseSettings";
-    	}
-    	for (size_t i= 0; i<nParams; ++i)
-    	{
-    		shared_ptr<OperatorParam>const& param = operatorParameters[i];
-    		string parameterString;
-    		if (logical)
-    		{
-    			parameterString = evaluate(((shared_ptr<OperatorParamLogicalExpression>&) param)->getExpression(),query, TID_STRING).getString();
-    		}
-    		else
-    		{
-    			parameterString = ((shared_ptr<OperatorParamPhysicalExpression>&) param)->getExpression()->evaluate().getString();
-    		}
-    		if (starts_with(parameterString, cellsPerChunkHeader))
-    		{
-    			if (cellsPerChunkSet)
-    			{
-    				throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set cells_per_chunk multiple times";
-    			}
-    			string paramContent = parameterString.substr(cellsPerChunkHeader.size());
-    			trim(paramContent);
-    			try
-    			{
-    				_cellsPerChunk = lexical_cast<int64_t>(paramContent);
-    				if(_cellsPerChunk<=0)
-    				{
-    					throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "cells_per_chunk must be positive";
-    				}
-    			}
-    			catch (bad_lexical_cast const& exn)
-    			{
-    				throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse cells_per_chunk";
-    			}
-    		}
-    		else if (starts_with(parameterString, attributeDelimiterHeader))
-    		{
-    		    if (attributeDelimiterSet)
+        if (nParams > MAX_PARAMETERS)
+        {   //assert-like exception. Caller should have taken care of this!
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal number of parameters passed to UnparseSettings";
+        }
+        for (size_t i= 0; i<nParams; ++i)
+        {
+            shared_ptr<OperatorParam>const& param = operatorParameters[i];
+            string parameterString;
+            if (logical)
+            {
+                parameterString = evaluate(((shared_ptr<OperatorParamLogicalExpression>&) param)->getExpression(),query, TID_STRING).getString();
+            }
+            else
+            {
+                parameterString = ((shared_ptr<OperatorParamPhysicalExpression>&) param)->getExpression()->evaluate().getString();
+            }
+            if (starts_with(parameterString, cellsPerChunkHeader))
+            {
+                if (cellsPerChunkSet)
+                {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set cells_per_chunk multiple times";
+                }
+                string paramContent = parameterString.substr(cellsPerChunkHeader.size());
+                trim(paramContent);
+                try
+                {
+                    _cellsPerChunk = lexical_cast<int64_t>(paramContent);
+                    if(_cellsPerChunk<=0)
+                    {
+                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "cells_per_chunk must be positive";
+                    }
+                }
+                catch (bad_lexical_cast const& exn)
+                {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse cells_per_chunk";
+                }
+            }
+            else if (starts_with(parameterString, attributeDelimiterHeader))
+            {
+                if (attributeDelimiterSet)
                 {
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set attribute_delimiter multiple times";
                 }
@@ -202,16 +209,20 @@ public:
                 }
                 string paramContent = parameterString.substr(formatHeader.size());
                 trim(paramContent);
-                if(paramContent == "tdv" || paramContent == "tsv")
+                if(paramContent == "tdv" || paramContent == "tsv" || paramContent == "csv+")
                 {
                     _binaryFormat = false;
+                    if(paramContent == "csv+")
+                    {
+                        usingCsvPlus = true;
+                    }
                 }
                 else
                 {
                     _binaryFormat = true;
                     if(paramContent[0]!='(' || paramContent[paramContent.size()-1] != ')')
                     {
-                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "format must be either 'tdv' or a binary spec such as '(int64,double,string null)'";
+                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "format must be either 'tdv', 'tsv', 'csv+' or a binary spec such as '(int64,double,string null)'";
                     }
                     _binaryFormatString = paramContent;
                 }
@@ -295,40 +306,40 @@ public:
                 }
             }
             else if (starts_with(parameterString, nullPatternHeader))
-    		{
-            	if(nullPatternSet)
-            	{
-            		throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set null_pattern multiple times";
-            	}
-            	string nullPattern = parameterString.substr(nullPatternHeader.size());
-            	_nullPrefix.resize(0);
-            	_nullPostfix.resize(0);
-            	_printNullCode = false;
-            	size_t c;
-            	for(c=0; c<nullPattern.size(); ++c)
-            	{
-            		if(nullPattern[c] != '%')
-            		{
-            			_nullPrefix.append(1, nullPattern[c]);
-            		}
-            		else
-            		{
-            			break;
-            		}
-            	}
-            	if(c<nullPattern.size() && nullPattern[c]=='%')
-            	{
-            		_printNullCode = true;
-            		++c;
-            	}
-            	for( ; c<nullPattern.size(); ++c)
-            	{
-            		_nullPostfix.append(1, nullPattern[c]);
-            	}
-            	nullPatternSet = true;
-    		}
+            {
+                if(nullPatternSet)
+                {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set null_pattern multiple times";
+                }
+                string nullPattern = parameterString.substr(nullPatternHeader.size());
+                _nullPrefix.resize(0);
+                _nullPostfix.resize(0);
+                _printNullCode = false;
+                size_t c;
+                for(c=0; c<nullPattern.size(); ++c)
+                {
+                    if(nullPattern[c] != '%')
+                    {
+                        _nullPrefix.append(1, nullPattern[c]);
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+                if(c<nullPattern.size() && nullPattern[c]=='%')
+                {
+                    _printNullCode = true;
+                    ++c;
+                }
+                for( ; c<nullPattern.size(); ++c)
+                {
+                    _nullPostfix.append(1, nullPattern[c]);
+                }
+                nullPatternSet = true;
+            }
             else
-    		{
+            {
                 string path = parameterString;
                 trim(path);
                 bool containsStrangeCharacters = false;
@@ -347,37 +358,46 @@ public:
                   throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << errorMsg.str().c_str();
                 }
                 filePaths.push_back(path);
-    		}
-    	}
-    	if(filePaths.size() == 0)
-    	{
-    	    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "file path(s) was not provided, or failed to parse";
-    	}
-    	if(instanceIds.size() == 0)
-    	{
-    	    instanceIds.push_back(0);
-    	}
-    	if(filePaths.size() != instanceIds.size())
-    	{
-    	    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "the number of file paths provided does not match the number of instance IDs";
-    	}
-    	set<InstanceID> uniqueInstances;
-    	for(size_t i =0; i<instanceIds.size(); ++i)
-    	{
-    	    uniqueInstances.insert(instanceIds[i]);
-    	}
-    	if(uniqueInstances.size() < instanceIds.size())
-    	{
-    	    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "the provided instance IDs are not unique";
-    	}
+            }
+        }
+        if(filePaths.size() == 0)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "file path(s) was not provided, or failed to parse";
+        }
+        if(instanceIds.size() == 0)
+        {
+            instanceIds.push_back(0);
+        }
+        if(filePaths.size() != instanceIds.size())
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "the number of file paths provided does not match the number of instance IDs";
+        }
+        set<InstanceID> uniqueInstances;
+        for(size_t i =0; i<instanceIds.size(); ++i)
+        {
+            uniqueInstances.insert(instanceIds[i]);
+        }
+        if(uniqueInstances.size() < instanceIds.size())
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "the provided instance IDs are not unique";
+        }
         for(size_t i=0; i< filePaths.size(); ++i)
         {
             _instancesAndPaths[instanceIds[i]] = filePaths[i];
         }
-    	if(_binaryFormat && (lineDelimiterSet || attributeDelimiterSet || nullPatternSet))
-    	{
-    	    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "attribute_delimiter, line_delimiter and null_pattern are only used with 'format=tdv'";
-    	}
+        if((_binaryFormat || usingCsvPlus) && (lineDelimiterSet || attributeDelimiterSet || nullPatternSet))
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "attribute_delimiter, line_delimiter and null_pattern are only used with 'format=tdv'";
+        }
+        if(usingCsvPlus)
+        {
+            _nullPrefix = "null";
+            _quoteStrings = true;
+            _printCoordinates=true;
+            _attributeDelimiter = ',';
+            _lineDelimiter = '\n';
+            _writeHeader = true;
+        }
     }
 
     size_t getLinesPerChunk() const
@@ -387,12 +407,12 @@ public:
 
     char getAttributeDelimiter() const
     {
-    	return _attributeDelimiter;
+        return _attributeDelimiter;
     }
 
     char getLineDelimiter() const
     {
-    	return _lineDelimiter;
+        return _lineDelimiter;
     }
 
     bool isBinaryFormat() const
@@ -412,17 +432,31 @@ public:
 
     inline void printNull(ostringstream& output, int8_t missingReason) const
     {
-    	output<<_nullPrefix;
-    	if(_printNullCode)
-    	{
-    		output<<(int64_t)missingReason<<_nullPostfix;
-    	}
-    	else
-    	{
-    		return;
-    	}
+        output<<_nullPrefix;
+        if(_printNullCode)
+        {
+            output<<(int64_t)missingReason<<_nullPostfix;
+        }
+        else
+        {
+            return;
+        }
     }
 
+    bool printCoordinates() const
+    {
+        return _printCoordinates;
+    }
+
+    bool quoteStrings() const
+    {
+        return _quoteStrings;
+    }
+
+    bool printHeader() const
+    {
+        return _writeHeader;
+    }
 };
 
 }

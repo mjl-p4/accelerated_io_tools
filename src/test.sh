@@ -205,5 +205,7 @@ iquery -anq "aio_save(apply(show(foo), b, bool(true)),  'paths=/tmp/load_tools_t
 cat /tmp/load_tools_test/foo >> test.out
 iquery -anq "aio_save(apply(show(foo), b, bool(true)),  'paths=/tmp/load_tools_test/foo', 'instances=1', 'format=tdv')" >> test.out
 cat /tmp/load_tools_test/foo >> test.out
+iquery -anq "aio_save(apply(show('filter(foo, \'abc\' = \'def\' )', 'afl'), b, bool(true)),  'path=/tmp/load_tools_test/foo', 'instances=1', 'format=csv+')" >> test.out
+cat /tmp/load_tools_test/foo >> test.out
 
 diff test.out test.expected

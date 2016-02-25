@@ -250,6 +250,11 @@ public:
     {
         return _currentCell;
     }
+
+    Coordinates const& getPosition()
+    {
+        return _inputChunkIters[0]->getPosition();
+    }
 };
 
 
@@ -385,6 +390,8 @@ class TextChunkPopulator
 private:
     char const              _attDelim;
     char const              _lineDelim;
+    bool const              _printCoords;
+    bool const              _quoteStrings;
     vector<bool>            _isString;
     vector<bool>            _isBool;
     vector<FunctionPointer> _converters;
@@ -396,10 +403,12 @@ public:
                        AioSaveSettings const& settings):
        _attDelim(settings.getAttributeDelimiter()),
        _lineDelim(settings.getLineDelimiter()),
+       _printCoords(settings.printCoordinates()),
+       _quoteStrings(settings.quoteStrings()),
        _isString(inputArrayDesc.getAttributes(true).size(), false),
        _isBool(inputArrayDesc.getAttributes(true).size(), false),
        _converters(inputArrayDesc.getAttributes(true).size(), 0),
-	   _settings(settings)
+       _settings(settings)
     {
         Attributes const& inputAttrs = inputArrayDesc.getAttributes(true);
         for (size_t i = 0; i < inputAttrs.size(); ++i)
@@ -409,9 +418,9 @@ public:
                 _isString[i] = true;
             }
             else if(inputAttrs[i].getType() == TID_BOOL)
-			{
-				_isBool[i] = true;
-			}
+            {
+                _isBool[i] = true;
+            }
             else
             {
                 _converters[i] = FunctionLibrary::getInstance()->findConverter(
@@ -428,37 +437,74 @@ public:
     void populateChunk(MemChunkBuilder& builder, ArrayCursor& cursor, size_t const linesPerChunk)
     {
         size_t nCells = 0;
+        //XXX:add precision
         ostringstream outputBuf;
         while(nCells < linesPerChunk && !cursor.end())
         {
+            if(_printCoords)
+            {
+                Coordinates const& pos = cursor.getPosition();
+                for(size_t i =0, n=pos.size(); i<n; ++i)
+                {
+                    if(i)
+                    {
+                        outputBuf<<_attDelim;
+                    }
+                    outputBuf<<pos[i];
+                }
+            }
             vector <Value const *> const& cell = cursor.getCell();
             for (size_t i = 0; i < cursor.nAttrs(); ++i)
             {
                 Value const* v = cell[i];
-                if (i)
+                if (i || _printCoords)
                 {
                     outputBuf<<_attDelim;
                 }
                 if(v->isNull())
                 {
-                	_settings.printNull(outputBuf, v->getMissingReason());
+                    _settings.printNull(outputBuf, v->getMissingReason());
                 }
                 else
                 {
                     if(_isString[i])
                     {
-                        outputBuf<<v->getString();
+                        if(_quoteStrings)
+                        {
+                            char const* s = v->getString();
+                            outputBuf << '\'';
+                            while (char c = *s++)
+                            {
+                                if (c == '\'')
+                                {
+                                    outputBuf << '\\' << c;
+                                }
+                                else if (c == '\\')
+                                {
+                                    outputBuf << "\\\\";
+                                }
+                                else
+                                {
+                                    outputBuf << c;
+                                }
+                            }
+                            outputBuf << '\'';
+                        }
+                        else
+                        {
+                            outputBuf<<v->getString();
+                        }
                     }
                     else if(_isBool[i])
                     {
-                    	if(v->getBool())
-                    	{
-                    		outputBuf<<"true";
-                    	}
-                    	else
-                    	{
-                    		outputBuf<<"false";
-                    	}
+                        if(v->getBool())
+                        {
+                            outputBuf<<"true";
+                        }
+                        else
+                        {
+                            outputBuf<<"false";
+                        }
                     }
                     else
                     {
@@ -567,8 +613,9 @@ struct AwIoError
 uint64_t saveToDisk(shared_ptr<Array> const& array,
                     string file,
                     std::shared_ptr<Query> const& query,
-                    bool const isBinary,
-                    bool const append)
+                    bool const append,
+                    AioSaveSettings const& settings,
+                    ArrayDesc const& inputSchema)
 {
     ArrayDesc const& desc = array->getArrayDesc();
     const size_t N_ATTRS = desc.getAttributes(true).size();
@@ -585,7 +632,7 @@ uint64_t saveToDisk(shared_ptr<Array> const& array,
     }
     else
     {
-        f = fopen(file.c_str(), isBinary ? append ? "ab" : "wb" : append ? "a" : "w");
+        f = fopen(file.c_str(), settings.isBinaryFormat() ? append ? "ab" : "wb" : append ? "a" : "w");
         if (NULL == f)
         {
             int error = errno;
@@ -606,6 +653,31 @@ uint64_t saveToDisk(shared_ptr<Array> const& array,
     size_t bytesWritten = 0;
     try
     {
+        if(settings.printHeader())
+        {
+            ostringstream header;
+            if(settings.printCoordinates())
+            {
+                for(size_t i =0; i<inputSchema.getDimensions().size(); ++i)
+                {
+                    if(i)
+                    {
+                        header<<settings.getAttributeDelimiter();
+                    }
+                    header<<inputSchema.getDimensions()[i].getBaseName();
+                }
+            }
+            for(size_t i =0; i<inputSchema.getAttributes(true).size(); ++i)
+            {
+                if(i || settings.printCoordinates())
+                {
+                    header<<settings.getAttributeDelimiter();
+                }
+                header<<inputSchema.getAttributes(true)[i].getName();
+            }
+            header<<settings.getLineDelimiter();
+            fprintf(f, "%s", header.str().c_str());
+        }
         shared_ptr<ConstArrayIterator> arrayIter = array->getConstIterator(0);
         for (size_t n = 0; !arrayIter->end(); n++)
         {
@@ -684,50 +756,50 @@ public:
 
     bool isSingleChunk(ArrayDesc const& schema)
     {
-    	for(size_t i =0; i<schema.getDimensions().size(); ++i)
-    	{
-    		DimensionDesc const& d = schema.getDimensions()[i];
-    		if(((uint64_t) d.getChunkInterval()) != d.getLength())
-    		{
-    			return false;
-    		}
-    	}
-    	return true;
+        for(size_t i =0; i<schema.getDimensions().size(); ++i)
+        {
+            DimensionDesc const& d = schema.getDimensions()[i];
+            if(((uint64_t) d.getChunkInterval()) != d.getLength())
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     bool haveChunk(shared_ptr<Array>& input)
     {
-    	shared_ptr<ConstArrayIterator> iter = input->getConstIterator(0);
-    	return !(iter->end());
+        shared_ptr<ConstArrayIterator> iter = input->getConstIterator(0);
+        return !(iter->end());
     }
 
     /**
-	 * If all nodes call this with true - return true.
-	 * Otherwise, return false.
-	 */
-	bool agreeOnBoolean(bool value, shared_ptr<Query>& query)
-	{
-		std::shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, sizeof(bool)));
-		InstanceID myId = query->getInstanceID();
-		*((bool*) buf->getData()) = value;
-		for(InstanceID i=0; i<query->getInstancesCount(); i++)
-		{
-			if(i != myId)
-			{
-				BufSend(i, buf, query);
-			}
-		}
-		for(InstanceID i=0; i<query->getInstancesCount(); i++)
-		{
-			if(i != myId)
-			{
-				buf = BufReceive(i,query);
-				bool otherInstanceVal = *((bool*) buf->getData());
-				value = value && otherInstanceVal;
-			}
-		}
-		return value;
-	}
+     * If all nodes call this with true - return true.
+     * Otherwise, return false.
+     */
+    bool agreeOnBoolean(bool value, shared_ptr<Query>& query)
+    {
+        std::shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, sizeof(bool)));
+        InstanceID myId = query->getInstanceID();
+        *((bool*) buf->getData()) = value;
+        for(InstanceID i=0; i<query->getInstancesCount(); i++)
+        {
+            if(i != myId)
+            {
+                BufSend(i, buf, query);
+            }
+        }
+        for(InstanceID i=0; i<query->getInstancesCount(); i++)
+        {
+            if(i != myId)
+            {
+                buf = BufReceive(i,query);
+                bool otherInstanceVal = *((bool*) buf->getData());
+                value = value && otherInstanceVal;
+            }
+        }
+        return value;
+    }
 
     std::shared_ptr< Array> execute(std::vector< std::shared_ptr< Array> >& inputArrays, std::shared_ptr<Query> query)
     {
@@ -749,13 +821,13 @@ public:
         bool thisInstanceSavesData = (iter != settings.getInstanceMap().end());
         if(singleChunk && agreeOnBoolean((thisInstanceSavesData == haveChunk(input)), query))
         {
-        	LOG4CXX_DEBUG(logger, "ALT_SAVE>> single-chunk path")
-        	if(thisInstanceSavesData)
-        	{
+            LOG4CXX_DEBUG(logger, "ALT_SAVE>> single-chunk path")
+            if(thisInstanceSavesData)
+            {
                 string const& path = iter->second;
-        		saveToDisk(outArray, path, query, settings.isBinaryFormat(), false);
-        	}
-        	return shared_ptr<Array>(new MemArray(_schema, query));
+                saveToDisk(outArray, path, query, false, settings, inputSchema);
+            }
+            return shared_ptr<Array>(new MemArray(_schema, query));
         }
         shared_ptr<Array> outArrayRedist;
         LOG4CXX_DEBUG(logger, "ALT_SAVE>> Starting SG")
@@ -769,8 +841,8 @@ public:
         bool const wasConverted = (outArrayRedist != outArray) ;
         if (thisInstanceSavesData)
         {
-        	string const& path = iter->second;
-            saveToDisk(outArrayRedist, path, query, settings.isBinaryFormat(), false);
+            string const& path = iter->second;
+            saveToDisk(outArrayRedist, path, query, false, settings, inputSchema);
         }
         if (wasConverted)
         {

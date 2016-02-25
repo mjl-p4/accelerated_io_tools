@@ -386,3 +386,6 @@ Query was executed successfully
 foo<v1:float NULL DEFAULT null,v2:double,v3:string> [i=1:50,10,0]	true
 Query was executed successfully
 foo<v1:float NULL DEFAULT null,v2:double,v3:string> [i=1:50,10,0]	true
+Query was executed successfully
+i,schema,b
+0,'foo@1<v1:float NULL DEFAULT null,v2:double,v3:string> [i=1:50,10,0]',true
