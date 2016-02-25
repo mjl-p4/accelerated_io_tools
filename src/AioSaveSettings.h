@@ -209,10 +209,10 @@ public:
                 }
                 string paramContent = parameterString.substr(formatHeader.size());
                 trim(paramContent);
-                if(paramContent == "tdv" || paramContent == "tsv" || paramContent == "csv+")
+                if(paramContent == "tdv" || paramContent == "tsv" || paramContent == "csv+" || paramContent == "lcsv+")
                 {
                     _binaryFormat = false;
-                    if(paramContent == "csv+")
+                    if(paramContent == "csv+" || paramContent == "lcsv+")
                     {
                         usingCsvPlus = true;
                     }
