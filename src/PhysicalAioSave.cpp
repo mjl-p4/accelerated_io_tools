@@ -387,16 +387,26 @@ public:
 
 class TextChunkPopulator
 {
+
 private:
+    enum AttType
+    {
+        OTHER   =0,
+        STRING =1,
+        FLOAT  =2,
+        DOUBLE =3,
+        BOOL   =4
+    };
+
     char const              _attDelim;
     char const              _lineDelim;
     bool const              _printCoords;
     bool const              _quoteStrings;
-    vector<bool>            _isString;
-    vector<bool>            _isBool;
+    vector<AttType>         _attTypes;
     vector<FunctionPointer> _converters;
     Value                   _stringBuf;
     AioSaveSettings const&  _settings;
+    string                  _nanRepresentation;
 
 public:
     TextChunkPopulator(ArrayDesc const& inputArrayDesc,
@@ -405,21 +415,29 @@ public:
        _lineDelim(settings.getLineDelimiter()),
        _printCoords(settings.printCoordinates()),
        _quoteStrings(settings.quoteStrings()),
-       _isString(inputArrayDesc.getAttributes(true).size(), false),
-       _isBool(inputArrayDesc.getAttributes(true).size(), false),
+       _attTypes(inputArrayDesc.getAttributes(true).size(), OTHER),
        _converters(inputArrayDesc.getAttributes(true).size(), 0),
-       _settings(settings)
+       _settings(settings),
+       _nanRepresentation("nan")
     {
         Attributes const& inputAttrs = inputArrayDesc.getAttributes(true);
         for (size_t i = 0; i < inputAttrs.size(); ++i)
         {
             if(inputAttrs[i].getType() == TID_STRING)
             {
-                _isString[i] = true;
+                _attTypes[i] = STRING;
             }
             else if(inputAttrs[i].getType() == TID_BOOL)
             {
-                _isBool[i] = true;
+                _attTypes[i] = BOOL;
+            }
+            else if(inputAttrs[i].getType() == TID_DOUBLE)
+            {
+                _attTypes[i] = DOUBLE;
+            }
+            else if(inputAttrs[i].getType() == TID_FLOAT)
+            {
+                _attTypes[i] = FLOAT;
             }
             else
             {
@@ -437,8 +455,8 @@ public:
     void populateChunk(MemChunkBuilder& builder, ArrayCursor& cursor, size_t const linesPerChunk)
     {
         size_t nCells = 0;
-        //XXX:add precision
         ostringstream outputBuf;
+        outputBuf.precision(_settings.getPrecision());
         while(nCells < linesPerChunk && !cursor.end())
         {
             if(_printCoords)
@@ -467,8 +485,9 @@ public:
                 }
                 else
                 {
-                    if(_isString[i])
+                    switch(_attTypes[i])
                     {
+                    case STRING:
                         if(_quoteStrings)
                         {
                             char const* s = v->getString();
@@ -494,9 +513,8 @@ public:
                         {
                             outputBuf<<v->getString();
                         }
-                    }
-                    else if(_isBool[i])
-                    {
+                        break;
+                    case BOOL:
                         if(v->getBool())
                         {
                             outputBuf<<"true";
@@ -505,9 +523,34 @@ public:
                         {
                             outputBuf<<"false";
                         }
-                    }
-                    else
-                    {
+                        break;
+                    case DOUBLE:
+                        {
+                            double nbr =v->getDouble();
+                            if(std::isnan(nbr))
+                            {
+                                outputBuf<<_nanRepresentation;
+                            }
+                            else
+                            {
+                                outputBuf<<nbr;
+                            }
+                        }
+                        break;
+                    case FLOAT:
+                        {
+                            float fnbr =v->getFloat();
+                            if(std::isnan(fnbr))
+                            {
+                                outputBuf<<_nanRepresentation;
+                            }
+                            else
+                            {
+                                outputBuf<<fnbr;
+                            }
+                        }
+                        break;
+                    case OTHER:
                         (*_converters[i])(&v, &_stringBuf, NULL);
                         outputBuf<<_stringBuf.getString();
                     }

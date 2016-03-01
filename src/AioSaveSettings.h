@@ -52,6 +52,7 @@ private:
     bool                        _printCoordinates;
     bool                        _quoteStrings;
     bool                        _writeHeader;
+    int32_t                     _precision;
 
 public:
     static const size_t MAX_PARAMETERS = 6;
@@ -70,7 +71,8 @@ public:
                 _nullPostfix(""),
                 _printCoordinates(false),
                 _quoteStrings(false),
-                _writeHeader(false)
+                _writeHeader(false),
+                _precision(Config::getInstance()->getOption<int>(CONFIG_PRECISION))
     {
         string const cellsPerChunkHeader           = "cells_per_chunk=";
         string const attributeDelimiterHeader      = "attribute_delimiter=";
@@ -81,6 +83,7 @@ public:
         string const instanceHeader                = "instance=";
         string const instancesHeader               = "instances=";
         string const nullPatternHeader             = "null_pattern=";
+        string const precisionHeader               = "precision=";
         size_t const nParams = operatorParameters.size();
         bool  cellsPerChunkSet      = false;
         bool  attributeDelimiterSet = false;
@@ -88,6 +91,11 @@ public:
         bool  formatSet             = false;
         bool  nullPatternSet        = false;
         bool  usingCsvPlus          = false;
+        if(_precision <= 0)
+        {//correct for an unfortunate configuration problem that may arise
+            _precision = 6;
+        }
+        bool  precisionSet          = false;
         vector<string>     filePaths;
         vector<InstanceID> instanceIds;
         if (nParams > MAX_PARAMETERS)
@@ -126,7 +134,7 @@ public:
                 {
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse cells_per_chunk";
                 }
-            }
+            }             //some day I'll make this function smaller, I swear!
             else if (starts_with(parameterString, attributeDelimiterHeader))
             {
                 if (attributeDelimiterSet)
@@ -338,6 +346,27 @@ public:
                 }
                 nullPatternSet = true;
             }
+            else if (starts_with(parameterString, precisionHeader))
+            {
+                if (precisionSet)
+                {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set precision multiple times";
+                }
+                string paramContent = parameterString.substr(precisionHeader.size());
+                trim(paramContent);
+                try
+                {
+                    _precision = lexical_cast<int32_t>(paramContent);
+                    if(_precision<=0)
+                    {
+                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "precision must be positive";
+                    }
+                }
+                catch (bad_lexical_cast const& exn)
+                {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse precision";
+                }
+            }
             else
             {
                 string path = parameterString;
@@ -456,6 +485,11 @@ public:
     bool printHeader() const
     {
         return _writeHeader;
+    }
+
+    int32_t getPrecision() const
+    {
+        return _precision;
     }
 };
 
