@@ -1,15 +1,32 @@
 accelerated_io_tools
 ==========
 
-A separate, privately kept library that is a significant improvement over the regular `load_tools` package. Exists as a separate .so that compiles for SciDB 15.7. The `accelerated_io_tools` and regular `load_tools` libraries cannot coexist on the same installation; the user must load one or the other. The accelerated .so is superior in every way.
+A prototype library for the accelerated import and export of data out of SciDB. The work started as a previously-known `load_tools` package and continued to get optimized and expanded. Currently contains two SciDB operators and several functions:
+ * `aio_input`: an operator that reads token-separated text from 1 or more filesystem objects and returns the data as a SciDB array
+ * a few scalar string functions - `dcast`, `trim`, `nth_tdv`, etc that can be useful in some data loading scenarios
+ * `aio_save`: an operator that exports SciDB arrays into 1 or more filesystem objects, as token-separated text or binary files
+The `accelerated_io_tools` and regular `load_tools` libraries cannot coexist on the same installation; the user must load one or the other. The accelerated .so is superior in every way.
 
-The old `split` and `parse` operators are still available and unchanged; those can be used if needed.
+=== 
 
 ## aio_input
-This operator replaces `split()` and `parse()`; ingests CSV, TSV or similar text data and returns an array that contains it. The returned array can then be stored or processed further. Example simple ingest from a single file:
+This operator replaces the previous `split()` and `parse()` prototypes. It ingests token-delimited text data from one or more filesystem objects, quickly redistributes the data in chunks around the SciDB cluster and returns an array that contains the data populated into a number of string attributes. The returned array can then be stored or processed further. Here's an example ingest from a single file. The file is malformed on purpose:
 ```
-$ iquery -anq "aio_input('/tmp/foo.tsv', 'num_attributes=2')"
+$ cat /tmp/foo.tsv 
+1   alex
+2   bob
+3   jack
+4   dave    extra stuff here
+5error_no_tab
+$ iquery -aq "aio_input('/tmp/foo.tsv', 'num_attributes=2')"
+{tuple_no,dst_instance_id,src_instance_id} a0,a1,error
+{0,0,0} '1','alex',null
+{1,0,0} '2','bob',null
+{2,0,0} '3','jack',null
+{3,0,0} '4','dave','long    extra stuff here'
+{4,0,0} '5error_no_tab',null,'short'
 ```
+Note the extra `error` attribute is added and it is populated whenever the input line of text does not match the supplied number of attributes. The given filesystem object is opened and read only once with the fopen/fread/fclose call family; it can be a file, symlink, fifo or any other object that supports these calls.
 
 Example CSV ingest and store from multiple files:
 ```
@@ -74,6 +91,204 @@ The slice of the array at `attribute_no=N` shall contain the error attribute, po
  
 Other than `attribute_no` (when `split_on_dimension=1`) the dimensions are not intended to be used in queries. The `source_instance_id` matches the instance(s) reading the data; the `dst_instance_id` is assigned in a round-robin fashion to successive blocks from the same source. The `tuple_no` starts at 0 for each `{dst_instance_id, source_instance_id}` pair and is populated densely within the block. However, each new block starts a new chunk. 
 
+===
+
+## Scalar functions that may be useful in loading data
+
+#### dcast(): error-tolerant casting
+SciDB supports regular type casting but the behavior is to fail the entire query if the cast is unsuccessful. This may not be desirable when the user expects a small percentage of error values and has a different strategy for handling them, converting to null for example. In thos cases, `dcast` can be used to cast a string to a double, float, bool, int{64,32,16,8} or uint{64,32,16,8}, substituting in a special default value to return if the cast fails. The two arguments to the function are:
+ * the string value to cast
+ * the default value to use if the cast fails (often a null). 
+The SciDB typesystem and the type of the second value can be used to dispatch the right dcast return type.
+For example, this cast fails on the fifth row:
+```
+$ iquery -aq "aio_input('/tmp/foo.tsv', 'num_attributes=2')"
+{tuple_no,dst_instance_id,src_instance_id} a0,a1,error
+{0,0,0} '1','alex',null
+{1,0,0} '2','bob',null
+{2,0,0} '3','jack',null
+{3,0,0} '4','dave','long    extra stuff here'
+{4,0,0} '5error_no_tab',null,'short'
+$ iquery -aq "apply(aio_input('/tmp/foo.tsv', 'num_attributes=2'), d0, double(a0))"
+UserException in file: src/query/BuiltInFunctions.inc function: CONV_TID_DOUBLE_FROM_String line: 394
+Error id: scidb::SCIDB_SE_TYPESYSTEM::SCIDB_LE_FAILED_PARSE_STRING
+Error description: Typesystem error. Failed to parse string '5error_no_tab
+```
+
+And we can use dcast to return a null instead of failing the query:
+```
+$ iquery -aq "apply(aio_input('/tmp/foo.tsv', 'num_attributes=2'), d0, dcast(a0, double(null)))"
+{tuple_no,dst_instance_id,src_instance_id} a0,a1,error,d0
+{0,0,0} '1','alex',null,1
+{1,0,0} '2','bob',null,2
+{2,0,0} '3','jack',null,3
+{3,0,0} '4','dave','long    extra stuff here',4
+{4,0,0} '5error_no_tab',null,'short',null
+```
+
+We can also use a missing code, or a special non-null value like `-1`:
+```
+$ iquery -aq "apply(aio_input('/tmp/foo.tsv', 'num_attributes=2'), d0, dcast(a0, double(missing(1))))"
+{tuple_no,dst_instance_id,src_instance_id} a0,a1,error,d0
+{0,0,0} '1','alex',null,1
+{1,0,0} '2','bob',null,2
+{2,0,0} '3','jack',null,3
+{3,0,0} '4','dave','long    extra stuff here',4
+{4,0,0} '5error_no_tab',null,'short',?1
+$ iquery -aq "apply(aio_input('/tmp/foo.tsv', 'num_attributes=2'), d0, dcast(a0, double(-1)))"
+{tuple_no,dst_instance_id,src_instance_id} a0,a1,error,d0
+{0,0,0} '1','alex',null,1
+{1,0,0} '2','bob',null,2
+{2,0,0} '3','jack',null,3
+{3,0,0} '4','dave','long    extra stuff here',4
+{4,0,0} '5error_no_tab',null,'short',-1
+```
+
+dcast ignores any whitespace preceding or following the numeric value. When converting to an unsigned type, a negative input is considered non-convertible and the supplied defaul is returned. An input out of range is also considered non-convertible for integers (overflow will not happen). When converting to float or double, all ranges of values are supported but inf or -inf may be returned if the input exceeds machine limits. When converting to bool, values of 0,N,NO,F,FALSE or 1,Y,YES,T,TRUE (ignore case) are supported. Internally strtod, strtoll, strtoull are used - see those routines for details on locale sensitivity and what "whitespace" means.
+
+#### trim() removes specific characters from the beginning and end of a string:
+```
+$ iquery -aq "
+ project(
+  apply(
+   filter(
+    tmp, 
+    not (line_no=0 and chunk_no=0)
+   ), 
+  ta0, trim(a0, '\"')), 
+ a0, ta0
+ )"
+{source_instance_id,chunk_no,line_no} a0,ta0
+{0,0,1} '"alex"','alex'
+{0,1,0} '"b"ob"','b"ob'
+{0,1,1} 'jake','jake'
+{0,2,0} 'random','random'
+{0,2,1} 'bill','bill'
+{0,3,0} 'alice','alice'
+
+$ iquery -aq "
+ project(
+  apply(
+   filter(
+    tmp, 
+    not (line_no=0 and chunk_no=0)
+   ), 
+   ta0, trim(a0, '\"b')
+  ), 
+  a0, ta0
+ )"
+{source_instance_id,chunk_no,line_no} a0,ta0
+{0,0,1} '"alex"','alex'
+{0,1,0} '"b"ob"','o'
+{0,1,1} 'jake','jake'
+{0,2,0} 'random','random'
+{0,2,1} 'bill','ill'
+{0,3,0} 'alice','alice'
+```
+
+#### char_count() counts the occurrences of a particular character or list of characters:
+```
+$ iquery -aq "apply(build(<val:string>[i=0:0,1,0], 'abc, def, xyz'), cc, char_count(val, 'x'))"
+{i} val,cc
+{0} 'abc, def, xyz',1
+
+$ iquery -aq "apply(build(<val:string>[i=0:0,1,0], 'abc, def, xyz'), cc, char_count(val, ','))"
+{i} val,cc
+{0} 'abc, def, xyz',2
+```
+
+#### nth_tdv() and nth_csv() extract a substring from a field that contains delimiters:
+```
+$ iquery -aq "apply(build(<val:string>[i=0:0,1,0], 'abc, def, xyz'), n, nth_csv(val, 0))"
+{i} val,n
+{0} 'abc, def, xyz','abc'
+
+$ iquery -aq "apply(build(<val:string>[i=0:0,1,0], 'abc, def, xyz'), n, nth_csv(val, 1))"
+{i} val,n
+{0} 'abc, def, xyz',' def'
+```
+nth_tdv lets you specify a delimiter other than a comma:
+```
+$ iquery -aq "apply(build(<val:string>[i=0:0,1,0], 'abc, def, xyz'), n, nth_tdv(val, 1, ' '))"
+{i} val,n
+{0} 'abc, def, xyz','def,'
+```
+Note the benefit of using small cross_joins to decompose compound fields.
+The iif is present to overcome a limitation in SciDB's logic that determines when an attribute can be nullable,
+the iif can be skipped if you know exactly how many fields there are:
+```
+$ iquery -aq "
+ apply(
+  cross_join(
+   build(
+    <val:string>[i=0:0,1,0], 
+    'abc, def, xyz'), 
+   build(
+    <x:int64>[j=0:3,4,0], j)
+  ), 
+  n, iif(nth_csv(val, j) is null, null, nth_csv(val,j))
+ )"
+{i,j} val,x,n
+{0,0} 'abc, def, xyz',0,'abc'
+{0,1} 'abc, def, xyz',1,' def'
+{0,2} 'abc, def, xyz',2,' xyz'
+{0,3} 'abc, def, xyz',3,null
+```
+Similarly, maxlen_csv() and maxlen_tdv() first split a string along a delimiter but then return the length of the longest field as an integer. 
+
+####keyed_value() pulls values out of key-value lists
+It expects an input in the form of "KEY1=VALUE1;KEY2=VALUE2;.." and returns a value for a given key name. The third argument is a default to return when the key is not found:
+```
+$ iquery -aq "
+ apply(
+  build(
+   <val:string>[i=0:0,1,0], 'LEN=43;WID=35.3'), 
+  l, double(keyed_value(val, 'LEN', null)), 
+  w, double(keyed_value(val, 'WID', null))
+ )"
+{i} val,l,w
+{0} 'LEN=43;WID=35.3',43,35.3
+```
+
+####throw() terminates a query with an error if a particular condition is not met:
+```
+$ iquery -aq "apply(apply(build(<val:string>[i=0:0,1,0], 'LEN=43;WID=35.3'), l, double(keyed_value(val, 'LEN', null)), w, double(keyed_value(val, 'WID', null))), input_check, iif(w < 50, true, throw('Invalid Width')))"
+{i} val,l,w,input_check
+{0} 'LEN=43;WID=35.3',43,35.3,true
+
+$ iquery -aq "
+ apply(
+  apply(
+   build(
+    <val:string>[i=0:0,1,0], 'LEN=43;WID=35.3'
+   ), 
+   l, double(keyed_value(val, 'LEN', null)), 
+   w, double(keyed_value(val, 'WID', null))
+  ), 
+  input_check, iif(w < 30, true, throw('Invalid Width'))
+ )"
+SystemException in file: Functions.cpp function: toss line: 392
+Error id: scidb::SCIDB_SE_INTERNAL::SCIDB_LE_ILLEGAL_OPERATION
+Error description: Internal SciDB error. Illegal operation: Invalid Width
+```
+
+####codify() converts a given string to its ascii representation:
+```
+$ iquery -aq "project(apply(tmp, ca0, codify(a0)), a0, ca0)"
+{source_instance_id,chunk_no,line_no} a0,ca0
+{0,0,0} 'col1','99|111|108|49|0|'
+{0,0,1} '"alex"','34|97|108|101|120|34|0|'
+{0,1,0} '"b"ob"','34|98|34|111|98|34|0|'
+{0,1,1} 'jake','106|97|107|101|0|'
+{0,2,0} 'random','114|97|110|100|111|109|0|'
+{0,2,1} 'bill','98|105|108|108|0|'
+{0,3,0} 'alice','97|108|105|99|101|0|'
+```
+
+For an example of using regular expressions, consult the regular expression substitution routine provided in https://github.com/paradigm4/superfunpack
+
+===
+
 ## aio_save
 This operator replaces the existing save functionality, for binary and tab-delimited formats. 
 Example save to a binary file:
@@ -105,21 +320,21 @@ By default, the file is saved to a path on node 0 by instance 0. You can distrib
 * `instances=0;1;..`: multiple instance ID's for saving from different instances, separated by semicolon. Must be specified along with `paths` and have an equal number of unique terms. Either `instance` or `instances` must be specified, but not both.
 
 #### Other settings:
-* `format=F`: the format string, may be either `tdv` (token-delimited values) or a scidb-style binary format spec like `(int64, double null,...)`.
+* `format=F`: the format string, may be either `tdv` (token-delimited values) or a scidb-style binary format spec like `(int64, double null,...)`. Default is `tdv`.
 * `attributes_delimiter=A`: the character to write between array attributes. Default is a tab. Applies when fomat is set to `tdv`. 
 * `line_delimiter=L`: the character to write between array cells. Default is a newline. Applies when format is set to `tdv`.
 * `cells_per_chunk=C`: the number of array cells to place in a chunk before saving to disk. Default is 1,000,000.
-* `precision=P`: the maximum number of significant figures to write when outputing float or double values as text. Defaults to the core SciDB 'precision' config. Applies when format is set to `tdv`.
+* `precision=P`: the maximum number of significant figures to use when writing float or double values as text. Defaults to the SciDB 'precision' config. Applies when format is set to `tdv`.
 
 #### Returned array:
 The schema is always `<val:string null> [chunk_no=0:*,1,0, source_instance_id=0:*,1,0]`. The returned array is always empty as the operator's objective is to export the data.
 
 #### Saving data in order:
-Note that the order of the returned data is arbitrary by default. If the client requires data in specific order, they must:
+Note that the order of the returned data is arbitrary. If the client requires data in specific order, they must:
  0. save from a single instance
  1. add a sort operator
  2. make sure the sort chunk size (1M default) matches the aio_save cells_per_chunk (also 1M default)
- 3. add an explicit sg between the sort and the save - with round-robin distribution
+ 3. add an explicit `_sg` operator between the sort and the save - with round-robin distribution
 
 For example:
 ```
@@ -134,9 +349,25 @@ aio_save(
 )
 ```
 
-### Install
+===
+
+## Install
 
 You will need the `-dev` or `-devel` package of Protobuf in order to get headers. On Debian/Ubuntu:
 ```
 sudo apt-get install libprotobuf-dev protobuf-compiler
 ```
+After that, should be installable with https://github.com/paradigm4/dev_tools
+Warning: if you were previously using `prototype_load_tools` you will need to unload that library and restart the cluster:
+ * `iquery -aq "unload_library('prototype_load_tools')"
+ * restart the cluster
+ * `iquery -aq "load_library('accelerated_io_tools')"
+
+If you are using shim together with SciDB, note that you can configure shim to use aio_save after it is installed to speed up data exports.
+See: https://github.com/paradigm4/shim
+
+===
+
+#Old split() and parse() operators
+
+Are included in this .so as well and work the same way as before. They are, however, deprecated. Operator `aio_input` should be used instead.
