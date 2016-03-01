@@ -106,9 +106,10 @@ By default, the file is saved to a path on node 0 by instance 0. You can distrib
 
 #### Other settings:
 * `format=F`: the format string, may be either `tdv` (token-delimited values) or a scidb-style binary format spec like `(int64, double null,...)`.
-* `attributes_delimiter=A`: the character to write between array attributes. Default is a tab. applies when fomat is set to `tdv`. 
-* `line_delimiter=L`: the character to write between array cells. Default is a newline. applies when format is set to `tdv`.
+* `attributes_delimiter=A`: the character to write between array attributes. Default is a tab. Applies when fomat is set to `tdv`. 
+* `line_delimiter=L`: the character to write between array cells. Default is a newline. Applies when format is set to `tdv`.
 * `cells_per_chunk=C`: the number of array cells to place in a chunk before saving to disk. Default is 1,000,000.
+* `precision=P`: the maximum number of significant figures to write when outputing float or double values as text. Defaults to the core SciDB 'precision' config. Applies when format is set to `tdv`.
 
 #### Returned array:
 The schema is always `<val:string null> [chunk_no=0:*,1,0, source_instance_id=0:*,1,0]`. The returned array is always empty as the operator's objective is to export the data.

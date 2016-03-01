@@ -210,7 +210,6 @@ public:
         _chunkAddress.coords[0] = _chunkNo;
         shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         _chunk.initialize(this, &super::getArrayDesc(), _chunkAddress, 0);
-        //LOG4CXX_DEBUG(logger, "ALT_LOAD emitting chunk "<<CoordsToStr(_chunkAddress.coords));
         return _chunk;
     }
 };
@@ -231,6 +230,7 @@ private:
     vector<Value> _buf;
     ostringstream _errorBuf;
     Value _errorBufVal;
+    Coordinate _outputPositionLimit;
 
 public:
     AIOOutputWriter(ArrayDesc const& schema, shared_ptr<Query>& query, bool splitOnDimension, char const attDelimiter):
@@ -255,6 +255,7 @@ public:
     void newChunk (Coordinates const& inputChunkPosition, shared_ptr<Query>& query)
     {
         _outputPosition[0] = inputChunkPosition[0] * _outputChunkSize;
+        _outputPositionLimit = _outputPosition[0] + _outputChunkSize;
         _outputPosition[1] = inputChunkPosition[1];
         _outputPosition[2] = inputChunkPosition[2];
         if(_splitOnDimension)
@@ -274,6 +275,10 @@ public:
 
     void writeValue (char const* start, char const* end)
     {
+        if(_outputPosition[0] >= _outputPositionLimit)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "The chunk size is too small for the current block size. Lower the block size or increase chunk size";
+        }
         if(_outputColumn < _outputLineSize - 1)
         {
             Value& buf = _buf[_outputColumn];
@@ -443,7 +448,7 @@ public:
                }
                if(end == lim)
                {
-                   throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Encountered a whole block without line delim characters; Sorry! You need to increase the block size.";
+                   throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Encountered a whole block without line delimiter characters; Sorry! You need to increase the block size.";
                }
                Value firstLine;
                firstLine.setSize(end-start);
