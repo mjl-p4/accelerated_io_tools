@@ -23,8 +23,6 @@ The aio_input operator ingests data in spite of extraneous characters, ragged ro
 
 The `accelerated_io_tools` and regular `prototype_load_tools` libraries cannot coexist on the same installation; the user must load one or the other. The accelerated .so is superior in every way.
 
-=== 
-
 # Trivial end-to-end example
 Using a tiny file that is malformed on purpose. A toy example for those who may not be familiar with SciDB. 
 ```
@@ -175,8 +173,6 @@ If `split_on_dimension=1` the attributes are populated along a fourth dimension 
 The slice of the array at `attribute_no=N` shall contain the error attribute, populated as above.
  
 Other than `attribute_no` (when `split_on_dimension=1`) the dimensions are not intended to be used in queries. The `source_instance_id` matches the instance(s) reading the data; the `dst_instance_id` is assigned in a round-robin fashion to successive blocks from the same source. The `tuple_no` starts at 0 for each `{dst_instance_id, source_instance_id}` pair and is populated densely within the block. However, each new block starts a new chunk. 
-
-===
 
 # Scalar functions that may be useful in loading data
 
@@ -434,8 +430,6 @@ aio_save(
 )
 ```
 
-===
-
 # Installation
 
 You will need the `-dev` or `-devel` package of Protobuf in order to get headers. On Debian/Ubuntu:
@@ -450,8 +444,6 @@ Warning: if you were previously using `prototype_load_tools` you will need to un
 
 If you are using shim together with SciDB, note that you can configure shim to use aio_save after it is installed to speed up data exports.
 See: https://github.com/paradigm4/shim
-
-===
 
 # Old split() and parse() operators
 
