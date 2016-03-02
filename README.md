@@ -6,22 +6,22 @@ A prototype library for the accelerated import and export of data out of SciDB. 
  * a few scalar string functions - `dcast`, `trim`, `nth_tdv`, etc that can be useful in some data loading scenarios
  * `aio_save`: an operator that exports SciDB arrays into 1 or more filesystem objects, as token-separated text or binary files
 
-The package extends regular SciDB IO and provides benefits in a few areas
+The package extends regular SciDB IO and provides benefits in a few areas:
 
-### Performance
-When loading token-delimited data, the instance(s) reading the data use a fixed-size (default 8MB) `fread` call. The 8MB blocks are then sent to around the different SciDB instances as quickly as possible. Then, the "ragged line endings" of each block are separated and sent to the instance containing the next block. Finally, all the instances parse the data and populate the resulting array in parallel. Thus the expensive parsing step is almost fully parallelized; the ingest rate scales up with the number of instances. 
+#### 1. Fully distributed parsing and packing
+When loading token-delimited data, the instance(s) reading the data use a fixed-size `fread` call - usually reading multiple megabytes at once. The read blocks are sent around the different SciDB instances as quickly as possible. Then, the "ragged line ending" of each block is separated and sent to the instance containing the next block. Finally, all the instances parse the data and populate the resulting array in parallel. Thus the expensive parsing step is almost fully parallelized; the ingest rate scales up with the number of instances. 
 
-When saving data, the inverse process is used: each instance packs its data into fixed-size blocks, then streams down to one or several saving instances. Save can be done in binary form for faster speed.
+When saving data, the reverse process is used: each instance packs its data into fixed-size blocks, then streams down to one or more saving instances. Save can also be done in binary form for faster speed.
 
-### Load from multiple files
-When the parsing is so distributed, we find the read speed of the IO device is often the load bottleneck. To go around this, aio_input can be told to load data from 6 different files, for example. In such a case, 6 different SciDB instances, will open up 6 different files, on 6 different IO devices. The file pieces will then be quickly scattered across the whole SciDB cluster - perhaps 128 instances. Then the parallel parsing will begin. Inversely, saving to K different files is also supported.
+#### 2. Loading from multiple files
+When the parsing is so distributed, we find the read speed of the IO device is often the load bottleneck. To go around this, aio_input can be told to load data from 6 different files, for example. In such a case, 6 different SciDB instances, will open up 6 different files, on 6 different IO devices. The file pieces will then be quickly scattered across the whole SciDB cluster - up perhaps 128 instances. Then the parallel parsing will begin. In reverse, saving to K different files is also supported.
 
-### Error tolerance
-The aio_input operator allows you to ingest data in spite of extraneous characters, ragged rows that contain too little or too much information, or columns that are mostly numeric but sometimes contain a string. Such datasets can be loaded into temporary arrays first. Then the power of the database can be used to find errors and fix them as needed.
+The load from K files or save to K files happens transactionally as a single SciDB query. The user does not need to worry about firing up multiple "writer" processes and managing them. Simply give the plugin a list of file paths and SciDB will handle the rest.
+
+#### 3. Error tolerance
+The aio_input operator ingests data in spite of extraneous characters, ragged rows that contain too few or too many columns, or columns that are mostly numeric but sometimes contain characters. Such datasets can be loaded easily into temporary arrays. SciDB can then be effectively used to find errors and fix them as needed.
 
 The `accelerated_io_tools` and regular `prototype_load_tools` libraries cannot coexist on the same installation; the user must load one or the other. The accelerated .so is superior in every way.
-
-=== 
 
 # Trivial end-to-end example
 Using a tiny file that is malformed on purpose. A toy example for those who may not be familiar with SciDB. 
@@ -56,7 +56,7 @@ $ iquery -aq "filter(temp, error is not null)"
 {4,0,0} '5error_no_tab',null,'short'
 ```
 
-Let's take then non-error rows, convert them to a dimension in a new array:
+Let's take the non-error rows, and redimension them to a new array, using the first column as a dimension:
 ```
 $ iquery -anq "store(redimension(apply(filter(temp, error is null), dim, dcast(a0, int64(null)), val, a1), <val:string null>[dim=0:*,1000000,0]), foo)"
 Query was executed successfully
@@ -80,6 +80,7 @@ jack
 ```
 
 Or if you'd like to output the dimensions:
+```
 $ iquery -aq "aio_save(project(apply(foo, d, dim), d, val),  '/tmp/bar2.out')"
 
 $ cat /tmp/bar2.out 
@@ -88,7 +89,9 @@ $ cat /tmp/bar2.out
 3   jack
 ```
 
-# aio_input
+The following sections describe the various options, and parameters in detail.
+
+# Operator aio_input()
 This operator ingests token-delimited text data from one or more filesystem objects, quickly redistributes the data in chunks around the SciDB cluster and returns an array that contains the data populated into a number of string attributes. The returned array can then be persisted in SciDB or processed further. Here's an example ingest from a single file. The file is malformed on purpose:
 ```
 $ cat /tmp/foo.tsv 
@@ -170,8 +173,6 @@ If `split_on_dimension=1` the attributes are populated along a fourth dimension 
 The slice of the array at `attribute_no=N` shall contain the error attribute, populated as above.
  
 Other than `attribute_no` (when `split_on_dimension=1`) the dimensions are not intended to be used in queries. The `source_instance_id` matches the instance(s) reading the data; the `dst_instance_id` is assigned in a round-robin fashion to successive blocks from the same source. The `tuple_no` starts at 0 for each `{dst_instance_id, source_instance_id}` pair and is populated densely within the block. However, each new block starts a new chunk. 
-
-===
 
 # Scalar functions that may be useful in loading data
 
@@ -369,7 +370,7 @@ For an example of using regular expressions, consult the regular expression subs
 
 ===
 
-# aio_save
+# Operator aio_save()
 This operator replaces the existing save functionality, for binary and tab-delimited formats. 
 Example save to a binary file:
 ```
@@ -429,8 +430,6 @@ aio_save(
 )
 ```
 
-===
-
 # Installation
 
 You will need the `-dev` or `-devel` package of Protobuf in order to get headers. On Debian/Ubuntu:
@@ -445,8 +444,6 @@ Warning: if you were previously using `prototype_load_tools` you will need to un
 
 If you are using shim together with SciDB, note that you can configure shim to use aio_save after it is installed to speed up data exports.
 See: https://github.com/paradigm4/shim
-
-===
 
 # Old split() and parse() operators
 
