@@ -9,12 +9,14 @@ A prototype library for the accelerated import and export of data out of SciDB. 
 The package extends regular SciDB IO and provides benefits in a few areas:
 
 #### 1. Fully distributed parsing and packing
-When loading token-delimited data, the instance(s) reading the data use a fixed-size (default 8MB) `fread` call. The 8MB blocks are then sent to around the different SciDB instances as quickly as possible. Then, the "ragged line ending" of each block is separated and sent to the instance containing the next block. Finally, all the instances parse the data and populate the resulting array in parallel. Thus the expensive parsing step is almost fully parallelized; the ingest rate scales up with the number of instances. 
+When loading token-delimited data, the instance(s) reading the data use a fixed-size `fread` call - usually reading multiple megabytes at once. The read blocks are sent around the different SciDB instances as quickly as possible. Then, the "ragged line ending" of each block is separated and sent to the instance containing the next block. Finally, all the instances parse the data and populate the resulting array in parallel. Thus the expensive parsing step is almost fully parallelized; the ingest rate scales up with the number of instances. 
 
 When saving data, the reverse process is used: each instance packs its data into fixed-size blocks, then streams down to one or more saving instances. Save can also be done in binary form for faster speed.
 
 #### 2. Loading from multiple files
 When the parsing is so distributed, we find the read speed of the IO device is often the load bottleneck. To go around this, aio_input can be told to load data from 6 different files, for example. In such a case, 6 different SciDB instances, will open up 6 different files, on 6 different IO devices. The file pieces will then be quickly scattered across the whole SciDB cluster - up perhaps 128 instances. Then the parallel parsing will begin. In reverse, saving to K different files is also supported.
+
+The load from K files or save to K files happens transactionally as a single SciDB query. The user does not need to worry about firing up multiple "writer" processes and managing them. Simply give the plugin a list of file paths and SciDB will handle the rest.
 
 #### 3. Error tolerance
 The aio_input operator ingests data in spite of extraneous characters, ragged rows that contain too few or too many columns, or columns that are mostly numeric but sometimes contain characters. Such datasets can be loaded easily into temporary arrays. SciDB can then be effectively used to find errors and fix them as needed.
