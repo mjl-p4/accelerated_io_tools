@@ -9,7 +9,7 @@ A prototype library for the accelerated import and export of data out of SciDB. 
 The package extends regular SciDB IO and provides benefits in a few areas:
 
 #### 1. Fully distributed parsing and packing
-When loading token-delimited data, the instance(s) reading the data use a fixed-size (default 8MB) `fread` call. The 8MB blocks are then sent to around the different SciDB instances as quickly as possible. Then, the "ragged line endings" of each block are separated and sent to the instance containing the next block. Finally, all the instances parse the data and populate the resulting array in parallel. Thus the expensive parsing step is almost fully parallelized; the ingest rate scales up with the number of instances. 
+When loading token-delimited data, the instance(s) reading the data use a fixed-size (default 8MB) `fread` call. The 8MB blocks are then sent to around the different SciDB instances as quickly as possible. Then, the "ragged line ending" of each block is separated and sent to the instance containing the next block. Finally, all the instances parse the data and populate the resulting array in parallel. Thus the expensive parsing step is almost fully parallelized; the ingest rate scales up with the number of instances. 
 
 When saving data, the reverse process is used: each instance packs its data into fixed-size blocks, then streams down to one or more saving instances. Save can also be done in binary form for faster speed.
 
@@ -89,7 +89,7 @@ $ cat /tmp/bar2.out
 3   jack
 ```
 
-# aio_input
+# Operator aio_input()
 This operator ingests token-delimited text data from one or more filesystem objects, quickly redistributes the data in chunks around the SciDB cluster and returns an array that contains the data populated into a number of string attributes. The returned array can then be persisted in SciDB or processed further. Here's an example ingest from a single file. The file is malformed on purpose:
 ```
 $ cat /tmp/foo.tsv 
@@ -370,7 +370,7 @@ For an example of using regular expressions, consult the regular expression subs
 
 ===
 
-# aio_save
+# Operator aio_save()
 This operator replaces the existing save functionality, for binary and tab-delimited formats. 
 Example save to a binary file:
 ```
