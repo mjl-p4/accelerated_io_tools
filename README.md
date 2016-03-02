@@ -58,7 +58,7 @@ $ iquery -aq "filter(temp, error is not null)"
 {4,0,0} '5error_no_tab',null,'short'
 ```
 
-Let's take then non-error rows, convert them to a dimension in a new array:
+Let's take the non-error rows, and redimension them to a new array, using the first column as a dimension:
 ```
 $ iquery -anq "store(redimension(apply(filter(temp, error is null), dim, dcast(a0, int64(null)), val, a1), <val:string null>[dim=0:*,1000000,0]), foo)"
 Query was executed successfully
