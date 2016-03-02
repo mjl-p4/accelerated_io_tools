@@ -6,7 +6,7 @@ set -e
 DBNAME="mydb"
 #This is easily sym-linkable: ~/scidb
 SCIDB_INSTALL=`dirname ~/.`"/scidb"
-export SCIDB_THIRDPARTY_PREFIX="/opt/scidb/15.7"
+export SCIDB_THIRDPARTY_PREFIX="/opt/scidb/15.12"
 
 mydir=`dirname $0`
 pushd $mydir
