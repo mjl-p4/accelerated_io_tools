@@ -7,7 +7,7 @@
  * Modification notice:
  * The file is modified from its original version, to move fmix() from the CPP file to the header file.
  * The versions taking signed integers are added.
- * Paradigm4 Inc. June 2012
+ * Paradigm4 Inc. June 2012 - 2016
  */
 
 #ifndef _MURMURHASH3_H_
