@@ -54,12 +54,6 @@
 
 #include "AioSaveSettings.h"
 
-#ifdef CPP11
-using std::make_shared;
-#else
-using boost::make_shared;
-#endif
-
 using std::make_shared;
 using boost::algorithm::is_from_range;
 
@@ -336,10 +330,6 @@ public:
                     Value const* v = cell[i];
                     if (column.nullable)
                     {
-                        if (v->getMissingReason() > 127)
-                        {
-                            LOG4CXX_WARN(logger, "Missing reason " << v->getMissingReason() << " cannot be stored in binary file");
-                        }
                         int8_t missingReason = (int8_t)v->getMissingReason();
                         builder.addData( (char*) (&missingReason), sizeof(missingReason));
                     }
@@ -684,7 +674,7 @@ uint64_t saveToDisk(shared_ptr<Array> const& array,
     }
     else
     {
-        f = fopen(file.c_str(), settings.isBinaryFormat() ? append ? "ab" : "wb" : append ? "a" : "w");
+        f = ::fopen(file.c_str(), settings.isBinaryFormat() ? append ? "ab" : "wb" : append ? "a" : "w");
         if (NULL == f)
         {
             int error = errno;
@@ -728,7 +718,7 @@ uint64_t saveToDisk(shared_ptr<Array> const& array,
                 header<<inputSchema.getAttributes(true)[i].getName();
             }
             header<<settings.getLineDelimiter();
-            fprintf(f, "%s", header.str().c_str());
+            ::fprintf(f, "%s", header.str().c_str());
         }
         shared_ptr<ConstArrayIterator> arrayIter = array->getConstIterator(0);
         for (size_t n = 0; !arrayIter->end(); n++)
@@ -739,7 +729,7 @@ uint64_t saveToDisk(shared_ptr<Array> const& array,
             uint32_t size = *sizePointer;
             bytesWritten += size;
             char* data = ((char*)ch.getData() + MemChunkBuilder::chunkDataOffset());
-            if (fwrite(data, 1, size, f) != size)
+            if (::fwrite(data, 1, size, f) != size)
             {
                 int err = errno ? errno : EIO;
                 throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR) << ::strerror(err) << err;
@@ -788,23 +778,6 @@ public:
                    ArrayDesc const& schema):
         PhysicalOperator(logicalName, physicalName, parameters, schema)
     {}
-
-    virtual bool changesDistribution(std::vector<ArrayDesc> const&) const
-    {
-        return true;
-    }
-
-#ifdef CPP11
-    virtual RedistributeContext getOutputDistribution(std::vector<RedistributeContext> const&, std::vector<ArrayDesc> const&) const
-    {
-        return RedistributeContext(psUndefined);
-    }
-#else
-    virtual ArrayDistribution getOutputDistribution(std::vector<ArrayDistribution> const&, std::vector<ArrayDesc> const&) const
-    {
-        return ArrayDistribution(psUndefined);
-    }
-#endif
 
     bool isSingleChunk(ArrayDesc const& schema)
     {
@@ -884,12 +857,9 @@ public:
         shared_ptr<Array> outArrayRedist;
         LOG4CXX_DEBUG(logger, "ALT_SAVE>> Starting SG")
         outArrayRedist = pullRedistribute(outArray,
-                                            query,
-                                            psByCol,
-                                            ALL_INSTANCE_MASK,
-                                            std::shared_ptr<CoordinateTranslator>(),
-                                            0,
-                                            std::shared_ptr<PartitioningSchemaData>());
+                                          createDistribution(psByCol),
+                                          ArrayResPtr(),
+                                          query);
         bool const wasConverted = (outArrayRedist != outArray) ;
         if (thisInstanceSavesData)
         {

@@ -111,7 +111,7 @@ private:
 public:
     BinFileSplitArray(ArrayDesc const& schema,
                       shared_ptr<Query>& query,
-                      shared_ptr<UberLoadSettings> settings):
+                      shared_ptr<AioInputSettings> settings):
         super(schema),
         _rowIndex(0),
         _chunkAddress(0, Coordinates(3,0)),
@@ -124,7 +124,7 @@ public:
         _chunkNo(0)
     {
         super::setEnforceHorizontalIteration(true);
-        _chunkAddress.coords[2] = settings->getParseInstance();
+        _chunkAddress.coords[2] = query->getInstanceID();
         try
         {
             _chunk.allocate(_chunkOverheadSize + _fileBlockSize);
@@ -178,7 +178,7 @@ public:
     {
         if(_inputFile!=NULL)
         {
-            fclose(_inputFile);
+            ::fclose(_inputFile);
         }
     }
 
@@ -193,11 +193,11 @@ public:
         {
             return false;
         }
-        size_t numBytes = fread(_bufPointer, 1, _fileBlockSize, _inputFile);
+        size_t numBytes = ::fread(_bufPointer, 1, _fileBlockSize, _inputFile);
         if(numBytes != _fileBlockSize)
         {
             _endOfFile = true;
-            fclose(_inputFile);
+            ::fclose(_inputFile);
             _inputFile = NULL;
             if(numBytes == 0)
             {
@@ -388,15 +388,16 @@ public:
 class PhysicalAioInput : public PhysicalOperator
 {
 public:
-    static ArrayDesc getSplitSchema(size_t const nInstances)
+    static ArrayDesc getSplitSchema(shared_ptr<Query> & query)
     {
+        size_t const nInstances = query->getInstancesCount();
         vector<DimensionDesc> dimensions(3);
         dimensions[0] = DimensionDesc("chunk_no",           0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
         dimensions[1] = DimensionDesc("dst_instance_id",    0, 0, nInstances-1, nInstances-1, 1, 0);
         dimensions[2] = DimensionDesc("src_instance_id",    0, 0, nInstances-1, nInstances-1, 1, 0);
         vector<AttributeDesc> attributes;
         attributes.push_back(AttributeDesc((AttributeID)0, "value",  TID_BINARY, 0, 0));
-        return ArrayDesc("aio_input", attributes, dimensions, defaultPartitioning());
+        return ArrayDesc("aio_input", attributes, dimensions, defaultPartitioning(), query->getDefaultArrayResidency());
     }
 
     PhysicalAioInput(std::string const& logicalName,
@@ -411,15 +412,18 @@ public:
         return true;
     }
 
-    virtual RedistributeContext getOutputDistribution(std::vector<RedistributeContext> const&, std::vector<ArrayDesc> const&) const
+    virtual RedistributeContext getOutputDistribution(
+            std::vector<RedistributeContext> const& inputDistributions,
+            std::vector< ArrayDesc> const& inputSchemas) const
     {
-        return RedistributeContext(psUndefined);
+        RedistributeContext distro(_schema.getDistribution(), _schema.getResidency());
+        return distro;
     }
 
-    shared_ptr<Array> makeSupplement(shared_ptr<Array>& afterSplit, shared_ptr<Query>& query, shared_ptr<UberLoadSettings>& settings, vector<Coordinate>& lastBlocks)
+    shared_ptr<Array> makeSupplement(shared_ptr<Array>& afterSplit, shared_ptr<Query>& query, shared_ptr<AioInputSettings>& settings, vector<Coordinate>& lastBlocks)
     {
         char const lineDelim = settings->getLineDelimiter();
-        shared_ptr<Array> supplement(new MemArray(getSplitSchema(query->getInstancesCount()), query));
+        shared_ptr<Array> supplement(new MemArray(getSplitSchema(query), query));
         shared_ptr<ConstArrayIterator> srcArrayIter = afterSplit->getConstIterator(0);
         shared_ptr<ArrayIterator> dstArrayIter = supplement->getIterator(0);
         shared_ptr<ChunkIterator> dstChunkIter;
@@ -506,32 +510,29 @@ public:
 
     shared_ptr< Array> execute(std::vector< shared_ptr< Array> >& inputArrays, shared_ptr<Query> query)
     {
-        shared_ptr<UberLoadSettings> settings (new UberLoadSettings(_parameters, false, query));
+        shared_ptr<AioInputSettings> settings (new AioInputSettings(_parameters, false, query));
         shared_ptr<Array> splitData;
-        if(settings->getParseInstance() == static_cast<int64_t>(query->getInstanceID()))
+        if(settings->thisInstanceReadsData())
         {
-            splitData = shared_ptr<BinFileSplitArray>(new BinFileSplitArray(getSplitSchema(query->getInstancesCount()), query, settings));
+            splitData = shared_ptr<BinFileSplitArray>(new BinFileSplitArray(getSplitSchema(query), query, settings));
         }
         else
         {
-            splitData = shared_ptr<BinEmptySinglePass>(new BinEmptySinglePass(getSplitSchema(query->getInstancesCount())));
+            splitData = shared_ptr<BinEmptySinglePass>(new BinEmptySinglePass(getSplitSchema(query)));
         }
-        splitData = redistributeToRandomAccess(splitData, query,
-                                               psByCol,
-                                               ALL_INSTANCE_MASK,
-                                               std::shared_ptr<CoordinateTranslator>(),
-                                               0,
-                                               std::shared_ptr<PartitioningSchemaData>());
+
+        splitData = redistributeToRandomAccess(splitData,
+                                               createDistribution(psByCol),
+                                               ArrayResPtr(),
+                                               query);
         size_t const nInstances = query->getInstancesCount();
         vector<Coordinate> lastBlocks(nInstances, -1);
         shared_ptr<Array> supplement = makeSupplement(splitData, query, settings, lastBlocks);
         exchangeLastBlocks(lastBlocks, query);
-        supplement = redistributeToRandomAccess(supplement, query,
-                                                psByCol,
-                                                ALL_INSTANCE_MASK,
-                                                std::shared_ptr<CoordinateTranslator>(),
-                                                0,
-                                                std::shared_ptr<PartitioningSchemaData>());
+        supplement = redistributeToRandomAccess(supplement,
+                                                createDistribution(psByCol),
+                                                ArrayResPtr(),
+                                                query);
         shared_ptr<ConstArrayIterator> inputIterator = splitData->getConstIterator(0);
         shared_ptr<ConstArrayIterator> supplementIter = supplement->getConstIterator(0);
         size_t const outputChunkSize = _schema.getDimensions()[0].getChunkInterval();

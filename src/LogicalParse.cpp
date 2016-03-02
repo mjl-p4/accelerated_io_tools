@@ -73,15 +73,10 @@ public:
         size_t requestedChunkSize = settings.getChunkSize();
         vector<DimensionDesc> dimensions(3);
 
-#ifdef CPP11
         dimensions[0] = DimensionDesc("source_instance_id", 0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
         dimensions[1] = DimensionDesc("chunk_no",    0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
         dimensions[2] = DimensionDesc("line_no",     0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), requestedChunkSize, 0); 
-#else
-        dimensions[0] = DimensionDesc("source_instance_id", 0, 0, MAX_COORDINATE, MAX_COORDINATE, 1, 0);
-        dimensions[1] = DimensionDesc("chunk_no",           0, 0, MAX_COORDINATE, MAX_COORDINATE, 1, 0);
-        dimensions[2] = DimensionDesc("line_no",            0, 0, MAX_COORDINATE, MAX_COORDINATE, requestedChunkSize, 0);
-#endif
+
         vector<AttributeDesc> attributes;
         if (settings.getSplitOnDimension())
         {   //add 1 for the error column
@@ -100,11 +95,8 @@ public:
             attributes.push_back(AttributeDesc((AttributeID)numRequestedAttributes, "error", TID_STRING, AttributeDesc::IS_NULLABLE, 0));
         }
         attributes = addEmptyTagAttribute(attributes);
-#ifdef CPP11
-        return ArrayDesc("parse", attributes, dimensions, defaultPartitioning());
-#else
-        return ArrayDesc("parse", attributes, dimensions);
-#endif
+
+        return ArrayDesc("parse", attributes, dimensions, createDistribution(psUndefined), query->getDefaultArrayResidency());
     }
 };
 

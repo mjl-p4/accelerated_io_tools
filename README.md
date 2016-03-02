@@ -14,9 +14,9 @@ When loading token-delimited data, the instance(s) reading the data use a fixed-
 When saving data, the reverse process is used: each instance packs its data into fixed-size blocks, then streams down to one or more saving instances. Save can also be done in binary form for faster speed.
 
 #### 2. Loading from multiple files
-When the parsing is so distributed, we find the read speed of the IO device is often the load bottleneck. To go around this, aio_input can be told to load data from 6 different files, for example. In such a case, 6 different SciDB instances, will open up 6 different files, on 6 different IO devices. The file pieces will then be quickly scattered across the whole SciDB cluster - up perhaps 128 instances. Then the parallel parsing will begin. In reverse, saving to K different files is also supported.
+When the parsing is so distributed, we find the read speed of the IO device is often the load bottleneck. To go around this, aio_input can be told to load data from 6 different files, for example. In such a case, 6 different SciDB instances, will open up 6 different files, on 6 different IO devices. The file pieces will then be quickly scattered across the whole SciDB cluster - up to perhaps 128 instances. Then the parallel parsing will begin. In reverse, saving to K different files is also possible.
 
-The load from K files or save to K files happens transactionally as a single SciDB query. The user does not need to worry about firing up multiple "writer" processes and managing them. Simply give the plugin a list of file paths and SciDB will handle the rest.
+The load from K files or save to K files happens transactionally as a single SciDB query. The user does not need to worry about firing up multiple "writer" processes and managing them. Simply provide a list of file paths and SciDB will handle the rest.
 
 #### 3. Error tolerance
 The aio_input operator ingests data in spite of extraneous characters, ragged rows that contain too few or too many columns, or columns that are mostly numeric but sometimes contain characters. Such datasets can be loaded easily into temporary arrays. SciDB can then be effectively used to find errors and fix them as needed.
@@ -92,7 +92,7 @@ $ cat /tmp/bar2.out
 The following sections describe the various options, and parameters in detail.
 
 # Operator aio_input()
-This operator ingests token-delimited text data from one or more filesystem objects, quickly redistributes the data in chunks around the SciDB cluster and returns an array that contains the data populated into a number of string attributes. The returned array can then be persisted in SciDB or processed further. Here's an example ingest from a single file. The file is malformed on purpose:
+Going back to the above example:
 ```
 $ cat /tmp/foo.tsv 
 1   alex
@@ -109,7 +109,7 @@ $ iquery -aq "aio_input('/tmp/foo.tsv', 'num_attributes=2')"
 {3,0,0} '4','dave','long    extra stuff here'
 {4,0,0} '5error_no_tab',null,'short'
 ```
-Note the extra `error` attribute is added and it is populated whenever the input line of text does not match the supplied number of attributes. The given filesystem object is opened and read once with the fopen/fread/fclose call family; it can be a file, symlink, fifo or any other object that supports these calls.
+Note the extra `error` attribute is added and is not null whenever the input line of text does not match the specified number of attributes. The given filesystem object is opened and read once with the fopen/fread/fclose call family; it can be a file, symlink, fifo or any other object that supports these calls.
 
 Example CSV ingest and store from multiple files:
 ```
@@ -127,17 +127,17 @@ $ iquery -anq "store(
 ```
 
 ## Formally:
-All parameters are supplied as `key=value` strings. The `num_attributes` as well as `path` or `paths` must always be specified:
+All parameters are supplied as `key=value` strings. The `num_attributes` and either `path` or `paths` must always be specified:
 ```
 aio_input('parameter=value', 'parameter2=value2;value3',...)
 ```
 
 ### Load from one or multiple files:
-* `path=/path/to/file`: the absolute path to load from. Assumed to be on instance 0, if set. If the operator encounters a string without '=' it uses that as path.
+* `path=/path/to/file`: the absolute path to load from. Assumed to be on the coordinator instance. If the operator encounters a string without '=' it uses that as path.
 * `paths=/path/to/file1;/path/to/file2`: semicolon-seprated list of paths for loading from multiple fs devices.
 
-If `paths` is used, then `instances` must be used to specify the loading instances:
-* `instances=0;1;...`: semicolon-separated list of instance ids, in the same order as `paths`. Must match the number of `paths` and contain unique ids. By default, the file will be read from instance 0.
+If `paths` is used, then `instances` must be used to specify the loading instance identifiers:
+* `instances=0;1;...`: semicolon-separated list of instance ids, in the same order as `paths`. Must match the number of `paths` and contain unique ids.
   
 ### File format settings:
 * `num_attributes=N`: number of columns in the file (at least on the majority of the lines). Required.
@@ -394,10 +394,10 @@ aio_save(array, 'parameter1=value1', 'parameter2=value2',...)
 The `path` or `paths` must always be specified.
 
 ## Save to one or more files:
-By default, the file is saved to a path on node 0 by instance 0. You can distribute the IO and network load by simultaneously writing data to multiple FS devices from several different instances (one instance per path).
+By default, the file is saved to a path on the query coordinator instance. You can distribute the IO and network load by simultaneously writing data to multiple FS devices from several different instances (one instance per path).
 * `path=/path/to/file`: the location to save the file; required. If the operator enocunters a string parameter without '=', it assumes that to be the path.
 * `paths=/path1;/path2;..`: multiple file paths for saving from different instances, separated by semicolon. Must be specified along with `instances` and have an equal number of terms. Either `path` or `paths` must be specified, but not both.
-* `instance=I`: the instance to save the file on. Default is 0.
+* `instance=I`: the instance to save the file on. Default is the instance the query is submitted to.
 * `instances=0;1;..`: multiple instance ID's for saving from different instances, separated by semicolon. Must be specified along with `paths` and have an equal number of unique terms. Either `instance` or `instances` must be specified, but not both.
 
 ## Other settings:
@@ -444,6 +444,9 @@ Warning: if you were previously using `prototype_load_tools` you will need to un
 
 If you are using shim together with SciDB, note that you can configure shim to use aio_save after it is installed to speed up data exports.
 See: https://github.com/paradigm4/shim
+
+## Note: use the right branch for your version
+The git branches of accelerated_io_tools follow different versions of SciDB - with the master branch used for the most recent version. Note also changes in behavior are possible between versions.
 
 # Old split() and parse() operators
 

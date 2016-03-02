@@ -28,14 +28,8 @@
 #include <query/Operator.h>
 #include <log4cxx/logger.h>
 
-#ifndef UNPARSE_SETTINGS
-#define UNPARSE_SETTINGS
-
-#ifdef CPP11
-using std::shared_ptr;
-#else
-using boost::shared_ptr;
-#endif
+#ifndef AIO_SAVE_SETTINGS
+#define AIO_SAVE_SETTINGS
 
 using boost::algorithm::trim;
 using boost::starts_with;
@@ -285,10 +279,6 @@ public:
                 try
                 {
                     int64_t iid = lexical_cast<int64_t>(paramContent);
-                    if(iid<0 || ((uint64_t)iid) >= _numInstances)
-                    {
-                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "instance id must be non-negative";
-                    }
                     instanceIds.push_back( iid);
                 }
                 catch (bad_lexical_cast const& exn)
@@ -311,10 +301,6 @@ public:
                     try
                     {
                         int64_t iid = lexical_cast<int64_t>(tok);
-                        if(iid<0 || ((uint64_t)iid) >= _numInstances)
-                        {
-                            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "instance id out of bounds";
-                        }
                         instanceIds.push_back(iid);
                     }
                     catch (bad_lexical_cast const& exn)
@@ -405,7 +391,7 @@ public:
         }
         if(instanceIds.size() == 0)
         {
-            instanceIds.push_back(0);
+            instanceIds.push_back(query->getPhysicalCoordinatorID(true));
         }
         if(filePaths.size() != instanceIds.size())
         {
@@ -422,7 +408,15 @@ public:
         }
         for(size_t i=0; i< filePaths.size(); ++i)
         {
-            _instancesAndPaths[instanceIds[i]] = filePaths[i];
+            InstanceID const iid = instanceIds[i];
+            if(query->isPhysicalInstanceDead(iid))
+            {
+                ostringstream err;
+                err<<"Instance "<<iid<<" is not currently part of the cluster";
+                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << err.str().c_str();
+            }
+            InstanceID logId = query->mapPhysicalToLogical(iid);
+            _instancesAndPaths[logId] = filePaths[i];
         }
         if((_binaryFormat || usingCsvPlus) && (lineDelimiterSet || attributeDelimiterSet || nullPatternSet))
         {

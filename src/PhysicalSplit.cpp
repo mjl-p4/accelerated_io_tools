@@ -39,13 +39,6 @@ namespace scidb
 {
 
 using namespace std;
-#ifdef CPP11
-using std::shared_ptr;
-using std::weak_ptr;
-#else
-using boost::shared_ptr;
-using boost::weak_ptr;
-#endif
 
 /**
  * A wrapper around an open file (or pipe) that may iterate over the data once and split it into blocks, each
@@ -86,7 +79,7 @@ public:
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "FileSplitter() cannot allocate memory";
         }
-        _inputFile = fopen(filePath.c_str(), "r");
+        _inputFile = ::fopen(filePath.c_str(), "r");
         if (_inputFile == NULL)
         {   
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "FileSplitter() cannot open file";
@@ -102,11 +95,11 @@ public:
             }
             free(line);
         }
-        _dataSize = fread(&_buffer[0], 1, _bufferSize, _inputFile);
+        _dataSize = ::fread(&_buffer[0], 1, _bufferSize, _inputFile);
         if (_dataSize != _bufferSize)
         {
             _endOfFile= true;
-            fclose(_inputFile);
+            ::fclose(_inputFile);
             _inputFile =0;
         }
         _dataStartPos = &_buffer[0];
@@ -116,7 +109,7 @@ public:
     {
         if(_inputFile!=0)
         {
-            fclose(_inputFile);
+            ::fclose(_inputFile);
         }
     }
 
@@ -185,11 +178,11 @@ private:
         }
         char *newDataStart = bufStart + _dataSize;
         size_t remainderSize = _bufferSize - _dataSize;
-        size_t bytesRead = fread( newDataStart, 1, remainderSize, _inputFile);
+        size_t bytesRead = ::fread( newDataStart, 1, remainderSize, _inputFile);
         if(bytesRead != remainderSize)
         {
             _endOfFile = true;
-            fclose(_inputFile);
+            ::fclose(_inputFile);
             _inputFile =0;
         }
         _dataStartPos = bufStart;
@@ -199,7 +192,6 @@ private:
 };
 
 
-#ifdef CPP11
 class EmptySinglePass : public SinglePassArray
 {
 private:
@@ -307,131 +299,6 @@ public:
     }
 };
 
-
-#else //NOT CPP11; SciDB 14.12 and before
-
-class FileSplitArrayIterator : public ConstArrayIterator
-{
-private:
-    Array const* _parentArray;
-    weak_ptr<Query> _query;
-    FileSplitter _splitter;
-    Address _chunkAddress;
-    char   _delimiter;
-    char*  _buffer;
-    size_t _bufferSize;
-    MemChunk _chunk;
-
-public:
-    FileSplitArrayIterator(Array const* parent, weak_ptr<Query> const& query, shared_ptr<SplitSettings> const& settings):
-        _parentArray(parent),
-        _query(query),
-        _splitter(settings->getInputFilePath(),
-                  settings->getLinesPerChunk(),
-                  settings->getBufferSize(),
-                  settings->getDelimiter(),
-                  settings->getHeader()),
-	          _chunkAddress(0, Coordinates(2,0)),
-         _delimiter(settings->getDelimiter())
-    {
-    	_chunkAddress.coords[0] = settings->getParseInstance();
-    	_buffer = _splitter.getBlock(_bufferSize);
-    }
-
-    virtual bool end()
-    {
-        return _bufferSize == 0;
-    }
-
-    virtual void operator ++()
-    {
-        if(end())
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "FileSplitArrayIterator::++ attempt to iterate past end";
-        }
-        ++(_chunkAddress.coords[1]);
-        _buffer = _splitter.getBlock(_bufferSize);
-    }
-
-    virtual Coordinates const& getPosition()
-    {
-        return _chunkAddress.coords;
-    }
-
-    virtual bool setPosition(Coordinates const& pos)
-    {
-        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "FileSplitArrayIterator::setPosition() not supported";
-    }
-
-    virtual void reset()
-    {
-        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "FileSplitArrayIterator::reset() not supported";
-    }
-
-    virtual ConstChunk const& getChunk()
-    {
-        _chunk.initialize(_parentArray, &_parentArray->getArrayDesc(), _chunkAddress, 0);
-        shared_ptr<Query> query = Query::getValidQueryPtr(_query);
-        shared_ptr<ChunkIterator> chunkIt = _chunk.getIterator(query, ChunkIterator::SEQUENTIAL_WRITE | ChunkIterator::NO_EMPTY_CHECK);
-        Value v;
-        if(_buffer[_bufferSize-1] == _delimiter) //add the null-termination character; replace the last delimiter character if one is present
-        {
-            v.setSize(_bufferSize);
-            char *d = (char*) v.data();
-            memcpy(d, _buffer, _bufferSize);
-            d[_bufferSize-1] = 0;
-        }
-        else
-        {
-            v.setSize(_bufferSize+1);
-            char *d = (char*) v.data();
-            memcpy(d, _buffer, _bufferSize);
-            d[_bufferSize] = 0;
-        }
-        chunkIt->writeItem(v);
-        chunkIt->flush();
-        return _chunk;
-    }
-};
-
-class FileSplitArray : public Array
-{
-private:
-    ArrayDesc _desc;
-    shared_ptr<SplitSettings> _settings;
-
-public:
-    FileSplitArray(ArrayDesc const& schema, shared_ptr<Query> const& query, shared_ptr<SplitSettings> const& settings):
-        _desc(schema),
-        _settings(settings)
-    {
-        _query = query;
-    }
-
-    virtual ~FileSplitArray()
-    {}
-
-    virtual Access getSupportedAccess() const
-    {
-        return SINGLE_PASS;
-    }
-
-    ArrayDesc const& getArrayDesc() const
-    {
-        return _desc;
-    }
-
-    virtual shared_ptr<ConstArrayIterator> getConstIterator(AttributeID attr) const
-    {
-        if(attr != 0)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "FileSplitArray::getConstIterator request for nonexistent attribute";
-        }
-        return shared_ptr<ConstArrayIterator> (new FileSplitArrayIterator(this, _query, _settings));
-    }
-};
-#endif
-
 class PhysicalSplit : public PhysicalOperator
 {
 public:
@@ -441,23 +308,6 @@ public:
                      ArrayDesc const& schema):
         PhysicalOperator(logicalName, physicalName, parameters, schema)
     {}
-
-    virtual bool changesDistribution(std::vector<ArrayDesc> const&) const
-    {
-        return true;
-    }
-
-#ifdef CPP11
-    virtual RedistributeContext getOutputDistribution(std::vector<RedistributeContext> const&, std::vector<ArrayDesc> const&) const
-    {
-        return RedistributeContext(defaultPartitioning());
-    }
-#else
-    virtual ArrayDistribution getOutputDistribution(std::vector<ArrayDistribution> const&, std::vector<ArrayDesc> const&) const
-    {
-        return ArrayDistribution(psHashPartitioned);
-    }
-#endif
 
     shared_ptr< Array> execute(std::vector<shared_ptr< Array> >& inputArrays, shared_ptr<Query> query)
     {
@@ -469,23 +319,12 @@ public:
         }
         else
         {
-#ifdef CPP11
             result = std::shared_ptr<EmptySinglePass>(new EmptySinglePass(_schema));
-#else
-            result = boost::shared_ptr<MemArray>(new MemArray(_schema,query));
-#endif
         }
-
-#ifdef CPP11
-        result = redistributeToRandomAccess(result, query, defaultPartitioning(),
-                                                 ALL_INSTANCE_MASK,
-                                                 std::shared_ptr<CoordinateTranslator>(),
-                                                 0,
-                                                 std::shared_ptr<PartitioningSchemaData>());
-#else
-        result = redistribute(result, query, psHashPartitioned);
-#endif
-
+        result = redistributeToRandomAccess(result,
+                                            createDistribution(psHashPartitioned),
+                                            ArrayResPtr(),
+                                            query);
         return result;
     }
 };

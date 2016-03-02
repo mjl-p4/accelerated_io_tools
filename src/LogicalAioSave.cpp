@@ -64,7 +64,7 @@ public:
         dimensions[2] = DimensionDesc("source_instance_id", 0, 0, nInstances-1, nInstances-1, 1, 0);
         vector<AttributeDesc> attributes;
         attributes.push_back(AttributeDesc((AttributeID)0, "val", TID_STRING, AttributeDesc::IS_NULLABLE, 0));
-        return ArrayDesc("aio_save", attributes, dimensions, defaultPartitioning());
+        return ArrayDesc("aio_save", attributes, dimensions, defaultPartitioning(), query->getDefaultArrayResidency());
     }
 };
 

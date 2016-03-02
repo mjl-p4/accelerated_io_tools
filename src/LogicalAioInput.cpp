@@ -43,7 +43,7 @@ public:
     {
         std::vector<shared_ptr<OperatorParamPlaceholder> > res;
         res.push_back(END_OF_VARIES_PARAMS());
-        if (_parameters.size() < UberLoadSettings::MAX_PARAMETERS)
+        if (_parameters.size() < AioInputSettings::MAX_PARAMETERS)
         {
             res.push_back(PARAM_CONSTANT("string"));
         }
@@ -52,7 +52,7 @@ public:
 
     ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, shared_ptr< Query> query)
     {
-        UberLoadSettings settings (_parameters, true, query);
+        AioInputSettings settings (_parameters, true, query);
         size_t numRequestedAttributes = settings.getNumAttributes();
         size_t requestedChunkSize = settings.getChunkSize();
         size_t const nInstances = query->getInstancesCount();
@@ -78,7 +78,7 @@ public:
             attributes.push_back(AttributeDesc((AttributeID)numRequestedAttributes, "error", TID_STRING, AttributeDesc::IS_NULLABLE, 0));
         }
         attributes = addEmptyTagAttribute(attributes);
-        return ArrayDesc("aio_input", attributes, dimensions, defaultPartitioning());
+        return ArrayDesc("aio_input", attributes, dimensions, createDistribution(psUndefined), query->getDefaultArrayResidency());
     }
 };
 

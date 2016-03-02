@@ -30,12 +30,6 @@
 #ifndef PARSE_SETTINGS
 #define PARSE_SETTINGS
 
-#ifdef CPP11
-using std::shared_ptr;
-#else
-using boost::shared_ptr;
-#endif
-
 using boost::algorithm::trim;
 using boost::starts_with;
 using boost::lexical_cast;
@@ -234,7 +228,7 @@ public:
             {
                 ostringstream err;
                 err<<"Unrecognized parameter: "<<parameterString;
-                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << err.str();
+                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << err.str().c_str();
             }
         }
         if (_numAttributes == 0)

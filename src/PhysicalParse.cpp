@@ -37,12 +37,7 @@
 
 #include <boost/algorithm/string.hpp>
 
-#ifdef CPP11
 using std::make_shared;
-#else
-using boost::make_shared;
-#endif
-
 using boost::algorithm::is_from_range;
 
 namespace scidb
@@ -222,17 +217,13 @@ public:
         return true;
     }
 
-#ifdef CPP11
-    virtual RedistributeContext getOutputDistribution(std::vector<RedistributeContext> const&, std::vector<ArrayDesc> const&) const
+    virtual RedistributeContext getOutputDistribution(
+            std::vector<RedistributeContext> const& inputDistributions,
+            std::vector< ArrayDesc> const& inputSchemas) const
     {
-        return RedistributeContext(psUndefined);
+        RedistributeContext distro(_schema.getDistribution(), _schema.getResidency());
+        return distro;
     }
-#else
-    virtual ArrayDistribution getOutputDistribution(std::vector<ArrayDistribution> const&, std::vector<ArrayDesc> const&) const
-    {
-        return ArrayDistribution(psUndefined);
-    }
-#endif
 
     shared_ptr< Array> execute(std::vector< shared_ptr< Array> >& inputArrays, shared_ptr<Query> query)
     {

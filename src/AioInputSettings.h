@@ -29,15 +29,10 @@
 #include <boost/filesystem.hpp>
 #include <query/Operator.h>
 
-#ifndef UBER_LOAD_SETTINGS
-#define UBER_LOAD_SETTINGS
+#ifndef AIO_INPUT_SETTINGS
+#define AIO_INPUT_SETTINGS
 
-#ifdef CPP11
 using std::shared_ptr;
-#else
-using boost::shared_ptr;
-#endif
-
 using boost::starts_with;
 using boost::lexical_cast;
 using boost::bad_lexical_cast;
@@ -47,7 +42,7 @@ using namespace std;
 
 namespace scidb
 {
-class UberLoadSettings
+class AioInputSettings
 {
 private:
 
@@ -56,7 +51,7 @@ private:
     string           _inputFilePath;
     vector<string>   _inputPaths;
     vector<int64_t>  _inputInstances;
-    int64_t          _instanceParse;
+    bool             _thisInstanceReadsData;
     int64_t          _bufferSize;
     bool             _bufferSizeSet;
     int64_t          _header;
@@ -74,13 +69,13 @@ private:
 public:
     static const size_t MAX_PARAMETERS = 9;
 
-    UberLoadSettings(vector<shared_ptr<OperatorParam> > const& operatorParameters,
+    AioInputSettings(vector<shared_ptr<OperatorParam> > const& operatorParameters,
                      bool logical,
                      shared_ptr<Query>& query):
        _singlepath(false),
        _multiplepath(false),
        _inputFilePath(""),
-       _instanceParse(-1),
+       _thisInstanceReadsData(false),
        _bufferSize(8*1024*1024),
        _bufferSizeSet(false),
        _header(0),
@@ -105,8 +100,8 @@ public:
         string const numAttributesHeader        = "num_attributes=";
         string const chunkSizeHeader            = "chunk_size=";
         string const splitOnDimensionHeader     = "split_on_dimension=";
-
-        int64_t const myInstanceId = query->getInstanceID();
+        int64_t const myLogicalInstanceId = query->getInstanceID();
+        InstanceID const myPhysicalInstanceId = query->getPhysicalInstanceID();
         size_t const nParams = operatorParameters.size();
         if (nParams > MAX_PARAMETERS)
         {   //assert-like exception. Caller should have taken care of this!
@@ -134,7 +129,7 @@ public:
                 trim(paramContent);
                 _singlepath = true;
                 _inputFilePath = paramContent;
-                _instanceParse = 0;
+                _thisInstanceReadsData = query->isCoordinator();
             }
             else if  (starts_with(parameterString, inputPathsHeader))
             {
@@ -181,12 +176,12 @@ public:
                 trim(paramContent);
                 try
                 {
-                    _header = lexical_cast<int64_t>(paramContent);
-                    if(_header<=0)
+                   _header = lexical_cast<int64_t>(paramContent);
+                   if(_header<=0)
                    {
                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "header must be positive";
                    }
-                    _headerSet = true;
+                   _headerSet = true;
                 }
                 catch (bad_lexical_cast const& exn)
                 {
@@ -374,7 +369,7 @@ public:
                 }
                 _singlepath     = true;
                 _inputFilePath  = path;
-                _instanceParse  = 0;
+                _thisInstanceReadsData = query->isCoordinator();
             }
         }
         if(_multiplepath)
@@ -393,30 +388,28 @@ public:
             {
                 throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Both single path and multiple path were declared.";
             }
-            std::vector<int64_t>::iterator itrel = std::find(_inputInstances.begin(), _inputInstances.end(), -1);
-            if((_inputInstances.size()==1) && (itrel != _inputInstances.end()))
+            if((_inputInstances.size()==1) && _inputInstances[0]==-1)
             {
                  string relinputpath  = _inputPaths[0];
                  _inputFilePath  = relinputpath;  
-                 _instanceParse  = myInstanceId;
+                 _thisInstanceReadsData = true;
             }
             else
             {
-                int const numinstances = query->getInstancesCount()-1;
-                if (std::find_if (_inputInstances.begin(), _inputInstances.end() , bind2nd(greater<int64_t>(),numinstances)) != _inputInstances.end())
+                for(size_t i=0; i<_inputInstances.size(); ++i)
                 {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "instance specified that is greater than numinstances";
-                }
-                if (std::find_if (_inputInstances.begin(), _inputInstances.end() , bind2nd(less<int64_t>(),0)) != _inputInstances.end())
-                {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "instance specified that is less than 0";
-                }
-                std::vector<int64_t>::iterator it = std::find(_inputInstances.begin(), _inputInstances.end(), myInstanceId);
-                if (it != _inputInstances.end())
-                {
-                    int64_t index = std::distance(_inputInstances.begin(), it);
-                    _instanceParse       = myInstanceId;
-                    _inputFilePath       = _inputPaths[index];
+                    InstanceID physId = _inputInstances[i];
+                    if(query->isPhysicalInstanceDead(physId))
+                    {
+                        ostringstream err;
+                        err<<"Physical instance "<<physId<<" is not alive at the moment";
+                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << err.str().c_str();
+                    }
+                    if(physId == myPhysicalInstanceId)
+                    {
+                        _thisInstanceReadsData = true;
+                        _inputFilePath       = _inputPaths[i];
+                    }
                 }
             }
         }
@@ -438,9 +431,9 @@ public:
         }
     }
 
-    int64_t const& getParseInstance() const
+    bool thisInstanceReadsData()
     {
-        return _instanceParse;
+        return _thisInstanceReadsData;
     }
 
     string const& getInputFilePath() const

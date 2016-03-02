@@ -32,12 +32,6 @@
 #ifndef SPLIT_SETTINGS
 #define SPLIT_SETTINGS
 
-#ifdef CPP11
-using std::shared_ptr;
-#else
-using boost::shared_ptr;
-#endif
-
 using boost::starts_with;
 using boost::lexical_cast;
 using boost::bad_lexical_cast;
