@@ -91,6 +91,8 @@ $ cat /tmp/bar2.out
 3   jack
 ```
 
+The following sections describe the various options, and parameters in detail.
+
 # Operator aio_input()
 This operator ingests token-delimited text data from one or more filesystem objects, quickly redistributes the data in chunks around the SciDB cluster and returns an array that contains the data populated into a number of string attributes. The returned array can then be persisted in SciDB or processed further. Here's an example ingest from a single file. The file is malformed on purpose:
 ```
