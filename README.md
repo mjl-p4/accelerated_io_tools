@@ -436,7 +436,11 @@ You will need the `-dev` or `-devel` package of Protobuf in order to get headers
 ```
 sudo apt-get install libprotobuf-dev protobuf-compiler
 ```
-After that, use https://github.com/paradigm4/dev_tools to install
+After that, follow instructions https://github.com/paradigm4/dev_tools to get dev_tools first. Then:
+```
+iquery -aq "install_github('paradigm4/accelerated_io_tools')"
+iquery -aq "load_library('accelerated_io_tools')"
+```
 
 Warning: if you were previously using `prototype_load_tools` you will need to unload that library and restart the cluster:
  * `iquery -aq "unload_library('prototype_load_tools')"`
