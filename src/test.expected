@@ -389,3 +389,9 @@ foo<v1:float,v2:double NOT NULL,v3:string NOT NULL> [i=1:50,10,0]	true
 Query was executed successfully
 i,schema,b
 0,'foo@1<v1:float,v2:double NOT NULL,v3:string NOT NULL> [i=1:50,10,0]',true
+Query was executed successfully
+0	0
+1	1
+127	127
+128	-128
+255	-1

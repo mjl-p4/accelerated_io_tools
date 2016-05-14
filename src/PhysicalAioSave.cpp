@@ -394,7 +394,9 @@ private:
         STRING =1,
         FLOAT  =2,
         DOUBLE =3,
-        BOOL   =4
+        BOOL   =4,
+        UINT8  =5,
+        INT8    =6
     };
 
     char const              _attDelim;
@@ -437,6 +439,14 @@ public:
             else if(inputAttrs[i].getType() == TID_FLOAT)
             {
                 _attTypes[i] = FLOAT;
+            }
+            else if(inputAttrs[i].getType() == TID_UINT8)
+            {
+                _attTypes[i] = UINT8;
+            }
+            else if(inputAttrs[i].getType() == TID_INT8)
+            {
+                _attTypes[i] = INT8;
             }
             else
             {
@@ -547,6 +557,18 @@ public:
                             {
                                 outputBuf<<fnbr;
                             }
+                        }
+                        break;
+                    case UINT8:
+                        {
+                            uint8_t nbr =v->getUint8();
+                            outputBuf<<(int16_t) nbr;
+                        }
+                        break;
+                    case INT8:
+                        {
+                            int8_t nbr =v->getUint8();
+                            outputBuf<<(int16_t) nbr;
                         }
                         break;
                     case OTHER:
