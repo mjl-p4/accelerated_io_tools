@@ -436,7 +436,7 @@ static void extract_format_field( const Value **args, Value* res, void*) {
         {}
 
     size_t size = end - start + 1;
-    res->setSize(size);
+    res->setSize<Value::IGNORE_DATA>(size);
     memcpy(res->data(), &sampleField[start], (end-start));
     ((char*)res->data())[size-1]=0;
 }

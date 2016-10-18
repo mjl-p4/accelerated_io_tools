@@ -281,14 +281,14 @@ public:
         Value v;
         if(_buffer[_bufferSize-1] == _delimiter) //add the null-termination character; replace the last delimiter character if one is present
         {
-            v.setSize(_bufferSize);
+            v.setSize<Value::IGNORE_DATA>(_bufferSize);
             char *d = (char*) v.data();
             memcpy(d, _buffer, _bufferSize);
             d[_bufferSize-1] = 0;
         }
         else
         {
-            v.setSize(_bufferSize+1);
+            v.setSize<Value::IGNORE_DATA>(_bufferSize+1);
             char *d = (char*) v.data();
             memcpy(d, _buffer, _bufferSize);
             d[_bufferSize] = 0;

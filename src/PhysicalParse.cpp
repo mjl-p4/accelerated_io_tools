@@ -106,7 +106,7 @@ public:
     {
         if(_outputColumn < _outputLineSize - 1)
         {
-            _buf.setSize(end - start + 1);
+            _buf.setSize<Value::IGNORE_DATA>(end - start + 1);
             char* d = _buf.getData<char>();
             memcpy(d, start, end-start);
             d[(end-start)]=0;

@@ -291,7 +291,7 @@ public:
         if(_outputColumn < _outputLineSize - 1)
         {
             Value& buf = _buf[_outputColumn];
-            buf.setSize(end - start + 1);
+            buf.setSize<Value::IGNORE_DATA>(end - start + 1);
             char* d = buf.getData<char>();
             memcpy(d, start, end-start);
             d[(end-start)]=0;
@@ -464,7 +464,7 @@ public:
                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Encountered a whole block without line delimiter characters; Sorry! You need to increase the block size.";
                }
                Value firstLine;
-               firstLine.setSize(end-start);
+               firstLine.setSize<Value::IGNORE_DATA>(end-start);
                memcpy(firstLine.data(), start, end-start);
                dstChunkIter = dstArrayIter->newChunk(supplementCoords).getIterator(query,  ChunkIterator::SEQUENTIAL_WRITE);
                dstChunkIter->writeItem(firstLine);
@@ -547,75 +547,77 @@ public:
             Coordinate const block = pos[0] * nInstances + pos[1];
             bool const lastBlock = (lastBlocks[ pos[2] ] == block);
             ConstChunk const& chunk =  inputIterator->getChunk();
-            PinBuffer pinScope(chunk);
-            char* chunkData = ((char*) chunk.getData());
-            char* sourceStart = chunkData + overheadSize;
-            char* chunkBodyStart  = sourceStart;
-            uint32_t sourceSize = *((uint32_t*)(chunkData + sizeOffset));
-            if(sourceSize == 0)
             {
-                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "[defensive] encountered a chunk with no data.";
-            }
-            size_t nLines =0;
-            if(pos[0] != 0 || pos[1] != pos[2])
-            {
-                while((*sourceStart)!=lineDelim)
+                PinBuffer pinScope(chunk);
+                char* chunkData = ((char*) chunk.getData());
+                char* sourceStart = chunkData + overheadSize;
+                char* chunkBodyStart  = sourceStart;
+                uint32_t sourceSize = *((uint32_t*)(chunkData + sizeOffset));
+                if(sourceSize == 0)
                 {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "[defensive] encountered a chunk with no data.";
+                }
+                size_t nLines =0;
+                if(pos[0] != 0 || pos[1] != pos[2])
+                {
+                    while((*sourceStart)!=lineDelim)
+                    {
+                        sourceStart ++;
+                    }
                     sourceStart ++;
+                    sourceSize = sourceSize - (sourceStart - chunkBodyStart);
                 }
-                sourceStart ++;
-                sourceSize = sourceSize - (sourceStart - chunkBodyStart);
-            }
-            bool haveSupplement = supplementIter->setPosition(pos);
-            vector<char>buf;
-            if(haveSupplement)
-            {
-                shared_ptr<ConstChunkIterator> supplementChunkIterator = supplementIter->getChunk().getConstIterator();
-                Value const &s = supplementChunkIterator->getItem();
-                buf.resize(sourceSize+s.size());
-                memcpy(&buf[0], sourceStart, sourceSize);
-                memcpy(&buf[0]+ sourceSize, s.data(), s.size());
-            }
-            else
-            {
-                buf.resize(sourceSize);
-                memcpy(&buf[0], sourceStart, sourceSize);
-            }
-            if(lastBlock && buf.size() <= 1)
-            {
-                ++(*inputIterator);
-                continue;
-            }
-            const char *data = &buf[0];
-            const char* start = data;
-            const char* end = start;
-            const char* terminus = start + buf.size();
-            bool finished = false;
-            writer.newChunk(pos, query);
-            while (!finished)
-            {
-                while( end != terminus && (*end)!=attDelim && (*end)!=lineDelim )
+                bool haveSupplement = supplementIter->setPosition(pos);
+                vector<char>buf;
+                if(haveSupplement)
                 {
-                    ++end;
+                    shared_ptr<ConstChunkIterator> supplementChunkIterator = supplementIter->getChunk().getConstIterator();
+                    Value const &s = supplementChunkIterator->getItem();
+                    buf.resize(sourceSize+s.size());
+                    memcpy(&buf[0], sourceStart, sourceSize);
+                    memcpy(&buf[0]+ sourceSize, s.data(), s.size());
                 }
-                writer.writeValue(start, end);
-                if(end == terminus || (*end) == lineDelim )
+                else
                 {
-                    writer.endLine();
-                    ++nLines;
-                    if (nLines > outputChunkSize)
+                    buf.resize(sourceSize);
+                    memcpy(&buf[0], sourceStart, sourceSize);
+                }
+                if(lastBlock && buf.size() <= 1)
+                {
+                    ++(*inputIterator);
+                    continue;
+                }
+                const char *data = &buf[0];
+                const char* start = data;
+                const char* end = start;
+                const char* terminus = start + buf.size();
+                bool finished = false;
+                writer.newChunk(pos, query);
+                while (!finished)
+                {
+                    while( end != terminus && (*end)!=attDelim && (*end)!=lineDelim )
                     {
-                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Encountered a string with more lines than the chunk size; bailing";
+                        ++end;
                     }
-                    if(end == terminus || (lastBlock && end == terminus-1))
+                    writer.writeValue(start, end);
+                    if(end == terminus || (*end) == lineDelim )
                     {
-                        finished = true;
+                        writer.endLine();
+                        ++nLines;
+                        if (nLines > outputChunkSize)
+                        {
+                            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Encountered a string with more lines than the chunk size; bailing";
+                        }
+                        if(end == terminus || (lastBlock && end == terminus-1))
+                        {
+                            finished = true;
+                        }
                     }
-                }
-                if (end != terminus)
-                {
-                    start = end+1;
-                    end   = end+1;
+                    if (end != terminus)
+                    {
+                        start = end+1;
+                        end   = end+1;
+                    }
                 }
             }
             ++(*inputIterator);

@@ -76,7 +76,7 @@ public:
                 _printCoordinates(false),
                 _quoteStrings(false),
                 _writeHeader(false),
-                _precision(Config::getInstance()->getOption<int>(CONFIG_PRECISION))
+                _precision(std::numeric_limits<double>::digits10)
     {
         string const cellsPerChunkHeader           = "cells_per_chunk=";
         string const attributeDelimiterHeader      = "attribute_delimiter=";

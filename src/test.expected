@@ -93,17 +93,17 @@
 {i} v2_avg,v2_count,count
 {0} 60,6,60000000
 {i} v2_avg,v2_count,count
-{0} 20651.5,48755,60000000
+{0} 16376.9,1420,60000000
 {i} v2_avg,v2_count,count
-{0} 37142.9,115711,60000000
+{0} 32761.5,2840,60000000
 {i} v2_avg,v2_count,count
-{0} 2.75938e+08,18128466,60000000
+{0} 4.99191e+08,10016207,60000000
 {i} v2_avg,v2_count,count
-{0} 2.75938e+08,18128466,60000000
+{0} 4.99191e+08,10016207,60000000
 {i} v2_avg,v2_count,count
-{0} 6.15636e+17,28128466,60000000
+{0} 8.65143e+17,20016207,60000000
 {i} v2_avg,v2_count,count
-{0} 1.3731e+18,25814610,60000000
+{0} 2.00234e+18,17702351,60000000
 {i} v2_avg,v2_count,count
 {0} 5.7723e+17,30000000,60000000
 {i} v2_avg,v2_count,count
@@ -350,45 +350,45 @@ Query was executed successfully
 {48} 49,4.71154,'abcdef'
 {49} null,4.80769,'abcdef'
 Query was executed successfully
-?0	0.192308	abcdef
-?0	0.384615	abcdef
-?0	0.576923	abcdef
-?0	0.769231	abcdef
-?0	0.961538	abcdef
-?0	1.15385	abcdef
-?0	1.34615	abcdef
-?0	1.53846	abcdef
-?0	1.73077	abcdef
-?0	1.92308	abcdef
+?0	0.192307692307692	abcdef
+?0	0.384615384615385	abcdef
+?0	0.576923076923077	abcdef
+?0	0.769230769230769	abcdef
+?0	0.961538461538461	abcdef
+?0	1.15384615384615	abcdef
+?0	1.34615384615385	abcdef
+?0	1.53846153846154	abcdef
+?0	1.73076923076923	abcdef
+?0	1.92307692307692	abcdef
 Query was executed successfully
-NULL CODE 0, BRUH	0.192308	abcdef
-NULL CODE 0, BRUH	0.384615	abcdef
-NULL CODE 0, BRUH	0.576923	abcdef
-NULL CODE 0, BRUH	0.769231	abcdef
-NULL CODE 0, BRUH	0.961538	abcdef
-NULL CODE 0, BRUH	1.15385	abcdef
-NULL CODE 0, BRUH	1.34615	abcdef
-NULL CODE 0, BRUH	1.53846	abcdef
-NULL CODE 0, BRUH	1.73077	abcdef
-NULL CODE 0, BRUH	1.92308	abcdef
+NULL CODE 0, BRUH	0.192307692307692	abcdef
+NULL CODE 0, BRUH	0.384615384615385	abcdef
+NULL CODE 0, BRUH	0.576923076923077	abcdef
+NULL CODE 0, BRUH	0.769230769230769	abcdef
+NULL CODE 0, BRUH	0.961538461538461	abcdef
+NULL CODE 0, BRUH	1.15384615384615	abcdef
+NULL CODE 0, BRUH	1.34615384615385	abcdef
+NULL CODE 0, BRUH	1.53846153846154	abcdef
+NULL CODE 0, BRUH	1.73076923076923	abcdef
+NULL CODE 0, BRUH	1.92307692307692	abcdef
 Query was executed successfully
-0, BRUH	0.192308	abcdef
-0, BRUH	0.384615	abcdef
-0, BRUH	0.576923	abcdef
-0, BRUH	0.769231	abcdef
-0, BRUH	0.961538	abcdef
-0, BRUH	1.15385	abcdef
-0, BRUH	1.34615	abcdef
-0, BRUH	1.53846	abcdef
-0, BRUH	1.73077	abcdef
-0, BRUH	1.92308	abcdef
+0, BRUH	0.192307692307692	abcdef
+0, BRUH	0.384615384615385	abcdef
+0, BRUH	0.576923076923077	abcdef
+0, BRUH	0.769230769230769	abcdef
+0, BRUH	0.961538461538461	abcdef
+0, BRUH	1.15384615384615	abcdef
+0, BRUH	1.34615384615385	abcdef
+0, BRUH	1.53846153846154	abcdef
+0, BRUH	1.73076923076923	abcdef
+0, BRUH	1.92307692307692	abcdef
 Query was executed successfully
-foo<v1:float,v2:double NOT NULL,v3:string NOT NULL> [i=1:50,10,0]	true
+foo<v1:float,v2:double NOT NULL,v3:string NOT NULL> [i=1:50:0:10]	true
 Query was executed successfully
-foo<v1:float,v2:double NOT NULL,v3:string NOT NULL> [i=1:50,10,0]	true
+foo<v1:float,v2:double NOT NULL,v3:string NOT NULL> [i=1:50:0:10]	true
 Query was executed successfully
 i,schema,b
-0,'foo@1<v1:float,v2:double NOT NULL,v3:string NOT NULL> [i=1:50,10,0]',true
+0,'foo@1<v1:float,v2:double NOT NULL,v3:string NOT NULL> [i=1:50:0:10]',true
 Query was executed successfully
 0	0
 1	1
