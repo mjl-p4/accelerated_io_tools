@@ -1,6 +1,10 @@
 accelerated_io_tools
 ==========
 
+##Warning: You probably want the v15.12 branch##
+The master branch is compatible with SciDB 16.9 which isn't released yet. If this is your first time here, you are probably running SciDB 15.12 and should use the v15.12 branch of this package.
+==========
+
 A prototype library for the accelerated import and export of data out of SciDB. The work started previously as the `prototype_load_tools` package and continued to get optimized and expanded. Currently contains two SciDB operators and several functions:
  * `aio_input`: an operator that reads token-separated text from 1 or more filesystem objects and returns the data as a SciDB array
  * a few scalar string functions - `dcast`, `trim`, `nth_tdv`, etc that can be useful in some data loading scenarios
