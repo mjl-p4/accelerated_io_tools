@@ -104,6 +104,25 @@ time iquery -aq "aggregate(apply(big_n_wild, v2, dcast(val, double(null))), avg(
 
 time iquery -aq "aggregate(apply(filter(apply(big_n_wild, v2, dcast(val, bool(null))), v2 is not null), v3, iif(v2, 1, 0)), sum(v3), count(*))" >> test.out
 
+# nth_csv tests
+iquery -aq "apply(build(<s:string>[i=0:0,1,0], 'a,bbb,cc'), x, nth_csv(s,0))" >> test.out
+iquery -aq "apply(build(<s:string>[i=0:0,1,0], 'a,bbb,cc'), x, nth_csv(s,1))" >> test.out
+iquery -aq "apply(build(<s:string>[i=0:0,1,0], 'a,bbb,cc'), x, nth_csv(s,2))" >> test.out
+iquery -aq "apply(build(<s:string>[i=0:0,1,0], 'a,bbb,cc'), x, nth_csv(s,3))" >> test.out
+
+iquery -aq "apply(build(<s:string>[i=0:0,1,0], ',bbb,cc'), x, nth_csv(s,0))" >> test.out
+iquery -aq "apply(build(<s:string>[i=0:0,1,0], ',,cc'),    x, nth_csv(s,1))" >> test.out
+iquery -aq "apply(build(<s:string>[i=0:0,1,0], ',,'),      x, nth_csv(s,2))" >> test.out
+
+# nth_tdv tests
+iquery -aq "apply(build(<s:string>[i=0:0,1,0], 'a;,bbb;,cc'), x, nth_tdv(s,0,'x,'))" >> test.out
+iquery -aq "apply(build(<s:string>[i=0:0,1,0], 'a;,bbb;,cc'), x, nth_tdv(s,1,'x;'))" >> test.out
+iquery -aq "apply(build(<s:string>[i=0:0,1,0], 'a;,bbb;,cc'), x, nth_tdv(s,2,'x,'))" >> test.out
+iquery -aq "apply(build(<s:string>[i=0:0,1,0], 'a;,bbb;,cc'), x, nth_tdv(s,3,'x;'))" >> test.out
+
+iquery -aq "apply(build(<s:string>[i=0:0,1,0], ',bbb;,cc'), x, nth_tdv(s,0,'x,'))" >> test.out
+iquery -aq "apply(build(<s:string>[i=0:0,1,0], ';;,cc'), x,    nth_tdv(s,1,'x;'))" >> test.out
+iquery -aq "apply(build(<s:string>[i=0:0,1,0], ',,'), x,       nth_tdv(s,2,'x,'))" >> test.out
 
 rm -rf /tmp/load_tools_test
 mkdir /tmp/load_tools_test
