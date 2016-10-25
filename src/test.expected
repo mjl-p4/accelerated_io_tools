@@ -130,9 +130,9 @@ nth_csv tests
 {i} s,x
 {0} 'a,,cc','a'
 {i} s,x
-{0} 'a,,cc',',cc'
+{0} 'a,,cc',''
 {i} s,x
-{0} 'a,,cc',null
+{0} 'a,,cc','cc'
 {i} s,x
 {0} 'a,,cc',null
 {i} s,x
@@ -163,9 +163,9 @@ nth_tdv tests
 {i} s,x
 {0} 'a,,cc','a'
 {i} s,x
-{0} 'a,,cc',',cc'
+{0} 'a,,cc',''
 {i} s,x
-{0} 'a,,cc',null
+{0} 'a,,cc','cc'
 {i} s,x
 {0} 'a,,cc',null
 {i} s,x

@@ -281,21 +281,26 @@ $ iquery -aq "apply(build(<val:string>[i=0:0,1,0], 'abc, def, xyz'), cc, char_co
 {0} 'abc, def, xyz',2
 ```
 
-## nth_tdv() and nth_csv() extract a substring from a field that contains delimiters:
+## nth_tdv() and nth_csv() extract a substring from a field that contains delimiters.
+Adjacent delimiters return the empty string ('').
+Indices greater than than the number of delimiters return null
 ```
-$ iquery -aq "apply(build(<val:string>[i=0:0,1,0], 'abc, def, xyz'), n, nth_csv(val, 0))"
+$ iquery -aq "apply(build(<val:string>[i=0:0,1,0], 'abc,,xyz'), n, nth_csv(val, 0))"
 {i} val,n
-{0} 'abc, def, xyz','abc'
+{0} 'abc,,xyz','abc'
 
-$ iquery -aq "apply(build(<val:string>[i=0:0,1,0], 'abc, def, xyz'), n, nth_csv(val, 1))"
+$ iquery -aq "apply(build(<val:string>[i=0:0,1,0], 'abc,,xyz'), n, nth_csv(val, 1))"
 {i} val,n
-{0} 'abc, def, xyz',' def'
-```
-nth_tdv lets you specify a delimiter other than a comma:
-```
-$ iquery -aq "apply(build(<val:string>[i=0:0,1,0], 'abc, def, xyz'), n, nth_tdv(val, 1, ' '))"
+{0} 'abc,,xyz',''
+
+$ iquery -aq "apply(build(<val:string>[i=0:0,1,0], 'abc,,xyz'), n, nth_csv(val, 3))"
 {i} val,n
-{0} 'abc, def, xyz','def,'
+{0} 'abc,def,xyz',null
+```
+nth_tdv is more general: it lets you specify one or more delimiting characters:
+```
+$ iquery -aq "apply(build(<val:string>[i=0:0,1,0], 'abc def/xyz'), n, nth_tdv(val, 1, ' /'))"
+{0} 'abc def/xyz','def'
 ```
 Note the benefit of using small cross_joins to decompose compound fields.
 The iif is present to overcome a limitation in SciDB's logic that determines when an attribute can be nullable,
