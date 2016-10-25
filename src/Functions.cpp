@@ -307,47 +307,78 @@ void char_count(const scidb::Value** args, scidb::Value* res, void*)
 }
 static scidb::UserDefinedFunction ntdv( scidb::FunctionDescription("char_count", list_of("string")("string"), "uint32", &char_count));
 
-template <bool custom_separator>
-void nth_tdv(const scidb::Value** args, scidb::Value* res, void*)
+template <bool CUST_SEP>
+void nth_tdv(const scidb::Value** args, scidb::Value* result, void*)
 {
     if (args[0]->isNull())
     {
-        res->setNull(args[0]->getMissingReason());
+        result->setNull(args[0]->getMissingReason());
         return;
     }
     if (args[1]->isNull())
     {
-        res->setNull(0);
+        result->setNull(0);
         return;
     }
-    string separator = ",";
-    if(custom_separator)
-    {
-       if(args[2]->isNull())
-       {
-           res->setNull(0);
+
+    // arg 0
+    const char*  input    = args[0]->getString();
+    const size_t input_sz = args[0]->size();
+
+    // arg 1
+    const uint32_t fieldWanted = args[1]->getUint32();
+
+    // arg 2
+    const char * delims    = ",";
+    size_t delims_sz = 1;
+
+    if(CUST_SEP) {
+       if(args[2]->isNull()) {
+           result->setNull(0);
            return;
        }
-       separator = get_null_terminated_string(args[2]->getString(), args[2]->size());
-       if(separator.size()==0)
-       {
-           res->setNull(0);
+
+       delims    = args[2]->getString();
+       delims_sz = args[2]->size();
+       if(delims_sz==0) {
+           result->setNull(0);
            return;
        }
     }
-    uint32_t n = args[1]->getUint32();
-    string cell = get_null_terminated_string(args[0]->getString(), args[0]->size());
-    vector<string> values;
-    split(values, cell, is_any_of(separator));
-    if (values.size() <= n)
-    {
-        res->setNull(0);
-        return;
+
+    assert(src); // loop precondition
+
+    // search for separator characters, which increase fieldCount
+    uint32_t fieldCount = 0;
+
+    const char* end = input+input_sz;
+    const char* left = input;         // post-loop lifetime
+    const char* right = input;        // post-loop lifetime
+
+    for (; right < end; ++right) {
+        for(size_t j=0; j<delims_sz; ++j) {
+            if(*right == delims[j]) {              // delimiter found?
+                if(fieldCount == fieldWanted) {    // delimiter ends the desired field?
+                    result->setString(string(left, right-left));   // [left, right)
+                    return;
+                } else if (right < end-1) {        // delimiter, but not for desired field?
+                    ++fieldCount;                  // switch to next field
+                    left = right+1;                // ditto
+                    break;                         // find next delimiter
+                }
+            }
+        }
     }
-    res->setString(values[n]);
+
+    if (fieldCount == fieldWanted) {  // end of input terminates the correct answer?
+        result->setString(string(left, right-left));   // [left, right)
+    } else {             // there were not enough substrings in the input
+        result->setNull(0); // answer is null in original implementation, and remains so here.
+    }
 }
-static scidb::UserDefinedFunction ntcsv( scidb::FunctionDescription("nth_csv", list_of("string")("uint32"),           "string", &nth_tdv<false>));
-static scidb::UserDefinedFunction nttdv( scidb::FunctionDescription("nth_tdv", list_of("string")("uint32")("string"), "string", &nth_tdv<true>));
+
+static scidb::UserDefinedFunction nth_csv_func( scidb::FunctionDescription("nth_csv", list_of("string")("uint32"),           "string", &nth_tdv<false>));
+static scidb::UserDefinedFunction nth_tdv_func( scidb::FunctionDescription("nth_tdv", list_of("string")("uint32")("string"), "string", &nth_tdv<true>));
 
 template <bool custom_separator>
 void maxlen_tdv(const scidb::Value** args, scidb::Value* res, void*)
