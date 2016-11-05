@@ -453,19 +453,15 @@ public:
                {
                    supplementCoords[1] = dst - 1;
                }
-               char const* lim = start + sourceSize;
-               char const* end = start;
-               while( end != lim && (*end) != lineDelim)
-               {
-                   ++end;
-               }
-               if(end == lim)
+               void * tmp = memchr(start, lineDelim, sourceSize);
+               if(!tmp)
                {
                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Encountered a whole block without line delimiter characters; Sorry! You need to increase the block size.";
                }
+               char const* cur = static_cast<char*>(tmp);
                Value firstLine;
-               firstLine.setSize(end-start);
-               memcpy(firstLine.data(), start, end-start);
+               firstLine.setSize(cur-start);
+               memcpy(firstLine.data(), start, cur-start);
                dstChunkIter = dstArrayIter->newChunk(supplementCoords).getIterator(query,  ChunkIterator::SEQUENTIAL_WRITE);
                dstChunkIter->writeItem(firstLine);
                dstChunkIter->flush();

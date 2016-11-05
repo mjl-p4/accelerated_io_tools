@@ -23,7 +23,7 @@
 * END_COPYRIGHT
 */
 
-#include <limits>
+#include <cstring>
 #include <limits>
 #include <sstream>
 
@@ -80,6 +80,10 @@ public:
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "FileSplitter() cannot allocate memory";
         }
         _inputFile = ::fopen(filePath.c_str(), "r");
+        // todo: investigate whether using a larger FILE* buffer will help, e..g
+        // char sbuffer[128*1024];  // but aligned
+        // setbuffer(_inputFile, sbuffer, sizeof(sbuffer));
+
         if (_inputFile == NULL)
         {   
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "FileSplitter() cannot open file";
@@ -95,7 +99,7 @@ public:
             }
             free(line);
         }
-        _dataSize = ::fread(&_buffer[0], 1, _bufferSize, _inputFile);
+        _dataSize = ::fread_unlocked(&_buffer[0], 1, _bufferSize, _inputFile);
         if (_dataSize != _bufferSize)
         {
             _endOfFile= true;
@@ -120,21 +124,26 @@ public:
      * @param[out] numCharacters the size of returned data block, 0 if there is no more data
      * @return pointer to the data, not valid if numCharacters is 0
      */
-    char* getBlock(size_t& numCharacters)
+    char* getBlock(size_t& numCharactersRslt)
     {
         size_t lineCounter = _linesPerBlock;
         char* ch = _dataStartPos;
-        numCharacters = 0;
+        size_t numChar = 0;
         while (1)
         {
-            while (numCharacters < _dataSize && lineCounter != 0)
+            while (numChar < _dataSize && lineCounter != 0)
             {
-                if(*ch == _delimiter)
-                {
-                    lineCounter --;
+                char * p = static_cast<char*>(
+                               memchr(ch, _delimiter, _dataSize-numChar));
+                if(p) {
+                    lineCounter --;             // *p is the delimiter
+                    assert(p >= ch);
+                    numChar += p+1 - ch ;
+                    ch = p+1 ;
+                } else {                        // end reached, p is 0
+                    ch = _dataStartPos + _dataSize;     // end position
+                    numChar = _dataSize;          // end count
                 }
-                ++ch;
-                ++numCharacters;
             }
             if(lineCounter == 0 || _endOfFile)
             {
@@ -147,7 +156,8 @@ public:
         }
         char* res = _dataStartPos;
         _dataStartPos = ch;
-        _dataSize = _dataSize - numCharacters;
+        _dataSize = _dataSize - numChar; // _dataSize wrapped?
+        numCharactersRslt = numChar;
         return res;
     }
 
@@ -157,6 +167,8 @@ private:
         char *bufStart = &_buffer[0];
         if (_dataStartPos != bufStart)   //we have a block of data at the end of the buffer, move it to the beginning, then read more
         {
+            // this memmove is very expensive. it can be as much as 50% of the operator time,
+            // depending on numCharacters vs _buffersize
             memmove(bufStart, _dataStartPos, _dataSize);
         }
         else
@@ -178,7 +190,10 @@ private:
         }
         char *newDataStart = bufStart + _dataSize;
         size_t remainderSize = _bufferSize - _dataSize;
-        size_t bytesRead = ::fread( newDataStart, 1, remainderSize, _inputFile);
+
+        // note is inefficient to use buffered io (f{open,read} etc) when reading full blocks
+        // it is faster to do ::read() of 4K - 128K at a time (or more).
+        size_t bytesRead = ::fread_unlocked( newDataStart, 1, remainderSize, _inputFile);
         if(bytesRead != remainderSize)
         {
             _endOfFile = true;
