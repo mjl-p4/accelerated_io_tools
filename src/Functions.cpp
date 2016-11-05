@@ -346,7 +346,7 @@ void nth_tdv(const scidb::Value** args, scidb::Value* result, void*)
        }
     }
 
-    assert(src); // loop precondition
+    assert(input); // loop precondition
 
     // search for separator characters, which increase fieldCount
     uint32_t fieldCount = 0;
