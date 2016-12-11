@@ -148,7 +148,14 @@ public:
                 string tok;
                 while(getline(ss, tok, delimiter)) 
                 {
-                    _inputInstances.push_back(lexical_cast<int64_t>(tok));
+                   try
+                   {
+                        _inputInstances.push_back(lexical_cast<int64_t>(tok));
+                   }
+                   catch (bad_lexical_cast const& exn)
+                   {
+                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse instances";
+                   }
                 }
             }
             else if (starts_with(parameterString, headerHeader))
@@ -159,7 +166,14 @@ public:
                 }
                 string paramContent = parameterString.substr(headerHeader.size());
                 boost::algorithm::trim(paramContent);
-                _header = lexical_cast<int64_t>(paramContent);
+                try 
+                {
+                    _header = lexical_cast<int64_t>(paramContent);
+                }
+                catch (bad_lexical_cast const& exn)
+                {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse header";
+                }
                 _headerSet = true;
             }
             else if (starts_with(parameterString, linesPerChunkHeader))  //yeah, yeah it's a long function...

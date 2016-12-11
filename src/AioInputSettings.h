@@ -163,7 +163,14 @@ public:
                 string tok;
                 while(getline(ss, tok, delimiter)) 
                 {
-                    _inputInstances.push_back(lexical_cast<int64_t>(tok));
+                    try
+                    {
+                        _inputInstances.push_back(lexical_cast<int64_t>(tok));
+                    } 
+                    catch (bad_lexical_cast const& exn)
+                    {
+                       throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse instances";
+                    }
                 }
             }
             else if (starts_with(parameterString, headerHeader))
