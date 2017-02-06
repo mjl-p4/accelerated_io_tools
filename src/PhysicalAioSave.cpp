@@ -139,8 +139,11 @@ public:
             {
                 _allocSize = _allocSize * 2;
             }
+            vector<char> buf(_allocSize);
+            memcpy(&(buf[0]), _chunk.getData(), mySize);
             _chunk.allocate(_allocSize);
             _chunkStartPointer = (char*) _chunk.getData();
+            memcpy(_chunkStartPointer, &(buf[0]), mySize);
             _dataStartPointer = _chunkStartPointer + chunkDataOffset();
             _sizePointer = (uint32_t*) (_chunkStartPointer + chunkSizeOffset());
             _writePointer = _chunkStartPointer + mySize;
