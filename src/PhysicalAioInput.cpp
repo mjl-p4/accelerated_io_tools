@@ -32,6 +32,8 @@
 #include <util/Platform.h>
 #include <array/Tile.h>
 #include <array/TileIteratorAdaptors.h>
+#include <array/SinglePassArray.h>
+#include <array/PinBuffer.h>
 #include <system/Sysinfo.h>
 #include <util/Network.h>
 
@@ -520,7 +522,8 @@ public:
         splitData = redistributeToRandomAccess(splitData,
                                                createDistribution(psByCol),
                                                ArrayResPtr(),
-                                               query);
+                                               query,
+                                               getShared());
         size_t const nInstances = query->getInstancesCount();
         vector<Coordinate> lastBlocks(nInstances, -1);
         shared_ptr<Array> supplement = makeSupplement(splitData, query, settings, lastBlocks);
@@ -528,7 +531,8 @@ public:
         supplement = redistributeToRandomAccess(supplement,
                                                 createDistribution(psByCol),
                                                 ArrayResPtr(),
-                                                query);
+                                                query,
+                                                getShared());
         shared_ptr<ConstArrayIterator> inputIterator = splitData->getConstIterator(0);
         shared_ptr<ConstArrayIterator> supplementIter = supplement->getConstIterator(0);
         size_t const outputChunkSize = _schema.getDimensions()[0].getChunkInterval();

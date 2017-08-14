@@ -32,6 +32,7 @@
 #include <util/Platform.h>
 #include <array/Tile.h>
 #include <array/TileIteratorAdaptors.h>
+#include <array/SinglePassArray.h>
 #include <system/Sysinfo.h>
 #include "SplitSettings.h"
 
@@ -339,7 +340,8 @@ public:
         result = redistributeToRandomAccess(result,
                                             createDistribution(psHashPartitioned),
                                             ArrayResPtr(),
-                                            query);
+                                            query,
+                                            getShared());
         return result;
     }
 };

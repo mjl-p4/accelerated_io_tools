@@ -46,6 +46,9 @@
 #include <array/TileIteratorAdaptors.h>
 #include <util/Platform.h>
 #include <util/Network.h>
+#include <array/SinglePassArray.h>
+#include <array/SynchableArray.h>
+#include <array/PinBuffer.h>
 
 #include "UnparseTemplateParser.h"
 
@@ -884,7 +887,8 @@ public:
         outArrayRedist = pullRedistribute(outArray,
                                           createDistribution(psByCol),
                                           ArrayResPtr(),
-                                          query);
+                                          query,
+                                          getShared());
         bool const wasConverted = (outArrayRedist != outArray) ;
         if (thisInstanceSavesData)
         {
