@@ -409,7 +409,8 @@ By default, the file is saved to a path on the query coordinator instance. You c
 * `format=F`: the format string, may be either `tdv` (token-delimited values) or a scidb-style binary format spec like `(int64, double null,...)`. Default is `tdv`.
 * `attributes_delimiter=A`: the character to write between array attributes. Default is a tab. Applies when fomat is set to `tdv`. 
 * `line_delimiter=L`: the character to write between array cells. Default is a newline. Applies when format is set to `tdv`.
-* `cells_per_chunk=C`: the number of array cells to place in a chunk before saving to disk. Default is 1,000,000.
+* `cells_per_chunk=C`: the maximum number of array cells to place in each chunk before saving to disk. By default, binary accounting is used but this can be enabled to force an exact number of cells. See notes on saving data in order below.
+* `buffer_size=B`: the amount of data to pack into a single buffer before transferring and saving to disk. Default is 8 MB. This setting is not honored if `cells_per_chunk` is specified. 
 * `precision=P`: the maximum number of significant figures to use when writing float or double values as text. Defaults to the SciDB 'precision' config. Applies when format is set to `tdv`.
 
 ## Returned array:
@@ -419,15 +420,15 @@ The schema is always `<val:string null> [chunk_no=0:*,1,0, source_instance_id=0:
 Note that the order of the returned data is arbitrary. If the client requires data in specific order, they must:
  0. save from a single instance
  1. add a sort operator
- 2. make sure the sort chunk size (1M default) matches the aio_save cells_per_chunk (also 1M default)
+ 2. enable the `cells_per_chunk` setting and set it to match the sort chunk size (1M default)
  3. add an explicit `_sg` operator between the sort and the save - with round-robin distribution
 
 For example:
 ```
 aio_save(
  _sg(
-  sort(bar, attribute, 100000),
-  1, -1
+  sort(bar, attribute),
+  1
  ),
  '/path/to/file',
  'format=tdv',

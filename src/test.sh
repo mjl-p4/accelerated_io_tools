@@ -281,6 +281,17 @@ echo "test aio_save 1"
 echo "test aio_save 1" >> test.out
 iquery -naq "remove(foo)" > /dev/null 2>&1
 iquery -naq "store(apply(build(<v1:float null>[i=1:50,10,0], iif(i%2=0,null,i)), v2, double(i/10.4), v3, 'abcdef'), foo)" > /dev/null
+iquery -anq "aio_save(sort(foo,v1,v2,v3,25), 'paths=/tmp/load_tools_test/foo;/tmp/load_tools_test/foo2', 'instances=2;0', 'format=tdv', 'buffer_size=150')" >> test.out
+
+echo "create files /tmp/.../{foo,foo2}"
+echo "create files /tmp/.../{foo,foo2}" >> test.out
+iquery -aq "sort(input(foo, '/tmp/load_tools_test/foo',  0, 'tsv'), v2)" >> test.out
+iquery -aq "sort(input(foo, '/tmp/load_tools_test/foo2', 0, 'tsv'), v2)" >> test.out
+
+echo "test aio_save 1A"
+echo "test aio_save 1A" >> test.out
+iquery -naq "remove(foo)" > /dev/null 2>&1
+iquery -naq "store(apply(build(<v1:float null>[i=1:50,10,0], iif(i%2=0,null,i)), v2, double(i/10.4), v3, 'abcdef'), foo)" > /dev/null
 iquery -anq "aio_save(sort(foo,v1,v2,v3,25), 'paths=/tmp/load_tools_test/foo;/tmp/load_tools_test/foo2', 'instances=2;0', 'format=tdv', 'cells_per_chunk=3')" >> test.out
 
 echo "create files /tmp/.../{foo,foo2}"
@@ -288,9 +299,10 @@ echo "create files /tmp/.../{foo,foo2}" >> test.out
 iquery -aq "sort(input(foo, '/tmp/load_tools_test/foo',  0, 'tsv'), v2)" >> test.out
 iquery -aq "sort(input(foo, '/tmp/load_tools_test/foo2', 0, 'tsv'), v2)" >> test.out
 
+
 echo "test aio_save 2"
 echo "test aio_save 2" >> test.out
-iquery -anq "aio_save(foo, '/tmp/load_tools_test/foo', 'format=(float null, double, string)', 'cells_per_chunk=8')" >> test.out
+iquery -anq "aio_save(foo, '/tmp/load_tools_test/foo', 'format=(float null, double, string)', 'buffer_size=512')" >> test.out
 #cat /tmp/load_tools_test/foo >> test.out
 
 echo "test aio_save 3"
