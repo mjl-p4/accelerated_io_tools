@@ -84,17 +84,7 @@ private:
     MemChunk    _chunk;
 
 public:
-    static size_t chunkDataOffset()
-    {
-        return (sizeof(ConstRLEPayload::Header) + 2 * sizeof(ConstRLEPayload::Segment) + sizeof(varpart_offset_t) + 5);
-    }
-
-    static size_t chunkSizeOffset()
-    {
-        return (sizeof(ConstRLEPayload::Header) + 2 * sizeof(ConstRLEPayload::Segment) + sizeof(varpart_offset_t) + 1);
-    }
-
-    static const size_t s_startingSize = 20*1024*1024;
+    static const size_t s_startingSize = 8*1024*1024 + 512;
 
     MemChunkBuilder():
         _allocSize(s_startingSize)
@@ -144,8 +134,8 @@ public:
             _chunk.allocate(_allocSize);
             _chunkStartPointer = (char*) _chunk.getData();
             memcpy(_chunkStartPointer, &(buf[0]), mySize);
-            _dataStartPointer = _chunkStartPointer + chunkDataOffset();
-            _sizePointer = (uint32_t*) (_chunkStartPointer + chunkSizeOffset());
+            _dataStartPointer = _chunkStartPointer + AioSaveSettings::chunkDataOffset();
+            _sizePointer = (uint32_t*) (_chunkStartPointer + AioSaveSettings::chunkSizeOffset());
             _writePointer = _chunkStartPointer + mySize;
             ConstRLEPayload::Header* hdr = (ConstRLEPayload::Header*) _chunkStartPointer;
             _dataSizePointer = &(hdr->_dataSize);
@@ -314,10 +304,10 @@ public:
     ~BinaryChunkPopulator()
     {}
 
-    void populateChunk(MemChunkBuilder& builder, ArrayCursor& cursor, size_t const linesPerChunk)
+    void populateChunk(MemChunkBuilder& builder, ArrayCursor& cursor, size_t const bytesPerChunk, int64_t const cellsPerChunk)
     {
-        size_t nCells = 0;
-        while(nCells < linesPerChunk && !cursor.end())
+        int64_t nCells = 0;
+        while( !cursor.end() && ((cellsPerChunk<=0 && builder.getTotalSize() < bytesPerChunk) || (cellsPerChunk > 0 && nCells < cellsPerChunk)))
         {
             vector <Value const *> const& cell = cursor.getCell();
             for (size_t c = 0, i = 0; c < _nColumns; ++c)
@@ -464,12 +454,13 @@ public:
     ~TextChunkPopulator()
     {}
 
-    void populateChunk(MemChunkBuilder& builder, ArrayCursor& cursor, size_t const linesPerChunk)
+    void populateChunk(MemChunkBuilder& builder, ArrayCursor& cursor, size_t const bytesPerChunk, int64_t const cellsPerChunk)
     {
-        size_t nCells = 0;
+        int64_t nCells = 0;
         ostringstream outputBuf;
         outputBuf.precision(_settings.getPrecision());
-        while(nCells < linesPerChunk && !cursor.end())
+        size_t bufferSize = AioSaveSettings::chunkDataOffset();
+        while( !cursor.end() && ( (cellsPerChunk<=0 && bufferSize < bytesPerChunk) ||  (cellsPerChunk > 0 && nCells < cellsPerChunk) ))
         {
             if(_printCoords)
             {
@@ -582,6 +573,7 @@ public:
             }
             outputBuf<<_lineDelim;
             cursor.advance();
+            bufferSize =   AioSaveSettings::chunkDataOffset() + outputBuf.tellp() + 1;
             ++nCells;
         }
         string s = outputBuf.str();
@@ -599,7 +591,8 @@ private:
     ArrayCursor                              _inputCursor;
     MemChunkBuilder                          _chunkBuilder;
     weak_ptr<Query>                          _query;
-    size_t const                             _linesPerChunk;
+    size_t const                             _bytesPerChunk;
+    int64_t const                            _cellsPerChunk;
     ChunkPopulator                           _populator;
     map<InstanceID, string> const&           _instanceMap;
     map<InstanceID, string>::const_iterator  _mapIter;
@@ -614,7 +607,8 @@ public:
         _chunkAddress(0, Coordinates(3,0)),
         _inputCursor(inputArray),
         _query(query),
-        _linesPerChunk(settings.getLinesPerChunk()),
+        _bytesPerChunk(settings.getBufferSize()),
+        _cellsPerChunk(settings.getCellsPerChunk()),
         _populator(inputArray->getArrayDesc(), settings),
         _instanceMap(settings.getInstanceMap()),
         _mapIter(_instanceMap.begin())
@@ -647,7 +641,7 @@ public:
             return false;
         }
         _chunkBuilder.reset();
-        _populator.populateChunk(_chunkBuilder, _inputCursor, _linesPerChunk);
+        _populator.populateChunk(_chunkBuilder, _inputCursor, _bytesPerChunk, _cellsPerChunk);
         ++_rowIndex;
         return true;
     }
@@ -750,10 +744,10 @@ uint64_t saveToDisk(shared_ptr<Array> const& array,
         {
             ConstChunk const& ch = arrayIter->getChunk();
             PinBuffer scope(ch);
-            uint32_t* sizePointer = (uint32_t*) (((char*)ch.getData()) + MemChunkBuilder::chunkSizeOffset());
+            uint32_t* sizePointer = (uint32_t*) (((char*)ch.getData()) + AioSaveSettings::chunkSizeOffset());
             uint32_t size = *sizePointer;
             bytesWritten += size;
-            char* data = ((char*)ch.getData() + MemChunkBuilder::chunkDataOffset());
+            char* data = ((char*)ch.getData() + AioSaveSettings::chunkDataOffset());
             if (::fwrite(data, 1, size, f) != size)
             {
                 int err = errno ? errno : EIO;

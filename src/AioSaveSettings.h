@@ -42,7 +42,20 @@ namespace scidb
 
 class AioSaveSettings
 {
+public:
+    static size_t chunkDataOffset()
+    {
+        return (sizeof(ConstRLEPayload::Header) + 2 * sizeof(ConstRLEPayload::Segment) + sizeof(varpart_offset_t) + 5);
+    }
+
+    static size_t chunkSizeOffset()
+    {
+        return (sizeof(ConstRLEPayload::Header) + 2 * sizeof(ConstRLEPayload::Segment) + sizeof(varpart_offset_t) + 1);
+    }
+
+
 private:
+    size_t                      _bufferSize;
     int64_t                     _cellsPerChunk;
     char                        _attributeDelimiter;
     char                        _lineDelimiter;
@@ -64,7 +77,8 @@ public:
     AioSaveSettings(vector<shared_ptr<OperatorParam> > const& operatorParameters,
                     bool logical,
                     shared_ptr<Query>& query):
-                _cellsPerChunk(1000000),
+                _bufferSize(8 * 1024 * 1024),
+                _cellsPerChunk(-1),
                 _attributeDelimiter('\t'),
                 _lineDelimiter('\n'),
                 _numInstances(query->getInstancesCount()),
@@ -78,6 +92,7 @@ public:
                 _writeHeader(false),
                 _precision(std::numeric_limits<double>::digits10)
     {
+        string const bufferSizeHeader              = "buffer_size=";
         string const cellsPerChunkHeader           = "cells_per_chunk=";
         string const attributeDelimiterHeader      = "attribute_delimiter=";
         string const lineDelimiterHeader           = "line_delimiter=";
@@ -90,6 +105,7 @@ public:
         string const precisionHeader               = "precision=";
         size_t const nParams = operatorParameters.size();
         bool  cellsPerChunkSet      = false;
+        bool  bufferSizeSet         = false;
         bool  attributeDelimiterSet = false;
         bool  lineDelimiterSet      = false;
         bool  formatSet             = false;
@@ -129,7 +145,7 @@ public:
                 try
                 {
                     _cellsPerChunk = lexical_cast<int64_t>(paramContent);
-                    if(_cellsPerChunk<=0)
+                    if(_cellsPerChunk <= 0)
                     {
                         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "cells_per_chunk must be positive";
                     }
@@ -137,6 +153,30 @@ public:
                 catch (bad_lexical_cast const& exn)
                 {
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse cells_per_chunk";
+                }
+            }
+            else if (starts_with(parameterString, bufferSizeHeader))
+            {
+                if (bufferSizeSet)
+                {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set buffer_size multiple times";
+                }
+                string paramContent = parameterString.substr(bufferSizeHeader.size());
+                trim(paramContent);
+                try
+                {
+                    _bufferSize = lexical_cast<size_t>(paramContent);
+                    size_t const bufferSizeLimit = chunkDataOffset() + 8;
+                    if(_bufferSize <= bufferSizeLimit)
+                    {
+                        ostringstream err;
+                        err << "buffer_size must be above " << bufferSizeLimit;
+                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << err.str();
+                    }
+                }
+                catch (bad_lexical_cast const& exn)
+                {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse buffer_size";
                 }
             }             //some day I'll make this function smaller, I swear!
             else if (starts_with(parameterString, attributeDelimiterHeader))
@@ -433,9 +473,14 @@ public:
         }
     }
 
-    size_t getLinesPerChunk() const
+    int64_t getCellsPerChunk() const
     {
         return _cellsPerChunk;
+    }
+
+    size_t getBufferSize() const
+    {
+        return _bufferSize;
     }
 
     char getAttributeDelimiter() const
