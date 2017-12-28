@@ -53,7 +53,7 @@ public:
     {
         SplitSettings settings (_parameters, true, query); //construct and check to ensure settings are legit
         vector<AttributeDesc> attributes(1);
-        attributes[0] = AttributeDesc((AttributeID)0, "value",  TID_STRING, 0, 0);
+        attributes[0] = AttributeDesc((AttributeID)0, "value",  TID_STRING, 0, CompressorType::NONE);
         vector<DimensionDesc> dimensions(2);
 
         dimensions[0] = DimensionDesc("source_instance_id", 0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);

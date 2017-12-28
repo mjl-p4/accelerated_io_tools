@@ -41,7 +41,7 @@
 #include <query/TypeSystem.h>
 #include <query/FunctionLibrary.h>
 #include <query/Operator.h>
-#include <array/DBArray.h>
+//#include <array/DBArray.h>
 #include <array/Tile.h>
 #include <array/TileIteratorAdaptors.h>
 #include <util/Platform.h>
@@ -666,7 +666,7 @@ public:
         }
         shared_ptr<Query> query = Query::getValidQueryPtr(_query);
         MemChunk& ch = _chunkBuilder.getChunk();
-        ch.initialize(this, &super::getArrayDesc(), _chunkAddress, 0);
+        ch.initialize(this, &super::getArrayDesc(), _chunkAddress, CompressorType::NONE);
         return ch;
     }
 };

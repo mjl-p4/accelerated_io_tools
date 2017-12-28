@@ -220,7 +220,7 @@ public:
         }
         _chunkAddress.coords[0] = _chunkNo;
         shared_ptr<Query> query = Query::getValidQueryPtr(_query);
-        _chunk.initialize(this, &super::getArrayDesc(), _chunkAddress, 0);
+        _chunk.initialize(this, &super::getArrayDesc(), _chunkAddress, CompressorType::NONE);
         return _chunk;
     }
 };
@@ -398,7 +398,7 @@ public:
         dimensions[1] = DimensionDesc("dst_instance_id",    0, 0, nInstances-1, nInstances-1, 1, 0);
         dimensions[2] = DimensionDesc("src_instance_id",    0, 0, nInstances-1, nInstances-1, 1, 0);
         vector<AttributeDesc> attributes;
-        attributes.push_back(AttributeDesc((AttributeID)0, "value",  TID_BINARY, 0, 0));
+        attributes.push_back(AttributeDesc((AttributeID)0, "value",  TID_BINARY, 0, CompressorType::NONE));
         return ArrayDesc("aio_input", attributes, dimensions, defaultPartitioning(), query->getDefaultArrayResidency());
     }
 
