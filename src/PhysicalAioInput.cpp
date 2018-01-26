@@ -32,6 +32,8 @@
 #include <util/Platform.h>
 #include <array/Tile.h>
 #include <array/TileIteratorAdaptors.h>
+#include <array/SinglePassArray.h>
+#include <array/PinBuffer.h>
 #include <system/Sysinfo.h>
 #include <util/Network.h>
 
@@ -218,7 +220,7 @@ public:
         }
         _chunkAddress.coords[0] = _chunkNo;
         shared_ptr<Query> query = Query::getValidQueryPtr(_query);
-        _chunk.initialize(this, &super::getArrayDesc(), _chunkAddress, 0);
+        _chunk.initialize(this, &super::getArrayDesc(), _chunkAddress, CompressorType::NONE);
         return _chunk;
     }
 };
@@ -396,7 +398,7 @@ public:
         dimensions[1] = DimensionDesc("dst_instance_id",    0, 0, nInstances-1, nInstances-1, 1, 0);
         dimensions[2] = DimensionDesc("src_instance_id",    0, 0, nInstances-1, nInstances-1, 1, 0);
         vector<AttributeDesc> attributes;
-        attributes.push_back(AttributeDesc((AttributeID)0, "value",  TID_BINARY, 0, 0));
+        attributes.push_back(AttributeDesc((AttributeID)0, "value",  TID_BINARY, 0, CompressorType::NONE));
         return ArrayDesc("aio_input", attributes, dimensions, defaultPartitioning(), query->getDefaultArrayResidency());
     }
 
@@ -520,7 +522,8 @@ public:
         splitData = redistributeToRandomAccess(splitData,
                                                createDistribution(psByCol),
                                                ArrayResPtr(),
-                                               query);
+                                               query,
+                                               getShared());
         size_t const nInstances = query->getInstancesCount();
         vector<Coordinate> lastBlocks(nInstances, -1);
         shared_ptr<Array> supplement = makeSupplement(splitData, query, settings, lastBlocks);
@@ -528,7 +531,8 @@ public:
         supplement = redistributeToRandomAccess(supplement,
                                                 createDistribution(psByCol),
                                                 ArrayResPtr(),
-                                                query);
+                                                query,
+                                                getShared());
         shared_ptr<ConstArrayIterator> inputIterator = splitData->getConstIterator(0);
         shared_ptr<ConstArrayIterator> supplementIter = supplement->getConstIterator(0);
         size_t const outputChunkSize = _schema.getDimensions()[0].getChunkInterval();

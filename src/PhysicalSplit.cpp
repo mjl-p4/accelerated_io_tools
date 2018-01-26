@@ -32,6 +32,7 @@
 #include <util/Platform.h>
 #include <array/Tile.h>
 #include <array/TileIteratorAdaptors.h>
+#include <array/SinglePassArray.h>
 #include <system/Sysinfo.h>
 #include "SplitSettings.h"
 
@@ -291,7 +292,7 @@ public:
     {
         _chunkAddress.coords[1] = _rowIndex  -1;
         shared_ptr<Query> query = Query::getValidQueryPtr(_query);
-        _chunk.initialize(this, &super::getArrayDesc(), _chunkAddress, 0);
+        _chunk.initialize(this, &super::getArrayDesc(), _chunkAddress, CompressorType::NONE);
         shared_ptr<ChunkIterator> chunkIt = _chunk.getIterator(query, ChunkIterator::SEQUENTIAL_WRITE | ChunkIterator::NO_EMPTY_CHECK);
         Value v;
         if(_buffer[_bufferSize-1] == _delimiter) //add the null-termination character; replace the last delimiter character if one is present
@@ -339,7 +340,8 @@ public:
         result = redistributeToRandomAccess(result,
                                             createDistribution(psHashPartitioned),
                                             ArrayResPtr(),
-                                            query);
+                                            query,
+                                            getShared());
         return result;
     }
 };
