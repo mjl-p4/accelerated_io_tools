@@ -26,9 +26,12 @@ endif
 CFLAGS=-W -Wextra -Wall -Wno-unused-parameter -Wno-variadic-macros -Wno-strict-aliasing -Wno-long-long -Wno-unused -fPIC -D_STDC_FORMAT_MACROS -Wno-system-headers -O3 -g -DNDEBUG -D_STDC_LIMIT_MACROS -fno-omit-frame-pointer -std=c++14 -DCPP11
 
 INC=-I. -DPROJECT_ROOT="\"$(SCIDB)\"" -I"$(SCIDB_THIRDPARTY_PREFIX)/3rdparty/boost/include/" -I"$(SCIDB)/include"
-LIBS=-shared -Wl,-soname,libaccelerated_io_tools.so -L. -L"$(SCIDB_THIRDPARTY_PREFIX)/3rdparty/boost/lib" -L"$(SCIDB)/lib" -Wl,-rpath,$(SCIDB)/lib:$(RPATH) -lm
+LIBS=-shared -Wl,-soname,libaccelerated_io_tools.so -L. -L"$(SCIDB_THIRDPARTY_PREFIX)/3rdparty/boost/lib" -L"$(SCIDB)/lib" -Wl,-rpath,$(SCIDB)/lib -lm
 
-SRCS=plugin.cpp LogicalSplit.cpp PhysicalSplit.cpp LogicalParse.cpp PhysicalParse.cpp Functions.cpp LogicalAioInput.cpp PhysicalAioInput.cpp LogicalAioSave.cpp PhysicalAioSave.cpp
+SRCS=plugin.cpp LogicalSplit.cpp PhysicalSplit.cpp LogicalParse.cpp PhysicalParse.cpp LogicalAioInput.cpp PhysicalAioInput.cpp LogicalAioSave.cpp PhysicalAioSave.cpp Functions.cpp
+HEADERS=plugin.h AioInputSettings.h AioSaveSettings.h ParseSettings.h SplitSettings.h UnparseTemplateParser.h
+OBJS=$(SRCS:%.cpp=%.o)
+
 
 # Compiler settings for SciDB version >= 15.7
 ifneq ("$(wildcard /usr/bin/g++-4.9)","")
@@ -41,15 +44,23 @@ else
   endif
 endif
 
-all:
+
+all: libaccelerated_io_tools.so
+
+%.o: %.cpp $(HEADERS)
+	$(CXX) $(CFLAGS) $(INC) -c $< -o $@
+
+libaccelerated_io_tools.so: $(OBJS)
 	@if test ! -d "$(SCIDB)"; then echo  "Error. Try:\n\nmake SCIDB=<PATH TO SCIDB INSTALL PATH>"; exit 1; fi
-	$(CXX) $(CFLAGS) $(INC) -o libaccelerated_io_tools.so $(SRCS) $(LIBS)
+	$(CXX) $(CFLAGS) $(INC) -o libaccelerated_io_tools.so $(OBJS) $(LIBS)
 	@echo "Now copy *.so to your SciDB lib/scidb/plugins directory and run"
 	@echo "iquery -aq \"load_library('accelerated_io_tools')\" # to load the plugin."
 	@echo
 	@echo "Re-start SciDB if the plugin was already loaded previously."
 	@echo "Remember to copy the plugin to all your nodes in the cluster."
+
 test:
 	./test.sh
+
 clean:
 	rm -f *.so *.o
