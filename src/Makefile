@@ -1,4 +1,4 @@
-ifeq ($(SCIDB),) 
+ifeq ($(SCIDB),)
   X := $(shell which scidb 2>/dev/null)
   ifneq ($(X),)
     X := $(shell dirname ${X})
@@ -30,7 +30,7 @@ LIBS=-shared -Wl,-soname,libaccelerated_io_tools.so -L. -L"$(SCIDB_THIRDPARTY_PR
 SRCS=plugin.cpp LogicalSplit.cpp PhysicalSplit.cpp LogicalParse.cpp PhysicalParse.cpp Functions.cpp
 # Compiler settings for SciDB version >= 15.7
 ifneq ("$(wildcard /usr/bin/g++-4.9)","")
-  CC := "/usr/bin/gcc-4.9"a
+  CC := "/usr/bin/gcc-4.9"
   CXX := "/usr/bin/g++-4.9"
   CFLAGS+=-std=c++14 -DCPP11
   SRCS+=LogicalAioInput.cpp PhysicalAioInput.cpp LogicalAioSave.cpp PhysicalAioSave.cpp
