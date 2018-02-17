@@ -1,4 +1,4 @@
-ifeq ($(SCIDB),)
+ifeq ($(SCIDB),) 
   X := $(shell which scidb 2>/dev/null)
   ifneq ($(X),)
     X := $(shell dirname ${X})
@@ -9,9 +9,9 @@ endif
 # A way to set the 3rdparty prefix path that is convenient
 # for SciDB developers.
 ifeq ($(SCIDB_VER),)
-  SCIDB_3RDPARTY := $(SCIDB)
+  SCIDB_3RDPARTY = $(SCIDB)
 else
-  SCIDB_3RDPARTY := /opt/scidb/$(SCIDB_VER)
+  SCIDB_3RDPARTY = /opt/scidb/$(SCIDB_VER)
 endif
 
 # A better way to set the 3rdparty prefix path that does
@@ -22,41 +22,38 @@ ifeq ($(SCIDB_THIRDPARTY_PREFIX),)
 endif
 
 # Debug:
-#CFLAGS := -pedantic -W -Wextra -Wall -Wno-variadic-macros -Wno-strict-aliasing -Wno-long-long -Wno-unused-parameter -fPIC -D_STDC_FORMAT_MACROS -Wno-system-headers -g -ggdb3  -D_STDC_LIMIT_MACROS
-CFLAGS  :=  -W -Wextra -Wall -Wno-unused-parameter -Wno-variadic-macros -Wno-strict-aliasing -Wno-long-long -Wno-unused -fPIC -D_STDC_FORMAT_MACROS -Wno-system-headers -O3 -g -DNDEBUG -D_STDC_LIMIT_MACROS -fno-omit-frame-pointer -std=c++14 -DCPP11
+#CFLAGS=-pedantic -W -Wextra -Wall -Wno-variadic-macros -Wno-strict-aliasing -Wno-long-long -Wno-unused-parameter -fPIC -D_STDC_FORMAT_MACROS -Wno-system-headers -g -ggdb3  -D_STDC_LIMIT_MACROS
+CFLAGS=-W -Wextra -Wall -Wno-unused-parameter -Wno-variadic-macros -Wno-strict-aliasing -Wno-long-long -Wno-unused -fPIC -D_STDC_FORMAT_MACROS -Wno-system-headers -O3 -g -DNDEBUG -D_STDC_LIMIT_MACROS -fno-omit-frame-pointer
+INC=-I. -DPROJECT_ROOT="\"$(SCIDB)\"" -I"$(SCIDB_THIRDPARTY_PREFIX)/3rdparty/boost/include/" -I"$(SCIDB)/include"
+LIBS=-shared -Wl,-soname,libaccelerated_io_tools.so -L. -L"$(SCIDB_THIRDPARTY_PREFIX)/3rdparty/boost/lib" -L"$(SCIDB)/lib" -Wl,-rpath,$(SCIDB)/lib:$(RPATH) -lm
 
-INC     := -I. -DPROJECT_ROOT="\"$(SCIDB)\"" -I"$(SCIDB_THIRDPARTY_PREFIX)/3rdparty/boost/include/" -I"$(SCIDB)/include"
-LIBS    := -shared -Wl,-soname,libaccelerated_io_tools.so -L. -L"$(SCIDB_THIRDPARTY_PREFIX)/3rdparty/boost/lib" -L"$(SCIDB)/lib" -Wl,-rpath,"$(SCIDB)/lib":"$(RPATH)" -lm
-
-SRCS    := LogicalSplit.cpp PhysicalSplit.cpp LogicalParse.cpp PhysicalParse.cpp Functions.cpp LogicalAioInput.cpp PhysicalAioInput.cpp LogicalAioSave.cpp PhysicalAioSave.cpp plugin.cpp
-OBJS    := $(SRCS:%.cpp=%.o)
-HEADERS := AioInputSettings.h AioSaveSettings.h ParseSettings.h SplitSettings.h UnparseTemplateParser.h plugin.h
-
+SRCS=plugin.cpp LogicalSplit.cpp PhysicalSplit.cpp LogicalParse.cpp PhysicalParse.cpp Functions.cpp
 # Compiler settings for SciDB version >= 15.7
 ifneq ("$(wildcard /usr/bin/g++-4.9)","")
-  CC  := "/usr/bin/gcc-4.9"
+  CC := "/usr/bin/gcc-4.9"a
   CXX := "/usr/bin/g++-4.9"
+  CFLAGS+=-std=c++14 -DCPP11
+  SRCS+=LogicalAioInput.cpp PhysicalAioInput.cpp LogicalAioSave.cpp PhysicalAioSave.cpp
 else
   ifneq ("$(wildcard /opt/rh/devtoolset-3/root/usr/bin/gcc)","")
-   CC  := "/opt/rh/devtoolset-3/root/usr/bin/gcc"
+   CC := "/opt/rh/devtoolset-3/root/usr/bin/gcc"
    CXX := "/opt/rh/devtoolset-3/root/usr/bin/g++"
+   CFLAGS+=-std=c++14 -DCPP11
+   SRCS+=LogicalAioInput.cpp PhysicalAioInput.cpp LogicalAioSave.cpp PhysicalAioSave.cpp
   endif
 endif
 
+#$(CXX) $(CFLAGS) $(INC) -o libmultisplit.so plugin.cpp LogicalSplit.cpp PhysicalSplit.cpp Functions.cpp $(LIBS)
 
-all: libaccelerated_io_tools.so
-
-%.o: %.cpp $(HEADERS)
-	$(CXX) $(CFLAGS) $(INC) -c $< -o $@
-
-libaccelerated_io_tools.so: $(OBJS)
+all:
 	@if test ! -d "$(SCIDB)"; then echo  "Error. Try:\n\nmake SCIDB=<PATH TO SCIDB INSTALL PATH>"; exit 1; fi
-	$(CXX) $(CFLAGS) $(INC) -o libaccelerated_io_tools.so $(OBJS) $(LIBS)
+	$(CXX) $(CFLAGS) $(INC) -o libaccelerated_io_tools.so $(SRCS) $(LIBS)
 	@echo "Now copy *.so to your SciDB lib/scidb/plugins directory and run"
 	@echo "iquery -aq \"load_library('accelerated_io_tools')\" # to load the plugin."
 	@echo
 	@echo "Re-start SciDB if the plugin was already loaded previously."
 	@echo "Remember to copy the plugin to all your nodes in the cluster."
-
+test:
+	./test.sh
 clean:
 	rm -f *.so *.o
