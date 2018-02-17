@@ -1,0 +1,30 @@
+sudo: required
+
+language: python
+
+python:
+  - "3.6"
+
+env: SCIDB_VER=18.1 SCIDB_IMG=18.1
+
+services:
+  - docker
+
+before_install:
+  - docker pull rvernica/scidb:${SCIDB_IMG}
+  - docker run
+    --name scidb
+    --detach
+    --publish 8080:8080
+    --volume `pwd`:/accelerated_io_tools
+    rvernica/scidb:${SCIDB_IMG}
+  - while ! curl http://localhost:8080/version; do sleep 5; done
+
+install:
+  - docker exec --tty scidb /accelerated_io_tools/tests/docker-install.sh
+
+script:
+  - docker exec --tty scidb /accelerated_io_tools/tests/test.sh
+
+after_failure:
+  - docker logs scidb

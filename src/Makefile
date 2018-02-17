@@ -53,7 +53,5 @@ all:
 	@echo
 	@echo "Re-start SciDB if the plugin was already loaded previously."
 	@echo "Remember to copy the plugin to all your nodes in the cluster."
-test:
-	./test.sh
 clean:
 	rm -f *.so *.o
