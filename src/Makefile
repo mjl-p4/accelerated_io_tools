@@ -45,10 +45,10 @@ else
 endif
 
 
-all: libaccelerated_io_tools.so
-
 %.o: %.cpp $(HEADERS)
 	$(CXX) $(CFLAGS) $(INC) -c $< -o $@
+
+all: libaccelerated_io_tools.so
 
 libaccelerated_io_tools.so: $(OBJS)
 	@if test ! -d "$(SCIDB)"; then echo  "Error. Try:\n\nmake SCIDB=<PATH TO SCIDB INSTALL PATH>"; exit 1; fi
