@@ -45,7 +45,7 @@ else
 endif
 
 
-%.o: %.cpp $(HEADERS)
+%.o: %.cpp
 	$(CXX) $(CFLAGS) $(INC) -c $< -o $@
 
 all: libaccelerated_io_tools.so
