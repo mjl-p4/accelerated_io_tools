@@ -4,9 +4,24 @@ set -o errexit
 
 
 # Install prerequisites
+## https://github.com/red-data-tools/packages.red-data-tools.org#ubuntu
+## No packages for Debian jessie, use Ubuntu trusty
+cat <<APT_LINE | tee /etc/apt/sources.list.d/red-data-tools.list
+deb https://packages.red-data-tools.org/ubuntu/ trusty universe
+APT_LINE
+
+apt-get update
+apt-get install --assume-yes --no-install-recommends --allow-unauthenticated \
+        red-data-tools-keyring
 apt-get update
 apt-get install --assume-yes --no-install-recommends \
+        libarrow-dev=$ARROW_VER                      \
+        libarrow0=$ARROW_VER                         \
         libpqxx-dev
+
+wget --no-verbose https://bootstrap.pypa.io/get-pip.py
+python get-pip.py
+pip install pandas pyarrow
 
 
 # Reset SciDB instance count to 4

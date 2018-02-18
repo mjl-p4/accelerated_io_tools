@@ -5,7 +5,7 @@ language: python
 python:
   - "3.6"
 
-env: SCIDB_VER=18.1 SCIDB_IMG=18.1
+env: SCIDB_VER=18.1 SCIDB_IMG=18.1 ARROW_VER=0.8.0-2
 
 services:
   - docker
@@ -17,6 +17,7 @@ before_install:
     --detach
     --publish 8080:8080
     --volume `pwd`:/accelerated_io_tools
+    --env ARROW_VER=${ARROW_VER}
     rvernica/scidb:${SCIDB_IMG}
   - while ! curl http://localhost:8080/version; do sleep 5; done
 
@@ -25,6 +26,7 @@ install:
 
 script:
   - docker exec --tty scidb /accelerated_io_tools/tests/test.sh
+  - docker exec --tty scidb /accelerated_io_tools/tests/test_arrow.sh
 
 after_failure:
   - docker logs scidb

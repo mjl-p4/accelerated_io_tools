@@ -34,6 +34,14 @@
 #include <system/SystemCatalog.h>
 #include <system/Sysinfo.h>
 
+#include <arrow/buffer.h>
+#include <arrow/builder.h>
+#include <arrow/io/memory.h>
+#include <arrow/ipc/writer.h>
+#include <arrow/memory_pool.h>
+#include <arrow/record_batch.h>
+#include <arrow/type.h>
+
 #include <query/TypeSystem.h>
 #include <query/FunctionDescription.h>
 #include <query/FunctionLibrary.h>
@@ -382,22 +390,113 @@ public:
 
 class ArrowChunkPopulator
 {
+
+private:
+    Attributes const&                             _inputAttrs;
+    std::vector<TypeEnum>                         _inputTypes;
+    std::vector<std::shared_ptr<arrow::DataType>> _arrowTypes;
+    std::shared_ptr<arrow::Schema>                _arrowSchema;
+
 public:
     ArrowChunkPopulator(ArrayDesc const& inputArrayDesc,
-                        AioSaveSettings const& settings)
-    {}
+                        AioSaveSettings const& settings):
+	_inputAttrs(inputArrayDesc.getAttributes(true))
+    {
+        size_t noAttrs = _inputAttrs.size();
+
+	_inputTypes.resize(noAttrs);
+	_arrowTypes.resize(noAttrs);
+
+        std::vector<std::shared_ptr<arrow::Field>> arrowFields(noAttrs);
+	for(size_t i = 0; i < noAttrs; ++i) {
+	    auto inputType = _inputAttrs[i].getType();
+	    auto inputTypeEnum = typeId2TypeEnum(inputType, true);
+
+	    _inputTypes[i] = inputTypeEnum;
+
+	    switch (inputTypeEnum)
+	    {
+	    case TE_INT64:
+		_arrowTypes[i] = arrow::int64();
+		break;
+	    default:
+              ostringstream error;
+              error << "Type " << inputType << " not supported in arrow format";
+              throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION) << error.str();
+	    }
+
+	    arrowFields[i] = arrow::field(_inputAttrs[i].getName(), _arrowTypes[i]);
+	}
+        _arrowSchema = arrow::schema(arrowFields);
+    }
 
     ~ArrowChunkPopulator()
     {}
 
     void populateChunk(MemChunkBuilder& builder, ArrayCursor& cursor, size_t const bytesPerChunk, int16_t const cellsPerChunk)
     {
-        int64_t nCells = 0;
-        while( !cursor.end() && ((cellsPerChunk<=0 && builder.getTotalSize() < bytesPerChunk) || (cellsPerChunk > 0 && nCells < cellsPerChunk)))
+        size_t noAttrs = _inputTypes.size();
+        arrow::MemoryPool* arrowPool = arrow::default_memory_pool();
+
+        std::vector<std::unique_ptr<arrow::ArrayBuilder>> arrowBuilders(noAttrs);
+        std::vector<std::shared_ptr<arrow::Array>> arrowArrays(noAttrs);
+        for (size_t i = 0; i < noAttrs; ++i)
         {
+           arrow::MakeBuilder(arrowPool, _arrowTypes[i], &arrowBuilders[i]);
+        }
+
+        int64_t nCells = 0;
+        while (!cursor.end() && ((cellsPerChunk<=0 && builder.getTotalSize() < bytesPerChunk) || (cellsPerChunk > 0 && nCells < cellsPerChunk)))
+        {
+            vector<Value const*> const& cell = cursor.getCell();
+            for (size_t i = 0; i < cursor.nAttrs(); ++i)
+            {
+                Value const* value = cell[i];
+		switch (_inputTypes[i])
+		{
+		case TE_INT64:
+		     if(value->isNull())
+		     {
+			  static_cast<arrow::Int64Builder*>(
+			       arrowBuilders[i].get())->AppendNull();
+		     }
+		     else
+		     {
+			  static_cast<arrow::Int64Builder*>(
+			       arrowBuilders[i].get())->Append(value->getInt64());
+		     }
+		     break;
+		default:
+		     ostringstream error;
+		     error << "Type " << _inputAttrs[i].getType() << " not supported in arrow format";
+		     throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION) << error.str();
+		}
+            }
             cursor.advance();
             ++nCells;
         }
+
+	for (size_t i = 0; i < noAttrs; ++i) {
+	    arrowBuilders[i]->Finish(&arrowArrays[i]);
+	}
+
+        std::shared_ptr<arrow::RecordBatch> arrowBatch;
+        arrowBatch = arrow::RecordBatch::Make(_arrowSchema, nCells, arrowArrays);
+
+        std::shared_ptr<arrow::PoolBuffer> arrowBuffer;
+        std::unique_ptr<arrow::io::BufferOutputStream> arrowStream;
+        std::shared_ptr<arrow::ipc::RecordBatchWriter> arrowWriter;
+
+        arrowBuffer.reset(new arrow::PoolBuffer(arrowPool));
+        arrowStream.reset(new arrow::io::BufferOutputStream(arrowBuffer));
+        arrow::ipc::RecordBatchStreamWriter::Open(
+	     arrowStream.get(), _arrowSchema, &arrowWriter);
+        arrowWriter->WriteRecordBatch(*arrowBatch);
+        arrowWriter->Close();
+        arrowStream->Close();
+
+        builder.addData(reinterpret_cast<const char*>(arrowBuffer->data()),
+			arrowBuffer->size());
     }
 };
 
