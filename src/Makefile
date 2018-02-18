@@ -29,7 +29,7 @@ INC=-I. -DPROJECT_ROOT="\"$(SCIDB)\"" -I"$(SCIDB_THIRDPARTY_PREFIX)/3rdparty/boo
 LIBS=-shared -Wl,-soname,libaccelerated_io_tools.so -L. -L"$(SCIDB_THIRDPARTY_PREFIX)/3rdparty/boost/lib" -L"$(SCIDB)/lib" -Wl,-rpath,$(SCIDB)/lib -lm
 
 SRCS=plugin.cpp LogicalSplit.cpp PhysicalSplit.cpp LogicalParse.cpp PhysicalParse.cpp LogicalAioInput.cpp PhysicalAioInput.cpp LogicalAioSave.cpp PhysicalAioSave.cpp Functions.cpp
-HEADERS=plugin.h AioInputSettings.h AioSaveSettings.h ParseSettings.h SplitSettings.h UnparseTemplateParser.h
+HEADERS=AioInputSettings.h AioSaveSettings.h ParseSettings.h SplitSettings.h UnparseTemplateParser.h
 OBJS=$(SRCS:%.cpp=%.o)
 
 
@@ -45,7 +45,7 @@ else
 endif
 
 
-%.o: plugin.h AioInputSettings.h AioSaveSettings.h ParseSettings.h SplitSettings.h UnparseTemplateParser.h %.cpp
+%.o: %.cpp $(HEADERS)
 	$(CXX) $(CFLAGS) $(INC) -c $< -o $@
 
 all: libaccelerated_io_tools.so
