@@ -45,7 +45,7 @@ else
 endif
 
 
-%.o: %.cpp
+%.o: %.cpp plugin.h AioInputSettings.h AioSaveSettings.h ParseSettings.h SplitSettings.h UnparseTemplateParser.h
 	$(CXX) $(CFLAGS) $(INC) -c $< -o $@
 
 all: libaccelerated_io_tools.so
