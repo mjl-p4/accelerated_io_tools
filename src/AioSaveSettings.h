@@ -276,7 +276,7 @@ public:
                         usingCsvPlus = true;
                     }
                 }
-                if(paramContent == "arrow")
+                else if(paramContent == "arrow")
                 {
                     _format = ARROW;
                 }
