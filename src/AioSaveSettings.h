@@ -55,13 +55,20 @@ public:
 
 
 private:
+    enum FormatType
+    {
+        TEXT   = 0,
+        BINARY = 1,
+        ARROW  = 2
+    };
+
     size_t                      _bufferSize;
     int64_t                     _cellsPerChunk;
     char                        _attributeDelimiter;
     char                        _lineDelimiter;
     map<InstanceID, string>     _instancesAndPaths;
     size_t const                _numInstances;
-    bool                        _binaryFormat;
+    FormatType                  _format;
     string                      _binaryFormatString;
     string                      _nullPrefix;
     bool                        _printNullCode;
@@ -82,7 +89,7 @@ public:
                 _attributeDelimiter('\t'),
                 _lineDelimiter('\n'),
                 _numInstances(query->getInstancesCount()),
-                _binaryFormat(false),
+                _format(TEXT),
                 _binaryFormatString(""),
                 _nullPrefix("\\N"),
                 _printNullCode(false),
@@ -263,18 +270,22 @@ public:
                 trim(paramContent);
                 if(paramContent == "tdv" || paramContent == "tsv" || paramContent == "csv+" || paramContent == "lcsv+")
                 {
-                    _binaryFormat = false;
+                    _format = TEXT;
                     if(paramContent == "csv+" || paramContent == "lcsv+")
                     {
                         usingCsvPlus = true;
                     }
                 }
+                if(paramContent == "arrow")
+                {
+                    _format = ARROW;
+                }
                 else
                 {
-                    _binaryFormat = true;
+                    _format = BINARY;
                     if(paramContent[0]!='(' || paramContent[paramContent.size()-1] != ')')
                     {
-                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "format must be either 'tdv', 'tsv', 'csv+' or a binary spec such as '(int64,double,string null)'";
+                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "format must be either 'tdv', 'tsv', 'csv+', 'arrow', or a binary spec such as '(int64,double,string null)'";
                     }
                     _binaryFormatString = paramContent;
                 }
@@ -458,7 +469,7 @@ public:
             InstanceID logId = query->mapPhysicalToLogical(iid);
             _instancesAndPaths[logId] = filePaths[i];
         }
-        if((_binaryFormat || usingCsvPlus) && (lineDelimiterSet || attributeDelimiterSet || nullPatternSet))
+        if((_format == BINARY || usingCsvPlus) && (lineDelimiterSet || attributeDelimiterSet || nullPatternSet))
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "attribute_delimiter, line_delimiter and null_pattern are only used with 'format=tdv'";
         }
@@ -495,7 +506,12 @@ public:
 
     bool isBinaryFormat() const
     {
-        return _binaryFormat;
+        return _format == BINARY;
+    }
+
+    bool isArrowFormat() const
+    {
+        return _format == ARROW;
     }
 
     string const& getBinaryFormatString() const

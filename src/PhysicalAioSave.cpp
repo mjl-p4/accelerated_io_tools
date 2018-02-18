@@ -380,6 +380,27 @@ public:
     }
 };
 
+class ArrowChunkPopulator
+{
+public:
+    ArrowChunkPopulator(ArrayDesc const& inputArrayDesc,
+                        AioSaveSettings const& settings)
+    {}
+
+    ~ArrowChunkPopulator()
+    {}
+
+    void populateChunk(MemChunkBuilder& builder, ArrayCursor& cursor, size_t const bytesPerChunk, int16_t const cellsPerChunk)
+    {
+        int64_t nCells = 0;
+        while( !cursor.end() && ((cellsPerChunk<=0 && builder.getTotalSize() < bytesPerChunk) || (cellsPerChunk > 0 && nCells < cellsPerChunk)))
+        {
+            cursor.advance();
+            ++nCells;
+        }
+    }
+};
+
 class TextChunkPopulator
 {
 
@@ -666,6 +687,7 @@ public:
 };
 
 typedef ConversionArray <BinaryChunkPopulator> BinaryConvertedArray;
+typedef ConversionArray <ArrowChunkPopulator>  ArrowConvertedArray;
 typedef ConversionArray <TextChunkPopulator>   TextConvertedArray;
 
 struct AwIoError
@@ -858,6 +880,10 @@ public:
         if(settings.isBinaryFormat())
         {
             outArray.reset(new BinaryConvertedArray(_schema, input, query, settings));
+        }
+        else if(settings.isArrowFormat())
+        {
+            outArray.reset(new ArrowConvertedArray(_schema, input, query, settings));
         }
         else
         {
