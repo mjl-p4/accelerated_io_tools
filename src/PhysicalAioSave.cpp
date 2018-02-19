@@ -433,11 +433,16 @@ public:
     ~ArrowChunkPopulator()
     {}
 
-    void populateChunk(MemChunkBuilder& builder, ArrayCursor& cursor, size_t const bytesPerChunk, int16_t const cellsPerChunk)
+    void populateChunk(MemChunkBuilder& builder,
+		       ArrayCursor& cursor,
+		       size_t const bytesPerChunk,
+		       int16_t const cellsPerChunk)
     {
+	// Basic setup
         size_t noAttrs = _inputTypes.size();
         arrow::MemoryPool* arrowPool = arrow::default_memory_pool();
 
+	// Create Arrow Builders and Arrays
         std::vector<std::unique_ptr<arrow::ArrayBuilder>> arrowBuilders(noAttrs);
         std::vector<std::shared_ptr<arrow::Array>> arrowArrays(noAttrs);
         for (size_t i = 0; i < noAttrs; ++i)
@@ -445,6 +450,7 @@ public:
            arrow::MakeBuilder(arrowPool, _arrowTypes[i], &arrowBuilders[i]);
         }
 
+	// Append to Arrow Builders
         int64_t nCells = 0;
         while (!cursor.end() && ((cellsPerChunk<=0 && builder.getTotalSize() < bytesPerChunk) || (cellsPerChunk > 0 && nCells < cellsPerChunk)))
         {
@@ -476,17 +482,20 @@ public:
             ++nCells;
         }
 
+	// Finalize Arrow Builders and populate Arrow Arrays
 	for (size_t i = 0; i < noAttrs; ++i) {
 	    arrowBuilders[i]->Finish(&arrowArrays[i]);
 	}
 
+	// Create Arrow Record Batch
         std::shared_ptr<arrow::RecordBatch> arrowBatch;
         arrowBatch = arrow::RecordBatch::Make(_arrowSchema, nCells, arrowArrays);
 
+	// Stream Arrow Record Batch to Arrow Pool Buffer using Arrow Record
+	// Batch Writer and Arrow Buffer Output Stream
         std::shared_ptr<arrow::PoolBuffer> arrowBuffer;
         std::unique_ptr<arrow::io::BufferOutputStream> arrowStream;
         std::shared_ptr<arrow::ipc::RecordBatchWriter> arrowWriter;
-
         arrowBuffer.reset(new arrow::PoolBuffer(arrowPool));
         arrowStream.reset(new arrow::io::BufferOutputStream(arrowBuffer));
         arrow::ipc::RecordBatchStreamWriter::Open(
@@ -495,6 +504,7 @@ public:
         arrowWriter->Close();
         arrowStream->Close();
 
+	// Copy data to Mem Chunk Builder
         builder.addData(reinterpret_cast<const char*>(arrowBuffer->data()),
 			arrowBuffer->size());
     }
