@@ -19,3 +19,6 @@
 16  7  NaN
 17  8  8.0
 18  9  NaN
+UserException in file: PhysicalAioSave.cpp function: ArrowChunkPopulator
+Error id: scidb::SCIDB_SE_ARRAY_WRITER::SCIDB_LE_ILLEGAL_OPERATION
+Error description: Error while saving array. Illegal operation: Type uint64 not supported in arrow format.
