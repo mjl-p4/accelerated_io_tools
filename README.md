@@ -1,6 +1,8 @@
 accelerated_io_tools
 ==========
 
+[![Build Status](https://travis-ci.org/Paradigm4/accelerated_io_tools.svg)](https://travis-ci.org/Paradigm4/accelerated_io_tools)
+
 A prototype library for the accelerated import and export of data out of SciDB. The work started previously as the `prototype_load_tools` package and continued to get optimized and expanded. Currently contains two SciDB operators and several functions:
  * `aio_input`: an operator that reads token-separated text from 1 or more filesystem objects and returns the data as a SciDB array
  * a few scalar string functions - `dcast`, `trim`, `nth_tdv`, etc that can be useful in some data loading scenarios
@@ -442,6 +444,14 @@ You will need the `-dev` or `-devel` package of Protobuf in order to get headers
 ```
 sudo apt-get install libprotobuf-dev protobuf-compiler
 ```
+
+Follow distribution specific instructions to install the
+[red-data-tools](https://github.com/red-data-tools/packages.red-data-tools.org/blob/master/README.md#package-repository)
+package repository and the
+[Apache Arrow C++](https://github.com/red-data-tools/packages.red-data-tools.org/blob/master/README.md#apache-arrow-c)
+development library. For Red Hat Enterprise Linux use CentOS
+instructions.
+
 After that, follow instructions https://github.com/paradigm4/dev_tools to get dev_tools first. Then:
 ```
 iquery -aq "install_github('paradigm4/accelerated_io_tools')"
