@@ -9,7 +9,7 @@ A prototype library for the accelerated import and export of data out of SciDB. 
 The package extends regular SciDB IO and provides benefits in a few areas:
 
 #### 1. Fully distributed parsing and packing
-When loading token-delimited data, the instance(s) reading the data use a fixed-size `fread` call - usually reading multiple megabytes at once. The read blocks are sent around the different SciDB instances as quickly as possible. Then, the "ragged line ending" of each block is separated and sent to the instance containing the next block. Finally, all the instances parse the data and populate the resulting array in parallel. Thus the expensive parsing step is almost fully parallelized; the ingest rate scales up with the number of instances. 
+When loading token-delimited data, the instance(s) reading the data use a fixed-size `fread` call - usually reading multiple megabytes at once. The read blocks are sent around the different SciDB instances as quickly as possible. Then, the "ragged line ending" of each block is separated and sent to the instance containing the next block. Finally, all the instances parse the data and populate the resulting array in parallel. Thus the expensive parsing step is almost fully parallelized; the ingest rate scales up with the number of instances.
 
 When saving data, the reverse process is used: each instance packs its data into fixed-size blocks, then streams down to one or more saving instances. Save can also be done in binary form for faster speed.
 
@@ -24,7 +24,7 @@ The aio_input operator ingests data in spite of extraneous characters, ragged ro
 The `accelerated_io_tools` and regular `prototype_load_tools` libraries cannot coexist on the same installation; the user must load one or the other. The accelerated .so is superior in every way.
 
 # Trivial end-to-end example
-Using a tiny file that is malformed on purpose. A toy example for those who may not be familiar with SciDB. 
+Using a tiny file that is malformed on purpose. A toy example for those who may not be familiar with SciDB.
 ```
 $ cat /tmp/foo.tsv
 1   alex
@@ -73,7 +73,7 @@ Save the array foo to another file:
 $ iquery -aq "aio_save(foo, '/tmp/bar.out')"
 {chunk_no,dest_instance_id,source_instance_id} val
 
-$ cat /tmp/bar.out 
+$ cat /tmp/bar.out
 alex
 bob
 jack
@@ -83,7 +83,7 @@ Or if you'd like to output the dimensions:
 ```
 $ iquery -aq "aio_save(project(apply(foo, d, dim), d, val),  '/tmp/bar2.out')"
 
-$ cat /tmp/bar2.out 
+$ cat /tmp/bar2.out
 1   alex
 2   bob
 3   jack
@@ -94,7 +94,7 @@ The following sections describe the various options, and parameters in detail.
 # Operator aio_input()
 Going back to the above example:
 ```
-$ cat /tmp/foo.tsv 
+$ cat /tmp/foo.tsv
 1   alex
 2   bob
 3   jack
@@ -115,13 +115,13 @@ Example CSV ingest and store from multiple files:
 ```
 $ iquery -anq "store(
  aio_input(
-  'paths=/tmp/foo.tsv;/tmp/foo2.tsv', 
-  'instances=1;2', 
+  'paths=/tmp/foo.tsv;/tmp/foo2.tsv',
+  'instances=1;2',
   'num_attributes=4',
   'attribute_delimiter=,',
   'split_on_dimension=1',
   'header=1'
- ), 
+ ),
  temp
 )"
 ```
@@ -138,7 +138,7 @@ aio_input('parameter=value', 'parameter2=value2;value3',...)
 
 If `paths` is used, then `instances` must be used to specify the loading instance identifiers:
 * `instances=0;1;...`: semicolon-separated list of instance ids, in the same order as `paths`. Must match the number of `paths` and contain unique ids.
-  
+
 ### File format settings:
 * `num_attributes=N`: number of columns in the file (at least on the majority of the lines). Required.
 * `header=H`: an integer number of lines to skip from the file;  if "paths" is used, applies to all files. Default is 0.
@@ -160,8 +160,8 @@ If `split_on_dimension=0` (default), the schema of the returned array is as foll
   dst_instance_id    = 0: NUM_INSTANCES-1,   1,    0,
   source_instance_id = 0: NUM_INSTANCES-1,   1,    0]
 ```
-Where `N` is the specified `num_attributes` value, `CS` is the chunk size (10M default; see above) and `NUM_INSTANCES` is the number of SciDB instances in the cluster. The error attribute is null, unless the particular line in the file had a number of tokens not equal to `N`, in which case the error attribute is set to either 'short' or 'long ' followed by the leftover line. In the case of a short line, the absent attributes are set to null. 
- 
+Where `N` is the specified `num_attributes` value, `CS` is the chunk size (10M default; see above) and `NUM_INSTANCES` is the number of SciDB instances in the cluster. The error attribute is null, unless the particular line in the file had a number of tokens not equal to `N`, in which case the error attribute is set to either 'short' or 'long ' followed by the leftover line. In the case of a short line, the absent attributes are set to null.
+
 If `split_on_dimension=1` the attributes are populated along a fourth dimension like so:
 ```
  <a:string null>
@@ -171,15 +171,15 @@ If `split_on_dimension=1` the attributes are populated along a fourth dimension 
   attribute_no       = 0: N,                 N+1,  0]
 ```
 The slice of the array at `attribute_no=N` shall contain the error attribute, populated as above.
- 
-Other than `attribute_no` (when `split_on_dimension=1`) the dimensions are not intended to be used in queries. The `source_instance_id` matches the instance(s) reading the data; the `dst_instance_id` is assigned in a round-robin fashion to successive blocks from the same source. The `tuple_no` starts at 0 for each `{dst_instance_id, source_instance_id}` pair and is populated densely within the block. However, each new block starts a new chunk. 
+
+Other than `attribute_no` (when `split_on_dimension=1`) the dimensions are not intended to be used in queries. The `source_instance_id` matches the instance(s) reading the data; the `dst_instance_id` is assigned in a round-robin fashion to successive blocks from the same source. The `tuple_no` starts at 0 for each `{dst_instance_id, source_instance_id}` pair and is populated densely within the block. However, each new block starts a new chunk.
 
 # Scalar functions that may be useful in loading data
 
 ## dcast(): error-tolerant casting
 SciDB supports regular type casting but the behavior is to fail the entire query if any cast is unsuccessful. This may not be desirable when the user expects a small percentage of error values and has a different strategy for handling them, converting to null for example. In thos cases, `dcast` can be used to cast a string to a double, float, bool, int{64,32,16,8} or uint{64,32,16,8}, substituting in a special default value to return if the cast fails. The two arguments to the function are:
  * the string value to cast
- * the default value to use if the cast fails (often a null). 
+ * the default value to use if the cast fails (often a null).
 The SciDB typesystem and the type of the second value can be used to dispatch the right dcast return type.
 For example, this cast fails on the fifth row:
 ```
@@ -233,10 +233,10 @@ $ iquery -aq "
  project(
   apply(
    filter(
-    tmp, 
+    tmp,
     not (line_no=0 and chunk_no=0)
-   ), 
-  ta0, trim(a0, '\"')), 
+   ),
+  ta0, trim(a0, '\"')),
  a0, ta0
  )"
 {source_instance_id,chunk_no,line_no} a0,ta0
@@ -251,11 +251,11 @@ $ iquery -aq "
  project(
   apply(
    filter(
-    tmp, 
+    tmp,
     not (line_no=0 and chunk_no=0)
-   ), 
+   ),
    ta0, trim(a0, '\"b')
-  ), 
+  ),
   a0, ta0
  )"
 {source_instance_id,chunk_no,line_no} a0,ta0
@@ -307,11 +307,11 @@ $ iquery -aq "
  apply(
   cross_join(
    build(
-    <val:string>[i=0:0,1,0], 
-    'abc, def, xyz'), 
+    <val:string>[i=0:0,1,0],
+    'abc, def, xyz'),
    build(
     <x:int64>[j=0:3,4,0], j)
-  ), 
+  ),
   n, iif(nth_csv(val, j) is null, null, nth_csv(val,j))
  )"
 {i,j} val,x,n
@@ -320,7 +320,7 @@ $ iquery -aq "
 {0,2} 'abc, def, xyz',2,' xyz'
 {0,3} 'abc, def, xyz',3,null
 ```
-Similarly, maxlen_csv() and maxlen_tdv() first split a string along a delimiter but then return the length of the longest field as an integer. 
+Similarly, maxlen_csv() and maxlen_tdv() first split a string along a delimiter but then return the length of the longest field as an integer.
 
 ## keyed_value() pulls values out of key-value lists
 It expects an input in the form of "KEY1=VALUE1;KEY2=VALUE2;.." and returns a value for a given key name. The third argument is a default to return when the key is not found:
@@ -328,8 +328,8 @@ It expects an input in the form of "KEY1=VALUE1;KEY2=VALUE2;.." and returns a va
 $ iquery -aq "
  apply(
   build(
-   <val:string>[i=0:0,1,0], 'LEN=43;WID=35.3'), 
-  l, double(keyed_value(val, 'LEN', null)), 
+   <val:string>[i=0:0,1,0], 'LEN=43;WID=35.3'),
+  l, double(keyed_value(val, 'LEN', null)),
   w, double(keyed_value(val, 'WID', null))
  )"
 {i} val,l,w
@@ -347,10 +347,10 @@ $ iquery -aq "
   apply(
    build(
     <val:string>[i=0:0,1,0], 'LEN=43;WID=35.3'
-   ), 
-   l, double(keyed_value(val, 'LEN', null)), 
+   ),
+   l, double(keyed_value(val, 'LEN', null)),
    w, double(keyed_value(val, 'WID', null))
-  ), 
+  ),
   input_check, iif(w < 30, true, throw('Invalid Width'))
  )"
 SystemException in file: Functions.cpp function: toss line: 392
@@ -376,7 +376,7 @@ For an example of using regular expressions, consult the regular expression subs
 ===
 
 # Operator aio_save()
-This operator replaces the existing save functionality, for binary and tab-delimited formats. 
+This operator replaces the existing save functionality, for binary and tab-delimited formats.
 Example save to a binary file:
 ```
 iquery -anq "aio_save( bar, '/tmp/bar.out', 'format=(int64, double null, string null)')"
@@ -407,10 +407,10 @@ By default, the file is saved to a path on the query coordinator instance. You c
 
 ## Other settings:
 * `format=F`: the format string, may be either `tdv` (token-delimited values) or a scidb-style binary format spec like `(int64, double null,...)`. Default is `tdv`.
-* `attributes_delimiter=A`: the character to write between array attributes. Default is a tab. Applies when fomat is set to `tdv`. 
+* `attributes_delimiter=A`: the character to write between array attributes. Default is a tab. Applies when fomat is set to `tdv`.
 * `line_delimiter=L`: the character to write between array cells. Default is a newline. Applies when format is set to `tdv`.
 * `cells_per_chunk=C`: the maximum number of array cells to place in each chunk before saving to disk. By default, binary accounting is used but this can be enabled to force an exact number of cells. See notes on saving data in order below.
-* `buffer_size=B`: the amount of data to pack into a single buffer before transferring and saving to disk. Default is 8 MB. This setting is not honored if `cells_per_chunk` is specified. 
+* `buffer_size=B`: the amount of data to pack into a single buffer before transferring and saving to disk. Default is 8 MB. This setting is not honored if `cells_per_chunk` is specified.
 * `precision=P`: the maximum number of significant figures to use when writing float or double values as text. Defaults to the SciDB 'precision' config. Applies when format is set to `tdv`.
 
 ## Returned array:
