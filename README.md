@@ -375,8 +375,6 @@ $ iquery -aq "project(apply(tmp, ca0, codify(a0)), a0, ca0)"
 
 For an example of using regular expressions, consult the regular expression substitution routine provided in https://github.com/paradigm4/superfunpack
 
-===
-
 # Operator aio_save()
 This operator replaces the existing save functionality, for binary and tab-delimited formats.
 Example save to a binary file:
