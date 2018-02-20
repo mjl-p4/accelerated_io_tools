@@ -36,10 +36,14 @@
 
 #include <arrow/buffer.h>
 #include <arrow/builder.h>
+#include <arrow/io/file.h>
+#include <arrow/io/interfaces.h>
 #include <arrow/io/memory.h>
+#include <arrow/ipc/reader.h>
 #include <arrow/ipc/writer.h>
 #include <arrow/memory_pool.h>
 #include <arrow/record_batch.h>
+#include <arrow/status.h>
 #include <arrow/type.h>
 
 #include <query/TypeSystem.h>
@@ -65,8 +69,59 @@
 
 #include "AioSaveSettings.h"
 
+
+#define THROW_NOT_OK(s)                                            \
+    {                                                              \
+        arrow::Status _s = (s);                                    \
+        if (!_s.ok())                                              \
+        {                                                          \
+            throw USER_EXCEPTION(                                  \
+                SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION) \
+                    << _s.ToString().c_str();                      \
+        }                                                          \
+    }
+
+#define THROW_NOT_OK_FILE(s)                                      \
+    {                                                             \
+        arrow::Status _s = (s);                                   \
+        if (!_s.ok())                                             \
+        {                                                         \
+            throw USER_EXCEPTION(                                 \
+                SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR) \
+                    << _s.ToString().c_str() << (int)_s.code();   \
+        }                                                         \
+    }
+
+
 using std::make_shared;
 using boost::algorithm::is_from_range;
+
+
+// Workaround for https://issues.apache.org/jira/browse/ARROW-2179
+// Addapted from arrow/util/io-util.h
+// Output stream that just writes to stdout.
+class StdoutStream : public arrow::io::OutputStream {
+ public:
+  StdoutStream() : pos_(0) { set_mode(arrow::io::FileMode::WRITE); }
+  ~StdoutStream() override {}
+
+  arrow::Status Close() override { return arrow::Status::OK(); }
+
+  arrow::Status Tell(int64_t* position) const override {
+    *position = pos_;
+    return arrow::Status::OK();
+  }
+
+  arrow::Status Write(const void* data, int64_t nbytes) override {
+    pos_ += nbytes;
+    std::cout.write(reinterpret_cast<const char*>(data), nbytes);
+    return arrow::Status::OK();
+  }
+
+ private:
+  int64_t pos_;
+};
+
 
 namespace scidb
 {
@@ -920,6 +975,113 @@ uint64_t saveToDisk(shared_ptr<Array> const& array,
     return 0;
 }
 
+uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
+                         string fileName,
+                         std::shared_ptr<Query> const& query,
+                         bool const append,
+                         AioSaveSettings const& settings,
+                         ArrayDesc const& inputSchema)
+{
+    ArrayDesc const& desc = array->getArrayDesc();
+    const size_t N_ATTRS = desc.getAttributes(true).size();
+    EXCEPTION_ASSERT(N_ATTRS==1);
+
+    LOG4CXX_DEBUG(logger, "ALT_SAVE>> opening file")
+    std::shared_ptr<arrow::io::OutputStream> arrowStream;
+    if (fileName == "console" || fileName == "stdout")
+    {
+        arrowStream.reset(new StdoutStream());
+        throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION)
+             << "stdout or console not supported for arrow format";
+    }
+    else if (fileName == "stderr")
+    {
+        // TODO: StderrStream support
+        throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION)
+             << "stderr not supported for arrow format";
+    }
+    else
+    {
+        std::shared_ptr<arrow::io::FileOutputStream> arrowFile;
+        auto arrowStatus = arrow::io::FileOutputStream::Open(
+	    fileName, append, &arrowFile);
+        if (!arrowStatus.ok())
+        {
+            auto str = arrowStatus.ToString().c_str();
+            int code = (int)arrowStatus.code();
+            LOG4CXX_DEBUG(logger, "Attempted to open output file '" << fileName << "' failed: " << str << " (" << code << ")");
+            throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_CANT_OPEN_FILE)
+                 << fileName << str << code;
+        }
+        arrowStream = arrowFile;
+        // TODO: is file lock necessary?
+    }
+
+    LOG4CXX_DEBUG(logger, "ALT_SAVE>> starting write")
+    std::shared_ptr<arrow::ipc::RecordBatchWriter> arrowWriter;
+    size_t bytesWritten = 0;
+    try
+    {
+        shared_ptr<ConstArrayIterator> arrayIter = array->getConstIterator(0);
+        for (size_t n = 0; !arrayIter->end(); n++)
+        {
+            ConstChunk const& ch = arrayIter->getChunk();
+            PinBuffer scope(ch);
+            uint32_t* sizePointer = (uint32_t*) (((char*)ch.getData()) + AioSaveSettings::chunkSizeOffset());
+            uint32_t size = *sizePointer;
+            bytesWritten += size;
+            char* data = ((char*)ch.getData() + AioSaveSettings::chunkDataOffset());
+
+            arrow::io::BufferReader arrowBufferReader(
+                reinterpret_cast<const uint8_t*>(data), size);
+            std::shared_ptr<arrow::RecordBatchReader> arrowReader;
+            arrow::ipc::RecordBatchStreamReader::Open(
+                &arrowBufferReader, &arrowReader);
+
+            std::shared_ptr<arrow::RecordBatch> arrowBatch;
+            THROW_NOT_OK(arrowReader->ReadNext(&arrowBatch));
+
+            if (arrowWriter == nullptr)
+            {
+                arrow::ipc::RecordBatchStreamWriter::Open(
+                    arrowStream.get(), arrowBatch->schema(), &arrowWriter);
+            }
+            arrowWriter->WriteRecordBatch(*arrowBatch);
+
+	    ++(*arrayIter);
+        }
+    }
+    catch (AwIoError& e)
+    {
+        if (arrowWriter != nullptr)
+        {
+            arrowWriter->Close();
+        }
+        if (fileName == "console" || fileName == "stdout")
+        {
+            arrowStream->Flush();
+        }
+        else
+        {
+            arrowStream->Close();
+        }
+        throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR) << ::strerror(e.error) << e.error;
+    }
+
+    LOG4CXX_DEBUG(logger, "ALT_SAVE>> wrote "<< bytesWritten<< " bytes, closing");
+    THROW_NOT_OK_FILE(arrowWriter->Close());
+    if (fileName == "console" || fileName == "stdout")
+    {
+        THROW_NOT_OK_FILE(arrowStream->Flush());
+    }
+    else
+    {
+        THROW_NOT_OK_FILE(arrowStream->Close());
+    }
+    LOG4CXX_DEBUG(logger, "ALT_SAVE>> closed")
+    return 0;
+}
+
 
 class PhysicalAioSave : public PhysicalOperator
 {
@@ -1006,7 +1168,16 @@ public:
             if(thisInstanceSavesData)
             {
                 string const& path = iter->second;
-                saveToDisk(outArray, path, query, false, settings, inputSchema);
+		if (settings.isArrowFormat())
+		{
+		    saveToDiskArrow(
+			outArray, path, query, false, settings, inputSchema);
+		}
+		else
+		{
+		    saveToDisk(
+			outArray, path, query, false, settings, inputSchema);
+		}
             }
             return shared_ptr<Array>(new MemArray(_schema, query));
         }
@@ -1021,7 +1192,16 @@ public:
         if (thisInstanceSavesData)
         {
             string const& path = iter->second;
-            saveToDisk(outArrayRedist, path, query, false, settings, inputSchema);
+	    if (settings.isArrowFormat())
+	    {
+		saveToDiskArrow(
+		    outArrayRedist, path, query, false, settings, inputSchema);
+	    }
+	    else
+	    {
+		saveToDisk(
+		    outArrayRedist, path, query, false, settings, inputSchema);
+	    }
         }
         if (wasConverted)
         {
