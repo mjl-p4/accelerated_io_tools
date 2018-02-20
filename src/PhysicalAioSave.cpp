@@ -491,18 +491,17 @@ public:
         std::shared_ptr<arrow::RecordBatch> arrowBatch;
         arrowBatch = arrow::RecordBatch::Make(_arrowSchema, nCells, arrowArrays);
 
-        std::shared_ptr<arrow::PoolBuffer> arrowBuffer;
-        std::unique_ptr<arrow::io::BufferOutputStream> arrowStream;
         // Stream Arrow Record Batch to Arrow Pool Buffer using Arrow Record
         // Batch Writer and Arrow Buffer Output Stream
+        std::shared_ptr<arrow::PoolBuffer> arrowBuffer(
+	    new arrow::PoolBuffer(arrowPool));
+        arrow::io::BufferOutputStream arrowStream(arrowBuffer);
         std::shared_ptr<arrow::ipc::RecordBatchWriter> arrowWriter;
-        arrowBuffer.reset(new arrow::PoolBuffer(arrowPool));
-        arrowStream.reset(new arrow::io::BufferOutputStream(arrowBuffer));
-        arrow::ipc::RecordBatchStreamWriter::Open(
-	     arrowStream.get(), _arrowSchema, &arrowWriter);
+	arrow::ipc::RecordBatchStreamWriter::Open(
+	    &arrowStream, _arrowSchema, &arrowWriter);
 	arrowWriter->WriteRecordBatch(*arrowBatch);
         arrowWriter->Close();
-        arrowStream->Close();
+        arrowStream.Close();
 
         // Copy data to Mem Chunk Builder
         builder.addData(reinterpret_cast<const char*>(arrowBuffer->data()),
