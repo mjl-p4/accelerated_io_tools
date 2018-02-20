@@ -400,33 +400,33 @@ private:
 public:
     ArrowChunkPopulator(ArrayDesc const& inputArrayDesc,
                         AioSaveSettings const& settings):
-	_inputAttrs(inputArrayDesc.getAttributes(true))
+        _inputAttrs(inputArrayDesc.getAttributes(true))
     {
         size_t noAttrs = _inputAttrs.size();
 
-	_inputTypes.resize(noAttrs);
-	_arrowTypes.resize(noAttrs);
+        _inputTypes.resize(noAttrs);
+        _arrowTypes.resize(noAttrs);
 
         std::vector<std::shared_ptr<arrow::Field>> arrowFields(noAttrs);
-	for(size_t i = 0; i < noAttrs; ++i) {
-	    auto inputType = _inputAttrs[i].getType();
-	    auto inputTypeEnum = typeId2TypeEnum(inputType, true);
+        for(size_t i = 0; i < noAttrs; ++i) {
+            auto inputType = _inputAttrs[i].getType();
+            auto inputTypeEnum = typeId2TypeEnum(inputType, true);
 
-	    _inputTypes[i] = inputTypeEnum;
+            _inputTypes[i] = inputTypeEnum;
 
-	    switch (inputTypeEnum)
-	    {
-	    case TE_INT64:
-		_arrowTypes[i] = arrow::int64();
-		break;
-	    default:
+            switch (inputTypeEnum)
+            {
+            case TE_INT64:
+                _arrowTypes[i] = arrow::int64();
+                break;
+            default:
               ostringstream error;
               error << "Type " << inputType << " not supported in arrow format";
               throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION) << error.str();
-	    }
+            }
 
-	    arrowFields[i] = arrow::field(_inputAttrs[i].getName(), _arrowTypes[i]);
-	}
+            arrowFields[i] = arrow::field(_inputAttrs[i].getName(), _arrowTypes[i]);
+        }
         _arrowSchema = arrow::schema(arrowFields);
     }
 
@@ -434,15 +434,15 @@ public:
     {}
 
     void populateChunk(MemChunkBuilder& builder,
-		       ArrayCursor& cursor,
-		       size_t const bytesPerChunk,
-		       int16_t const cellsPerChunk)
+                       ArrayCursor& cursor,
+                       size_t const bytesPerChunk,
+                       int16_t const cellsPerChunk)
     {
-	// Basic setup
+        // Basic setup
         size_t noAttrs = _inputTypes.size();
         arrow::MemoryPool* arrowPool = arrow::default_memory_pool();
 
-	// Create Arrow Builders and Arrays
+        // Create Arrow Builders and Arrays
         std::vector<std::unique_ptr<arrow::ArrayBuilder>> arrowBuilders(noAttrs);
         std::vector<std::shared_ptr<arrow::Array>> arrowArrays(noAttrs);
         for (size_t i = 0; i < noAttrs; ++i)
@@ -450,7 +450,7 @@ public:
            arrow::MakeBuilder(arrowPool, _arrowTypes[i], &arrowBuilders[i]);
         }
 
-	// Append to Arrow Builders
+        // Append to Arrow Builders
         int64_t nCells = 0;
         while (!cursor.end() && ((cellsPerChunk<=0 && builder.getTotalSize() < bytesPerChunk) || (cellsPerChunk > 0 && nCells < cellsPerChunk)))
         {
@@ -458,55 +458,55 @@ public:
             for (size_t i = 0; i < cursor.nAttrs(); ++i)
             {
                 Value const* value = cell[i];
-		switch (_inputTypes[i])
-		{
-		case TE_INT64:
-		     if(value->isNull())
-		     {
-			  static_cast<arrow::Int64Builder*>(
-			       arrowBuilders[i].get())->AppendNull();
-		     }
-		     else
-		     {
-			  static_cast<arrow::Int64Builder*>(
-			       arrowBuilders[i].get())->Append(value->getInt64());
-		     }
-		     break;
-		default:
-		     ostringstream error;
-		     error << "Type " << _inputAttrs[i].getType() << " not supported in arrow format";
-		     throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION) << error.str();
-		}
+                switch (_inputTypes[i])
+                {
+                case TE_INT64:
+                     if(value->isNull())
+                     {
+                          static_cast<arrow::Int64Builder*>(
+                               arrowBuilders[i].get())->AppendNull();
+                     }
+                     else
+                     {
+                          static_cast<arrow::Int64Builder*>(
+                               arrowBuilders[i].get())->Append(value->getInt64());
+                     }
+                     break;
+                default:
+                     ostringstream error;
+                     error << "Type " << _inputAttrs[i].getType() << " not supported in arrow format";
+                     throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION) << error.str();
+                }
             }
             cursor.advance();
             ++nCells;
         }
 
-	// Finalize Arrow Builders and populate Arrow Arrays
-	for (size_t i = 0; i < noAttrs; ++i) {
-	    arrowBuilders[i]->Finish(&arrowArrays[i]);
-	}
+        // Finalize Arrow Builders and populate Arrow Arrays
+        for (size_t i = 0; i < noAttrs; ++i) {
+            arrowBuilders[i]->Finish(&arrowArrays[i]);
+        }
 
-	// Create Arrow Record Batch
+        // Create Arrow Record Batch
         std::shared_ptr<arrow::RecordBatch> arrowBatch;
         arrowBatch = arrow::RecordBatch::Make(_arrowSchema, nCells, arrowArrays);
 
-	// Stream Arrow Record Batch to Arrow Pool Buffer using Arrow Record
-	// Batch Writer and Arrow Buffer Output Stream
         std::shared_ptr<arrow::PoolBuffer> arrowBuffer;
         std::unique_ptr<arrow::io::BufferOutputStream> arrowStream;
+        // Stream Arrow Record Batch to Arrow Pool Buffer using Arrow Record
+        // Batch Writer and Arrow Buffer Output Stream
         std::shared_ptr<arrow::ipc::RecordBatchWriter> arrowWriter;
         arrowBuffer.reset(new arrow::PoolBuffer(arrowPool));
         arrowStream.reset(new arrow::io::BufferOutputStream(arrowBuffer));
         arrow::ipc::RecordBatchStreamWriter::Open(
 	     arrowStream.get(), _arrowSchema, &arrowWriter);
-        arrowWriter->WriteRecordBatch(*arrowBatch);
+	arrowWriter->WriteRecordBatch(*arrowBatch);
         arrowWriter->Close();
         arrowStream->Close();
 
-	// Copy data to Mem Chunk Builder
+        // Copy data to Mem Chunk Builder
         builder.addData(reinterpret_cast<const char*>(arrowBuffer->data()),
-			arrowBuffer->size());
+                        arrowBuffer->size());
     }
 };
 
