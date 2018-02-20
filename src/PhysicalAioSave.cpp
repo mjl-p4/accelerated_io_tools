@@ -122,7 +122,6 @@ class StdoutStream : public arrow::io::OutputStream {
   int64_t pos_;
 };
 
-
 namespace scidb
 {
 
@@ -502,7 +501,9 @@ public:
         std::vector<std::shared_ptr<arrow::Array>> arrowArrays(noAttrs);
         for (size_t i = 0; i < noAttrs; ++i)
         {
-           arrow::MakeBuilder(arrowPool, _arrowTypes[i], &arrowBuilders[i]);
+	    THROW_NOT_OK(
+		arrow::MakeBuilder(
+		    arrowPool, _arrowTypes[i], &arrowBuilders[i]));
         }
 
         // Append to Arrow Builders
@@ -518,13 +519,16 @@ public:
                 case TE_INT64:
                      if(value->isNull())
                      {
-                          static_cast<arrow::Int64Builder*>(
-                               arrowBuilders[i].get())->AppendNull();
+			 THROW_NOT_OK(
+			     static_cast<arrow::Int64Builder*>(
+				 arrowBuilders[i].get())->AppendNull());
                      }
                      else
                      {
-                          static_cast<arrow::Int64Builder*>(
-                               arrowBuilders[i].get())->Append(value->getInt64());
+			 THROW_NOT_OK(
+			     static_cast<arrow::Int64Builder*>(
+				 arrowBuilders[i].get())->Append(
+				     value->getInt64()));
                      }
                      break;
                 default:
@@ -539,7 +543,8 @@ public:
 
         // Finalize Arrow Builders and populate Arrow Arrays
         for (size_t i = 0; i < noAttrs; ++i) {
-            arrowBuilders[i]->Finish(&arrowArrays[i]);
+	    THROW_NOT_OK(
+		arrowBuilders[i]->Finish(&arrowArrays[i]));
         }
 
         // Create Arrow Record Batch
@@ -552,11 +557,13 @@ public:
 	    new arrow::PoolBuffer(arrowPool));
         arrow::io::BufferOutputStream arrowStream(arrowBuffer);
         std::shared_ptr<arrow::ipc::RecordBatchWriter> arrowWriter;
-	arrow::ipc::RecordBatchStreamWriter::Open(
-	    &arrowStream, _arrowSchema, &arrowWriter);
-	arrowWriter->WriteRecordBatch(*arrowBatch);
-        arrowWriter->Close();
-        arrowStream.Close();
+	THROW_NOT_OK(
+	    arrow::ipc::RecordBatchStreamWriter::Open(
+		&arrowStream, _arrowSchema, &arrowWriter));
+	THROW_NOT_OK(
+	    arrowWriter->WriteRecordBatch(*arrowBatch));
+        THROW_NOT_OK(arrowWriter->Close());
+        THROW_NOT_OK(arrowStream.Close());
 
         // Copy data to Mem Chunk Builder
         builder.addData(reinterpret_cast<const char*>(arrowBuffer->data()),
@@ -1019,6 +1026,8 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
 
     LOG4CXX_DEBUG(logger, "ALT_SAVE>> starting write")
     std::shared_ptr<arrow::ipc::RecordBatchWriter> arrowWriter;
+    std::shared_ptr<arrow::RecordBatchReader> arrowReader;
+    std::shared_ptr<arrow::RecordBatch> arrowBatch;
     size_t bytesWritten = 0;
     try
     {
@@ -1034,19 +1043,27 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
 
             arrow::io::BufferReader arrowBufferReader(
                 reinterpret_cast<const uint8_t*>(data), size);
-            std::shared_ptr<arrow::RecordBatchReader> arrowReader;
-            arrow::ipc::RecordBatchStreamReader::Open(
-                &arrowBufferReader, &arrowReader);
 
-            std::shared_ptr<arrow::RecordBatch> arrowBatch;
+	    // Open Record Batch Stream Reader
+	    THROW_NOT_OK(
+		arrow::ipc::RecordBatchStreamReader::Open(
+		    &arrowBufferReader, &arrowReader));
+
+	    // Read Record Batch
             THROW_NOT_OK(arrowReader->ReadNext(&arrowBatch));
 
-            if (arrowWriter == nullptr)
+	    // Open Record Batch Stream Writer on first iteration
+	    // Need to open now since we just got the Schema
+            if (n == 0)
             {
-                arrow::ipc::RecordBatchStreamWriter::Open(
-                    arrowStream.get(), arrowBatch->schema(), &arrowWriter);
+		THROW_NOT_OK_FILE(
+		    arrow::ipc::RecordBatchStreamWriter::Open(
+			arrowStream.get(), arrowBatch->schema(), &arrowWriter));
             }
-            arrowWriter->WriteRecordBatch(*arrowBatch);
+
+	    // Write Record Batch to stream
+	    THROW_NOT_OK_FILE(
+		arrowWriter->WriteRecordBatch(*arrowBatch));
 
 	    ++(*arrayIter);
         }
@@ -1065,7 +1082,8 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
         {
             arrowStream->Close();
         }
-        throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR) << ::strerror(e.error) << e.error;
+        throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR)
+	    << ::strerror(e.error) << e.error;
     }
 
     LOG4CXX_DEBUG(logger, "ALT_SAVE>> wrote "<< bytesWritten<< " bytes, closing");
