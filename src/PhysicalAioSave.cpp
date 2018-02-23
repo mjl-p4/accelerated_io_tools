@@ -92,10 +92,20 @@
         }                                                         \
     }
 
+namespace scidb
+{
 
-using std::make_shared;
-using boost::algorithm::is_from_range;
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.alt_save"));
 
+using namespace scidb;
+
+static void EXCEPTION_ASSERT(bool cond)
+{
+    if (! cond)
+    {
+        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Internal inconsistency";
+    }
+}
 
 // Workaround for https://issues.apache.org/jira/browse/ARROW-2179
 // Addapted from arrow/util/io-util.h
@@ -121,21 +131,6 @@ class StdoutStream : public arrow::io::OutputStream {
  private:
   int64_t pos_;
 };
-
-namespace scidb
-{
-
-static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.alt_save"));
-
-using namespace scidb;
-
-static void EXCEPTION_ASSERT(bool cond)
-{
-    if (! cond)
-    {
-        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Internal inconsistency";
-    }
-}
 
 class MemChunkBuilder
 {
