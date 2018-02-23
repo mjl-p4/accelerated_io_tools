@@ -107,6 +107,33 @@ static void EXCEPTION_ASSERT(bool cond)
     }
 }
 
+std::shared_ptr<arrow::Schema> attributes2ArrowSchema(Attributes const& attrs)
+{
+    size_t noAttrs = attrs.size();
+
+    std::vector<std::shared_ptr<arrow::Field>> arrowFields(noAttrs);
+    for(size_t i = 0; i < noAttrs; ++i)
+    {
+        auto type = attrs[i].getType();
+        auto typeEnum = typeId2TypeEnum(type, true);
+        std::shared_ptr<arrow::DataType> arrowType;
+
+        switch (typeEnum)
+        {
+        case TE_INT64:
+            arrowType = arrow::int64();
+            break;
+        default:
+            ostringstream error;
+            error << "Type " << type << " not supported in arrow format";
+            throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION) << error.str();
+        }
+
+        arrowFields[i] = arrow::field(attrs[i].getName(), arrowType);
+    }
+    return arrow::schema(arrowFields);
+}
+
 // Workaround for https://issues.apache.org/jira/browse/ARROW-2179
 // Addapted from arrow/util/io-util.h
 // Output stream that just writes to stdout.
@@ -450,7 +477,8 @@ private:
 public:
     ArrowChunkPopulator(ArrayDesc const& inputArrayDesc,
                         AioSaveSettings const& settings):
-        _inputAttrs(inputArrayDesc.getAttributes(true))
+        _inputAttrs(inputArrayDesc.getAttributes(true)),
+        _arrowSchema(attributes2ArrowSchema(_inputAttrs))
     {
         size_t noAttrs = _inputAttrs.size();
 
@@ -458,36 +486,15 @@ public:
         _arrowBuilders.resize(noAttrs);
         _arrowArrays.resize(noAttrs);
 
-        // Get Arrow Types and Schema
-        std::vector<std::shared_ptr<arrow::DataType>> arrowTypes(noAttrs);
-        std::vector<std::shared_ptr<arrow::Field>> arrowFields(noAttrs);
+        // Create Arrow Builders
         for(size_t i = 0; i < noAttrs; ++i) {
-            auto inputType = _inputAttrs[i].getType();
-            auto inputTypeEnum = typeId2TypeEnum(inputType, true);
+            _inputTypes[i] = typeId2TypeEnum(_inputAttrs[i].getType(), true);
 
-            _inputTypes[i] = inputTypeEnum;
-
-            switch (inputTypeEnum)
-            {
-            case TE_INT64:
-                arrowTypes[i] = arrow::int64();
-                break;
-            default:
-              ostringstream error;
-              error << "Type " << inputType << " not supported in arrow format";
-              throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION) << error.str();
-            }
-
-            arrowFields[i] = arrow::field(_inputAttrs[i].getName(), arrowTypes[i]);
-        }
-        _arrowSchema = arrow::schema(arrowFields);
-
-        // Create Arrow Builders and Arrays
-        for (size_t i = 0; i < noAttrs; ++i)
-        {
 	    THROW_NOT_OK(
 		arrow::MakeBuilder(
-		    _arrowPool, arrowTypes[i], &_arrowBuilders[i]));
+		    _arrowPool,
+                    _arrowSchema->field(i)->type(),
+                    &_arrowBuilders[i]));
         }
     }
 
