@@ -318,7 +318,6 @@ public:
     }
 };
 
-
 class BinaryChunkPopulator
 {
 private:
@@ -446,10 +445,13 @@ class ArrowChunkPopulator
 {
 
 private:
-    Attributes const&                             _inputAttrs;
-    std::vector<TypeEnum>                         _inputTypes;
-    std::vector<std::shared_ptr<arrow::DataType>> _arrowTypes;
-    std::shared_ptr<arrow::Schema>                _arrowSchema;
+    Attributes const&                                 _inputAttrs;
+    std::vector<TypeEnum>                             _inputTypes;
+    std::vector<std::shared_ptr<arrow::DataType>>     _arrowTypes;
+    std::shared_ptr<arrow::Schema>                    _arrowSchema;
+    std::vector<std::unique_ptr<arrow::ArrayBuilder>> _arrowBuilders;
+    std::vector<std::shared_ptr<arrow::Array>>        _arrowArrays;
+    arrow::MemoryPool*                                _arrowPool = arrow::default_memory_pool();
 
 public:
     ArrowChunkPopulator(ArrayDesc const& inputArrayDesc,
@@ -460,7 +462,10 @@ public:
 
         _inputTypes.resize(noAttrs);
         _arrowTypes.resize(noAttrs);
+        _arrowBuilders.resize(noAttrs);
+        _arrowArrays.resize(noAttrs);
 
+        // Get Arrow Types and Schema
         std::vector<std::shared_ptr<arrow::Field>> arrowFields(noAttrs);
         for(size_t i = 0; i < noAttrs; ++i) {
             auto inputType = _inputAttrs[i].getType();
@@ -482,6 +487,15 @@ public:
             arrowFields[i] = arrow::field(_inputAttrs[i].getName(), _arrowTypes[i]);
         }
         _arrowSchema = arrow::schema(arrowFields);
+
+        // Create Arrow Builders and Arrays
+        for (size_t i = 0; i < noAttrs; ++i)
+        {
+	    THROW_NOT_OK(
+		arrow::MakeBuilder(
+		    _arrowPool, _arrowTypes[i], &_arrowBuilders[i]));
+        }
+
     }
 
     ~ArrowChunkPopulator()
@@ -494,17 +508,6 @@ public:
     {
         // Basic setup
         size_t noAttrs = _inputTypes.size();
-        arrow::MemoryPool* arrowPool = arrow::default_memory_pool();
-
-        // Create Arrow Builders and Arrays
-        std::vector<std::unique_ptr<arrow::ArrayBuilder>> arrowBuilders(noAttrs);
-        std::vector<std::shared_ptr<arrow::Array>> arrowArrays(noAttrs);
-        for (size_t i = 0; i < noAttrs; ++i)
-        {
-	    THROW_NOT_OK(
-		arrow::MakeBuilder(
-		    arrowPool, _arrowTypes[i], &arrowBuilders[i]));
-        }
 
         // Append to Arrow Builders
         int64_t nCells = 0;
@@ -521,13 +524,13 @@ public:
                      {
 			 THROW_NOT_OK(
 			     static_cast<arrow::Int64Builder*>(
-				 arrowBuilders[i].get())->AppendNull());
+				 _arrowBuilders[i].get())->AppendNull());
                      }
                      else
                      {
 			 THROW_NOT_OK(
 			     static_cast<arrow::Int64Builder*>(
-				 arrowBuilders[i].get())->Append(
+				 _arrowBuilders[i].get())->Append(
 				     value->getInt64()));
                      }
                      break;
@@ -544,17 +547,17 @@ public:
         // Finalize Arrow Builders and populate Arrow Arrays
         for (size_t i = 0; i < noAttrs; ++i) {
 	    THROW_NOT_OK(
-		arrowBuilders[i]->Finish(&arrowArrays[i]));
+		_arrowBuilders[i]->Finish(&_arrowArrays[i])); // Resets builder
         }
 
         // Create Arrow Record Batch
         std::shared_ptr<arrow::RecordBatch> arrowBatch;
-        arrowBatch = arrow::RecordBatch::Make(_arrowSchema, nCells, arrowArrays);
+        arrowBatch = arrow::RecordBatch::Make(_arrowSchema, nCells, _arrowArrays);
 
         // Stream Arrow Record Batch to Arrow Pool Buffer using Arrow Record
         // Batch Writer and Arrow Buffer Output Stream
         std::shared_ptr<arrow::PoolBuffer> arrowBuffer(
-	    new arrow::PoolBuffer(arrowPool));
+	    new arrow::PoolBuffer(_arrowPool));
         arrow::io::BufferOutputStream arrowStream(arrowBuffer);
         std::shared_ptr<arrow::ipc::RecordBatchWriter> arrowWriter;
 	THROW_NOT_OK(
@@ -1231,6 +1234,5 @@ public:
 };
 
 REGISTER_PHYSICAL_OPERATOR_FACTORY(PhysicalAioSave, "aio_save", "PhysicalAioSave");
-
 
 } // end namespace scidb
