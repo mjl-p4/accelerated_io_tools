@@ -480,7 +480,7 @@ public:
         _inputAttrs(inputArrayDesc.getAttributes(true)),
         _arrowSchema(attributes2ArrowSchema(_inputAttrs))
     {
-        size_t noAttrs = _inputAttrs.size();
+        const size_t noAttrs = _inputAttrs.size();
 
         _inputTypes.resize(noAttrs);
         _arrowBuilders.resize(noAttrs);
@@ -507,7 +507,7 @@ public:
                        int16_t const cellsPerChunk)
     {
         // Basic setup
-        size_t noAttrs = _inputTypes.size();
+        const size_t noAttrs = _inputTypes.size();
 
         // Append to Arrow Builders
         int64_t nCells = 0;
@@ -992,11 +992,9 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
                          AioSaveSettings const& settings,
                          ArrayDesc const& inputSchema)
 {
-    ArrayDesc const& desc = array->getArrayDesc();
-    const size_t N_ATTRS = desc.getAttributes(true).size();
-    EXCEPTION_ASSERT(N_ATTRS==1);
+    EXCEPTION_ASSERT(array->getArrayDesc().getAttributes(true).size()==1);
 
-    LOG4CXX_DEBUG(logger, "ALT_SAVE>> opening file")
+    LOG4CXX_DEBUG(logger, "ALT_SAVE>> opening file");
     std::shared_ptr<arrow::io::OutputStream> arrowStream;
     if (fileName == "console" || fileName == "stdout")
     {
@@ -1027,13 +1025,18 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
         // TODO: is file lock necessary?
     }
 
-    LOG4CXX_DEBUG(logger, "ALT_SAVE>> starting write")
+    LOG4CXX_DEBUG(logger, "ALT_SAVE>> starting write");
     std::shared_ptr<arrow::ipc::RecordBatchWriter> arrowWriter;
-    std::shared_ptr<arrow::RecordBatchReader> arrowReader;
     std::shared_ptr<arrow::RecordBatch> arrowBatch;
     size_t bytesWritten = 0;
     try
     {
+        std::shared_ptr<arrow::Schema> arrowSchema = attributes2ArrowSchema(
+            inputSchema.getAttributes(true));
+        THROW_NOT_OK_FILE(
+            arrow::ipc::RecordBatchStreamWriter::Open(
+                arrowStream.get(), arrowSchema, &arrowWriter));
+
         shared_ptr<ConstArrayIterator> arrayIter = array->getConstIterator(0);
         for (size_t n = 0; !arrayIter->end(); n++)
         {
@@ -1045,24 +1048,19 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
             char* data = ((char*)ch.getData() + AioSaveSettings::chunkDataOffset());
 
             arrow::io::BufferReader arrowBufferReader(
-                reinterpret_cast<const uint8_t*>(data), size);
-
-	    // Open Record Batch Stream Reader
-	    THROW_NOT_OK(
-		arrow::ipc::RecordBatchStreamReader::Open(
-		    &arrowBufferReader, &arrowReader));
+                reinterpret_cast<const uint8_t*>(data), size); // zero copy
 
 	    // Read Record Batch
-            THROW_NOT_OK(arrowReader->ReadNext(&arrowBatch));
+            // THROW_NOT_OK(
+            //     arrow::ipc::ReadRecordBatch(
+            //         arrowSchema, &arrowBufferReader, &arrowBatch));
 
-	    // Open Record Batch Stream Writer on first iteration
-	    // Need to open now since we just got the Schema
-            if (n == 0)
-            {
-		THROW_NOT_OK_FILE(
-		    arrow::ipc::RecordBatchStreamWriter::Open(
-			arrowStream.get(), arrowBatch->schema(), &arrowWriter));
-            }
+            // Read Record Batch using Stream Reader
+            std::shared_ptr<arrow::RecordBatchReader> arrowReader;
+	    THROW_NOT_OK(
+	        arrow::ipc::RecordBatchStreamReader::Open(
+	            &arrowBufferReader, &arrowReader));
+            THROW_NOT_OK(arrowReader->ReadNext(&arrowBatch));
 
 	    // Write Record Batch to stream
 	    THROW_NOT_OK_FILE(
