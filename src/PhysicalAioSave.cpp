@@ -447,7 +447,6 @@ class ArrowChunkPopulator
 private:
     Attributes const&                                 _inputAttrs;
     std::vector<TypeEnum>                             _inputTypes;
-    std::vector<std::shared_ptr<arrow::DataType>>     _arrowTypes;
     std::shared_ptr<arrow::Schema>                    _arrowSchema;
     std::vector<std::unique_ptr<arrow::ArrayBuilder>> _arrowBuilders;
     std::vector<std::shared_ptr<arrow::Array>>        _arrowArrays;
@@ -461,11 +460,11 @@ public:
         size_t noAttrs = _inputAttrs.size();
 
         _inputTypes.resize(noAttrs);
-        _arrowTypes.resize(noAttrs);
         _arrowBuilders.resize(noAttrs);
         _arrowArrays.resize(noAttrs);
 
         // Get Arrow Types and Schema
+        std::vector<std::shared_ptr<arrow::DataType>> arrowTypes(noAttrs);
         std::vector<std::shared_ptr<arrow::Field>> arrowFields(noAttrs);
         for(size_t i = 0; i < noAttrs; ++i) {
             auto inputType = _inputAttrs[i].getType();
@@ -476,7 +475,7 @@ public:
             switch (inputTypeEnum)
             {
             case TE_INT64:
-                _arrowTypes[i] = arrow::int64();
+                arrowTypes[i] = arrow::int64();
                 break;
             default:
               ostringstream error;
@@ -484,7 +483,7 @@ public:
               throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION) << error.str();
             }
 
-            arrowFields[i] = arrow::field(_inputAttrs[i].getName(), _arrowTypes[i]);
+            arrowFields[i] = arrow::field(_inputAttrs[i].getName(), arrowTypes[i]);
         }
         _arrowSchema = arrow::schema(arrowFields);
 
@@ -493,9 +492,8 @@ public:
         {
 	    THROW_NOT_OK(
 		arrow::MakeBuilder(
-		    _arrowPool, _arrowTypes[i], &_arrowBuilders[i]));
+		    _arrowPool, arrowTypes[i], &_arrowBuilders[i]));
         }
-
     }
 
     ~ArrowChunkPopulator()
