@@ -4,6 +4,7 @@ all:
 
 test:
 	./tests/test.sh
+	./tests/test_arrow.sh
 
 clean:
 	$(MAKE) -C src clean
