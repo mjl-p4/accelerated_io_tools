@@ -29,10 +29,6 @@ scidb.py stopall $SCIDB_NAME
 rm --recursive $SCIDB_INSTALL_PATH/DB-$SCIDB_NAME
 sed --in-place s/server-0=127.0.0.1,1/server-0=127.0.0.1,3/ \
     $SCIDB_INSTALL_PATH/etc/config.ini
-su --command="                                                       \
-    $SCIDB_INSTALL_PATH/bin/scidb.py init-syscat $SCIDB_NAME         \
-        --db-password `cut --delimiter : --fields 5  /root/.pgpass`" \
-    postgres
 scidb.py init-all --force $SCIDB_NAME
 scidb.py startall $SCIDB_NAME
 iquery --afl --query "list('instances')"
