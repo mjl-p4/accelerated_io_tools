@@ -558,6 +558,8 @@ public:
         // Batch Writer and Arrow Buffer Output Stream
         std::shared_ptr<arrow::PoolBuffer> arrowBuffer(
 	    new arrow::PoolBuffer(_arrowPool));
+        // std::shared_ptr<arrow::PoolBuffer> arrowBuffer =
+        //   make_shared<arrow::PoolBuffer>(_arrowPool);
         arrow::io::BufferOutputStream arrowStream(arrowBuffer);
         std::shared_ptr<arrow::ipc::RecordBatchWriter> arrowWriter;
 	THROW_NOT_OK(
@@ -1028,6 +1030,7 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
     LOG4CXX_DEBUG(logger, "ALT_SAVE>> starting write");
     std::shared_ptr<arrow::ipc::RecordBatchWriter> arrowWriter;
     std::shared_ptr<arrow::RecordBatch> arrowBatch;
+    std::shared_ptr<arrow::RecordBatchReader> arrowReader;
     size_t bytesWritten = 0;
     try
     {
@@ -1042,7 +1045,8 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
         {
             ConstChunk const& ch = arrayIter->getChunk();
             PinBuffer scope(ch);
-            uint32_t* sizePointer = (uint32_t*) (((char*)ch.getData()) + AioSaveSettings::chunkSizeOffset());
+            uint32_t* sizePointer = (uint32_t*) (((char*)ch.getData()) +
+                                                 AioSaveSettings::chunkSizeOffset());
             uint32_t size = *sizePointer;
             bytesWritten += size;
             char* data = ((char*)ch.getData() + AioSaveSettings::chunkDataOffset());
@@ -1056,7 +1060,6 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
             //         arrowSchema, &arrowBufferReader, &arrowBatch));
 
             // Read Record Batch using Stream Reader
-            std::shared_ptr<arrow::RecordBatchReader> arrowReader;
 	    THROW_NOT_OK(
 	        arrow::ipc::RecordBatchStreamReader::Open(
 	            &arrowBufferReader, &arrowReader));
