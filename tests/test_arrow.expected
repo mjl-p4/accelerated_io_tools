@@ -127,3 +127,10 @@ Error description: Error while saving array. Illegal operation: Type uint64 not 
 UserException in file: PhysicalAioSave.cpp function: saveToDiskArrow
 Error id: scidb::SCIDB_SE_ARRAY_WRITER::SCIDB_LE_ILLEGAL_OPERATION
 Error description: Error while saving array. Illegal operation: stderr not supported for arrow format.
+Query was executed successfully
+{inst,attid} att,count,bytes,chunks,min_count,avg_count,max_count,min_bytes,avg_bytes,max_bytes
+{0,0} 'all',32768000,524294336,99,768000,992970,1000000,48,5.2959e+06,8000072
+{i} x,y
+{chunk_no,dest_instance_id,source_instance_id} val
+{chunk_no,dest_instance_id,source_instance_id} val
+Query was executed successfully
