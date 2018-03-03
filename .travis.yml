@@ -29,4 +29,6 @@ script:
   - docker exec --tty scidb /accelerated_io_tools/tests/test_arrow.sh
 
 after_failure:
+  - docker exec --tty scidb cat /accelerated_io_tools/tests/test.out
+  - docker exec --tty scidb cat /accelerated_io_tools/tests/test_arrow.out
   - docker logs scidb

@@ -21,7 +21,7 @@ apt-get install --assume-yes --no-install-recommends \
 
 wget --no-verbose https://bootstrap.pypa.io/get-pip.py
 python get-pip.py
-pip install pandas pyarrow
+pip install pandas pyarrow scidb-py
 
 
 # Reset SciDB instance count to 4
