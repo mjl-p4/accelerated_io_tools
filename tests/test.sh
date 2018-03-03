@@ -341,4 +341,12 @@ echo "test aio_save 9" >> $TEST_OUT
 iquery -anq "aio_save(apply(build(<a:uint8>[i=1:5,5,0], '[(0),(1),(127),(128),(255)]',true), b, int8(a)), '/tmp/load_tools_test/foo')" >> $TEST_OUT
 cat /tmp/load_tools_test/foo >> $TEST_OUT
 
+iquery -anq "remove(foo)"                        > /dev/null 2>&1
+iquery -anq "remove(bar)"                        > /dev/null 2>&1
+iquery -anq "remove(zero_to_255)"                > /dev/null 2>&1
+iquery -anq "remove(minus_128_to_127)"           > /dev/null 2>&1
+iquery -anq "remove(zero_to_65535)"              > /dev/null 2>&1
+iquery -anq "remove(minus_32768_to_32767)"       > /dev/null 2>&1
+iquery -anq "remove(big_n_wild)"                 > /dev/null 2>&1
+
 diff $TEST_OUT $DIR/test.expected
