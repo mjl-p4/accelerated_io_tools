@@ -34,9 +34,8 @@ $IQ "aio_save(build(<x:int64>[i=0:0], i), 'stderr', 'format=arrow')" \
     >> $TEST_OUT
 
 
-
 echo "1. store"
-time $IQ "set no fetch; store(apply(build(<x:int64>[i=1:32768000], i), y, x * x), foo)" \
+time $IQ "set no fetch; store(apply(build(<x:int64>[i=1:13107200], i), y, x * x), foo)" \
      >> $TEST_OUT
 iq "summarize(foo)"
 
@@ -44,19 +43,22 @@ echo "2. save"
 time $IQ "save(foo, '$F', 0, '(int64, int64)')" \
      >> $TEST_OUT
 sz=`stat --printf="%s" $F`
-echo "$((sz / 1024 / 1024)) MB ($sz B)"
+echo "$((sz / 1024 / 1024)) MB ($sz B)" \
+     >> $TEST_OUT
 
 echo "3. aio_save(binary)"
 time $IQ "aio_save(foo, '$F', 'format=(int64, int64)')" \
      >> $TEST_OUT
 sz=`stat --printf="%s" $F`
-echo "$((sz / 1024 / 1024)) MB ($sz B)"
+echo "$((sz / 1024 / 1024)) MB ($sz B)" \
+     >> $TEST_OUT
 
 echo "4. aio_save(arrow)"
 time $IQ "aio_save(foo, '$F', 'format=arrow')" \
      >> $TEST_OUT
 sz=`stat --printf="%s" $F`
-echo "$((sz / 1024 / 1024)) MB ($sz B)"
+echo "$((sz / 1024 / 1024)) MB ($sz B)" \
+     >> $TEST_OUT
 
 echo "5. SciDB-Py fetch"
 time python -c "import scidbpy; scidbpy.connect().arrays.foo.fetch()"

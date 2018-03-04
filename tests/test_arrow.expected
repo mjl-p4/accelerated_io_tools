@@ -129,8 +129,11 @@ Error description: Error while saving array. Illegal operation: Type uint64 not 
 {chunk_no,dest_instance_id,source_instance_id} val
 Query was executed successfully
 {inst,attid} att,count,bytes,chunks,min_count,avg_count,max_count,min_bytes,avg_bytes,max_bytes
-{0,0} 'all',32768000,524294336,99,768000,992970,1000000,48,5.2959e+06,8000072
+{0,0} 'all',13107200,209717888,42,107200,936229,1000000,48,4.99328e+06,8000072
 {i} x,y
+200 MB (209715200 B)
 {chunk_no,dest_instance_id,source_instance_id} val
+200 MB (209715200 B)
 {chunk_no,dest_instance_id,source_instance_id} val
+200 MB (209715956 B)
 Query was executed successfully
