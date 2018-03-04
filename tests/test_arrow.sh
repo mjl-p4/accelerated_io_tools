@@ -26,10 +26,12 @@ $IQ "aio_save(build(<x:uint64>[i=0:0], i), '$F', 'format=arrow')" 2>&1 \
     |  grep --invert-match "Failed query id:" >> $TEST_OUT                 \
     || echo "expected exception"
 
-$IQ "aio_save(build(<x:int64>[i=0:0], i), 'stderr', 'format=arrow')" 2>&1 \
-    |  sed --expression='s/ line: [0-9]\+//g'                             \
-    |  grep --invert-match "Failed query id:" >> $TEST_OUT                \
-    || echo "expected exception"
+$IQ "aio_save(build(<x:int64>[i=0:0], i), 'console', 'format=arrow')" \
+    >> $TEST_OUT
+$IQ "aio_save(build(<x:int64>[i=0:0], i), 'stdout', 'format=arrow')" \
+    >> $TEST_OUT
+$IQ "aio_save(build(<x:int64>[i=0:0], i), 'stderr', 'format=arrow')" \
+    >> $TEST_OUT
 
 
 

@@ -159,6 +159,29 @@ class StdoutStream : public arrow::io::OutputStream {
   int64_t pos_;
 };
 
+// Output stream that just writes to stderr.
+class StderrStream : public arrow::io::OutputStream {
+ public:
+  StderrStream() : pos_(0) { set_mode(arrow::io::FileMode::WRITE); }
+  ~StderrStream() override {}
+
+  arrow::Status Close() override { return arrow::Status::OK(); }
+
+  arrow::Status Tell(int64_t* position) const override {
+    *position = pos_;
+    return arrow::Status::OK();
+  }
+
+  arrow::Status Write(const void* data, int64_t nbytes) override {
+    pos_ += nbytes;
+    std::cerr.write(reinterpret_cast<const char*>(data), nbytes);
+    return arrow::Status::OK();
+  }
+
+ private:
+  int64_t pos_;
+};
+
 class MemChunkBuilder
 {
 private:
@@ -1001,14 +1024,10 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
     if (fileName == "console" || fileName == "stdout")
     {
         arrowStream.reset(new StdoutStream());
-        throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION)
-             << "stdout or console not supported for arrow format";
     }
     else if (fileName == "stderr")
     {
-        // TODO: StderrStream support
-        throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION)
-             << "stderr not supported for arrow format";
+        arrowStream.reset(new StderrStream());
     }
     else
     {
@@ -1078,7 +1097,7 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
         {
             arrowWriter->Close();
         }
-        if (fileName == "console" || fileName == "stdout")
+        if (fileName == "console" || fileName == "stdout" || fileName == "stderr")
         {
             arrowStream->Flush();
         }
@@ -1092,7 +1111,7 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
 
     LOG4CXX_DEBUG(logger, "ALT_SAVE>> wrote "<< bytesWritten<< " bytes, closing");
     THROW_NOT_OK_FILE(arrowWriter->Close());
-    if (fileName == "console" || fileName == "stdout")
+    if (fileName == "console" || fileName == "stdout" || fileName == "stderr")
     {
         THROW_NOT_OK_FILE(arrowStream->Flush());
     }
