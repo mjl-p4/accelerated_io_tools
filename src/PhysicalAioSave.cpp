@@ -123,6 +123,9 @@ std::shared_ptr<arrow::Schema> attributes2ArrowSchema(Attributes const& attrs)
         case TE_INT64:
             arrowType = arrow::int64();
             break;
+        case TE_STRING:
+            arrowType = arrow::utf8();
+            break;
         default:
             ostringstream error;
             error << "Type " << type << " not supported in arrow format";
@@ -555,6 +558,21 @@ public:
 			     static_cast<arrow::Int64Builder*>(
 				 _arrowBuilders[i].get())->Append(
 				     value->getInt64()));
+                     }
+                     break;
+                case TE_STRING:
+                     if(value->isNull())
+                     {
+			 THROW_NOT_OK(
+			     static_cast<arrow::StringBuilder*>(
+				 _arrowBuilders[i].get())->AppendNull());
+                     }
+                     else
+                     {
+			 THROW_NOT_OK(
+			     static_cast<arrow::StringBuilder*>(
+				 _arrowBuilders[i].get())->Append(
+				     value->getString()));
                      }
                      break;
                 default:
