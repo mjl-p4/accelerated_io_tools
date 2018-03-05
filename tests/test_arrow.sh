@@ -41,7 +41,7 @@ $IQ "aio_save(build(<x:int64>[i=0:0], i), 'stderr', 'format=arrow')" \
 
 echo "I. int64, int64(null)"
 echo "1. store"
-time $IQ "set no fetch; store(apply(build(<x:int64>[i=1:13107200], i), y, iif(i%2=0, i * i, int64(null))), foo)" \
+time $IQ "set no fetch; store(apply(build(<x:int64 not null>[i=1:3100000], i), y, iif(i%2=0, i * i, int64(null))), foo)" \
      >> $TEST_OUT
 iq "summarize(foo)"
 
@@ -67,7 +67,7 @@ echo "$((sz / 1024 / 1024)) MB ($sz B)" \
      >> $TEST_OUT
 
 echo "5. SciDB-Py fetch"
-time python -c "import scidbpy; scidbpy.connect().arrays.foo.fetch()"
+time python -c "import scidbpy; scidbpy.connect().arrays.foo.fetch(atts_only=True)"
 
 echo "6. Arrow read"
 time python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas())" \
@@ -78,7 +78,7 @@ iq "remove(foo)"
 
 echo "II. int64, string(null)"
 echo "1. store"
-time $IQ "set no fetch; store(apply(build(<x:int64>[i=1:13107200], i), y, iif(i%2=0, string(i * i), string(null))), foo)" \
+time $IQ "set no fetch; store(apply(build(<x:int64 not null>[i=1:2700000], i), y, iif(i%2=0, string(i * i), string(null))), foo)" \
      >> $TEST_OUT
 iq "summarize(foo)"
 
@@ -104,7 +104,7 @@ echo "$((sz / 1024 / 1024)) MB ($sz B)" \
      >> $TEST_OUT
 
 echo "5. SciDB-Py fetch"
-time python -c "import scidbpy; scidbpy.connect().arrays.foo.fetch(as_dataframe=False)"
+time python -c "import scidbpy; scidbpy.connect().arrays.foo.fetch(atts_only=True)"
 
 echo "6. Arrow read"
 time python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas())" \
