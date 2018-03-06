@@ -11,6 +11,14 @@ services:
   - docker
 
 before_install:
+  - mkdir shim
+  - wget --no-verbose --output-document -
+    https://github.com/Paradigm4/shim/archive/master.tar.gz
+    | tar --extract --gzip --directory=shim
+  - mkdir scidb-py
+  - wget --no-verbose --output-document -
+    https://github.com/Paradigm4/scidb-py/archive/master.tar.gz
+    | tar --extract --gzip --directory=scidb-py
   - docker pull rvernica/scidb:${SCIDB_IMG}
   - docker run
     --name scidb
@@ -19,6 +27,8 @@ before_install:
     --volume `pwd`:/accelerated_io_tools
     --env ARROW_VER=${ARROW_VER}
     rvernica/scidb:${SCIDB_IMG}
+  - docker exec scidb ls /accelerated_io_tools/shim
+  - docker exec scidb ls /accelerated_io_tools/scidb-py
   - while ! curl http://localhost:8080/version; do sleep 5; done
 
 install:
