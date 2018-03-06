@@ -27,7 +27,6 @@ before_install:
     --volume `pwd`:/accelerated_io_tools
     --env ARROW_VER=${ARROW_VER}
     rvernica/scidb:${SCIDB_IMG}
-  - docker exec scidb pipls /accelerated_io_tools/scidb-py
   - while ! curl http://localhost:8080/version; do sleep 5; done
 
 install:
