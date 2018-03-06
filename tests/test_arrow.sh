@@ -70,7 +70,7 @@ echo "5. SciDB-Py fetch"
 time python -c "import scidbpy; scidbpy.connect().arrays.foo.fetch(atts_only=True)"
 
 echo "6. Arrow read"
-time python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas())" \
+time python -c "import pyarrow; print(pyarrow.open_stream('$F').read_pandas())" \
      >> /dev/null
 
 iq "remove(foo)"
@@ -107,7 +107,7 @@ echo "5. SciDB-Py fetch"
 time python -c "import scidbpy; scidbpy.connect().arrays.foo.fetch(atts_only=True)"
 
 echo "6. Arrow read"
-time python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas())" \
+time python -c "import pyarrow; print(pyarrow.open_stream('$F').read_pandas())" \
      >> /dev/null
 
 iq "remove(foo)"
