@@ -66,12 +66,15 @@ sz=`stat --printf="%s" $F`
 echo "$((sz / 1024 / 1024)) MB ($sz B)" \
      >> $TEST_OUT
 
-echo "5. SciDB-Py fetch"
-time python -c "import scidbpy; scidbpy.connect().arrays.foo.fetch(atts_only=True)"
-
-echo "6. Arrow read"
+echo "5. Arrow read"
 time python -c "import pyarrow; print(pyarrow.open_stream('$F').read_pandas())" \
      >> /dev/null
+
+echo "6. SciDB-Py fetch"
+time python -c "import scidbpy; scidbpy.connect().arrays.foo.fetch(atts_only=True)"
+
+echo "7. SciDB-Py fetch w/ Arrow"
+time python -c "import scidbpy; scidbpy.connect().arrays.foo.fetch(atts_only=True, use_arrow=True)"
 
 iq "remove(foo)"
 
@@ -103,12 +106,16 @@ sz=`stat --printf="%s" $F`
 echo "$((sz / 1024 / 1024)) MB ($sz B)" \
      >> $TEST_OUT
 
-echo "5. SciDB-Py fetch"
-time python -c "import scidbpy; scidbpy.connect().arrays.foo.fetch(atts_only=True)"
-
-echo "6. Arrow read"
+echo "5. Arrow read"
 time python -c "import pyarrow; print(pyarrow.open_stream('$F').read_pandas())" \
      >> /dev/null
+
+echo "6. SciDB-Py fetch"
+time python -c "import scidbpy; scidbpy.connect().arrays.foo.fetch(atts_only=True)"
+
+echo "7. SciDB-Py fetch w/ Arrow"
+time python -c "import scidbpy; scidbpy.connect().arrays.foo.fetch(atts_only=True, use_arrow=True)"
+
 
 iq "remove(foo)"
 
