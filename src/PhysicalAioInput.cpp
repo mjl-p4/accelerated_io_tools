@@ -135,7 +135,7 @@ public:
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "File splitter cannot allocate memory";
         }
-        _bufPointer = (char*) _chunk.getData();
+        _bufPointer = (char*) _chunk.getConstData();
         ConstRLEPayload::Header* hdr = (ConstRLEPayload::Header*) _bufPointer;
         hdr->_magic = RLE_PAYLOAD_MAGIC;
         hdr->_nSegs = 1;
@@ -444,8 +444,8 @@ public:
            {
                ConstChunk const& ch = srcArrayIter->getChunk();
                PinBuffer pinScope(ch);
-               char* start = ((char*) ch.getData()) + getChunkOverheadSize();
-               uint32_t const sourceSize = *((uint32_t*)(((char*) ch.getData()) + getSizeOffset()));
+               char* start = ((char*) ch.getConstData()) + getChunkOverheadSize();
+               uint32_t const sourceSize = *((uint32_t*)(((char*) ch.getConstData()) + getSizeOffset()));
                if(dst == 0)
                {
                    supplementCoords[1] = nInstances-1;
@@ -495,7 +495,7 @@ public:
             }
             buf = BufReceive(i, query);
             vector<Coordinate> otherLastBlocks(numInstances);
-            memcpy(&otherLastBlocks[0], buf->getData(), vectorSize);
+            memcpy(&otherLastBlocks[0], buf->getConstData(), vectorSize);
             for(size_t j =0; j<numInstances; ++j)
             {
                 if(otherLastBlocks[j] > myLastBlocks[j])
@@ -549,7 +549,7 @@ public:
             ConstChunk const& chunk =  inputIterator->getChunk();
             {
                 PinBuffer pinScope(chunk);
-                char* chunkData = ((char*) chunk.getData());
+                char* chunkData = ((char*) chunk.getConstData());
                 char* sourceStart = chunkData + overheadSize;
                 char* chunkBodyStart  = sourceStart;
                 uint32_t sourceSize = *((uint32_t*)(chunkData + sizeOffset));
