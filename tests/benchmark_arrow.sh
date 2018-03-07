@@ -16,7 +16,6 @@ if ! [[ $MB =~ $RE ]] ; then
 fi
 
 CNT=$((MB * 32768))            # MB * 1024 * 1024 / 8 / 4
-echo $CNT
 
 
 echo "I. int64, int64, int64, int64"
