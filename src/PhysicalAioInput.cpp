@@ -135,7 +135,7 @@ public:
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "File splitter cannot allocate memory";
         }
-        _bufPointer = (char*) _chunk.getData();
+        _bufPointer = (char*) _chunk.getConstData();
         ConstRLEPayload::Header* hdr = (ConstRLEPayload::Header*) _bufPointer;
         hdr->_magic = RLE_PAYLOAD_MAGIC;
         hdr->_nSegs = 1;
