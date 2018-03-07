@@ -93,7 +93,7 @@ public:
         _allocSize(s_startingSize)
     {
         _chunk.allocate(_allocSize);
-        _chunkStartPointer = (char*) _chunk.getData();
+        _chunkStartPointer = (char*) _chunk.getConstData();
         ConstRLEPayload::Header* hdr = (ConstRLEPayload::Header*) _chunkStartPointer;
         hdr->_magic = RLE_PAYLOAD_MAGIC;
         hdr->_nSegs = 1;
@@ -133,9 +133,9 @@ public:
                 _allocSize = _allocSize * 2;
             }
             vector<char> buf(_allocSize);
-            memcpy(&(buf[0]), _chunk.getData(), mySize);
+            memcpy(&(buf[0]), _chunk.getConstData(), mySize);
             _chunk.allocate(_allocSize);
-            _chunkStartPointer = (char*) _chunk.getData();
+            _chunkStartPointer = (char*) _chunk.getConstData();
             memcpy(_chunkStartPointer, &(buf[0]), mySize);
             _dataStartPointer = _chunkStartPointer + AioSaveSettings::chunkDataOffset();
             _sizePointer = (uint32_t*) (_chunkStartPointer + AioSaveSettings::chunkSizeOffset());
@@ -747,10 +747,10 @@ uint64_t saveToDisk(shared_ptr<Array> const& array,
         {
             ConstChunk const& ch = arrayIter->getChunk();
             PinBuffer scope(ch);
-            uint32_t* sizePointer = (uint32_t*) (((char*)ch.getData()) + AioSaveSettings::chunkSizeOffset());
+            uint32_t* sizePointer = (uint32_t*) (((char*)ch.getConstData()) + AioSaveSettings::chunkSizeOffset());
             uint32_t size = *sizePointer;
             bytesWritten += size;
-            char* data = ((char*)ch.getData() + AioSaveSettings::chunkDataOffset());
+            char* data = ((char*)ch.getConstData() + AioSaveSettings::chunkDataOffset());
             if (::fwrite(data, 1, size, f) != size)
             {
                 int err = errno ? errno : EIO;
@@ -828,7 +828,7 @@ public:
     {
         std::shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, sizeof(bool)));
         InstanceID myId = query->getInstanceID();
-        *((bool*) buf->getData()) = value;
+        *((bool*) buf->getConstData()) = value;
         for(InstanceID i=0; i<query->getInstancesCount(); i++)
         {
             if(i != myId)
@@ -841,7 +841,7 @@ public:
             if(i != myId)
             {
                 buf = BufReceive(i,query);
-                bool otherInstanceVal = *((bool*) buf->getData());
+                bool otherInstanceVal = *((bool*) buf->getConstData());
                 value = value && otherInstanceVal;
             }
         }
