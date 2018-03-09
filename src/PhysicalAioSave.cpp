@@ -93,7 +93,7 @@ public:
         _allocSize(s_startingSize)
     {
         _chunk.allocate(_allocSize);
-        _chunkStartPointer = (char*) _chunk.getConstData();
+        _chunkStartPointer = (char*) _chunk.getData();
         ConstRLEPayload::Header* hdr = (ConstRLEPayload::Header*) _chunkStartPointer;
         hdr->_magic = RLE_PAYLOAD_MAGIC;
         hdr->_nSegs = 1;
@@ -133,9 +133,9 @@ public:
                 _allocSize = _allocSize * 2;
             }
             vector<char> buf(_allocSize);
-            memcpy(&(buf[0]), _chunk.getConstData(), mySize);
+            memcpy(&(buf[0]), _chunk.getData(), mySize);
             _chunk.allocate(_allocSize);
-            _chunkStartPointer = (char*) _chunk.getConstData();
+            _chunkStartPointer = (char*) _chunk.getData();
             memcpy(_chunkStartPointer, &(buf[0]), mySize);
             _dataStartPointer = _chunkStartPointer + AioSaveSettings::chunkDataOffset();
             _sizePointer = (uint32_t*) (_chunkStartPointer + AioSaveSettings::chunkSizeOffset());
@@ -828,7 +828,7 @@ public:
     {
         std::shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, sizeof(bool)));
         InstanceID myId = query->getInstanceID();
-        *((bool*) buf->getConstData()) = value;
+        *((bool*) buf->getData()) = value;
         for(InstanceID i=0; i<query->getInstancesCount(); i++)
         {
             if(i != myId)
