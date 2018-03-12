@@ -537,7 +537,10 @@ public:
 
         // Append to Arrow Builders
         int64_t nCells = 0;
-        while (!cursor.end() && ((cellsPerChunk<=0 && builder.getTotalSize() < bytesPerChunk) || (cellsPerChunk > 0 && nCells < cellsPerChunk)))
+
+        while (!cursor.end() &&
+               ((cellsPerChunk <= 0 && builder.getTotalSize() < bytesPerChunk) ||
+                (cellsPerChunk > 0 && nCells < cellsPerChunk)))
         {
             vector<Value const*> const& cell = cursor.getCell();
             for (size_t i = 0; i < nAttrs; ++i)
