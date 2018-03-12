@@ -109,10 +109,10 @@ static void EXCEPTION_ASSERT(bool cond)
 
 std::shared_ptr<arrow::Schema> attributes2ArrowSchema(Attributes const& attrs)
 {
-    size_t noAttrs = attrs.size();
+    size_t nAttrs = attrs.size();
 
-    std::vector<std::shared_ptr<arrow::Field>> arrowFields(noAttrs);
-    for(size_t i = 0; i < noAttrs; ++i)
+    std::vector<std::shared_ptr<arrow::Field>> arrowFields(nAttrs);
+    for(size_t i = 0; i < nAttrs; ++i)
     {
         auto type = attrs[i].getType();
         auto typeEnum = typeId2TypeEnum(type, true);
@@ -506,14 +506,14 @@ public:
         _inputAttrs(inputArrayDesc.getAttributes(true)),
         _arrowSchema(attributes2ArrowSchema(_inputAttrs))
     {
-        const size_t noAttrs = _inputAttrs.size();
+        const size_t nAttrs = _inputAttrs.size();
 
-        _inputTypes.resize(noAttrs);
-        _arrowBuilders.resize(noAttrs);
-        _arrowArrays.resize(noAttrs);
+        _inputTypes.resize(nAttrs);
+        _arrowBuilders.resize(nAttrs);
+        _arrowArrays.resize(nAttrs);
 
         // Create Arrow Builders
-        for(size_t i = 0; i < noAttrs; ++i) {
+        for(size_t i = 0; i < nAttrs; ++i) {
             _inputTypes[i] = typeId2TypeEnum(_inputAttrs[i].getType(), true);
 
 	    THROW_NOT_OK(
@@ -533,14 +533,14 @@ public:
                        int16_t const cellsPerChunk)
     {
         // Basic setup
-        const size_t noAttrs = _inputTypes.size();
+        const size_t nAttrs = _inputTypes.size();
 
         // Append to Arrow Builders
         int64_t nCells = 0;
         while (!cursor.end() && ((cellsPerChunk<=0 && builder.getTotalSize() < bytesPerChunk) || (cellsPerChunk > 0 && nCells < cellsPerChunk)))
         {
             vector<Value const*> const& cell = cursor.getCell();
-            for (size_t i = 0; i < cursor.nAttrs(); ++i)
+            for (size_t i = 0; i < nAttrs; ++i)
             {
                 Value const* value = cell[i];
                 switch (_inputTypes[i])
@@ -586,7 +586,7 @@ public:
         }
 
         // Finalize Arrow Builders and populate Arrow Arrays
-        for (size_t i = 0; i < noAttrs; ++i) {
+        for (size_t i = 0; i < nAttrs; ++i) {
 	    THROW_NOT_OK(
 		_arrowBuilders[i]->Finish(&_arrowArrays[i])); // Resets builder
         }
