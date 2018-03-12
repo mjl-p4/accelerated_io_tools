@@ -313,29 +313,29 @@ public:
         return _nAttrs;
     }
 
-    void advance()
+    void advanceChunkIters()
     {
-        if(_end)
+        if (_end)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Internal error: iterating past end of cursor";
         }
         if (_inputChunkIters[0] == 0) //1st time!
         {
-            for(size_t i =0; i<_nAttrs; ++i)
+            for(size_t i = 0; i < _nAttrs; ++i)
             {
                 _inputChunkIters[i] = _inputArrayIters[i]->getChunk().getConstIterator(ConstChunkIterator::IGNORE_OVERLAPS | ConstChunkIterator::IGNORE_EMPTY_CELLS);
             }
         }
         else if (!_inputChunkIters[0]->end()) //not first time!
         {
-            for(size_t i =0; i<_nAttrs; ++i)
+            for(size_t i = 0; i < _nAttrs; ++i)
             {
                 ++(*_inputChunkIters[i]);
             }
         }
         while(_inputChunkIters[0]->end())
         {
-            for(size_t i =0; i<_nAttrs; ++i)
+            for(size_t i =0; i < _nAttrs; ++i)
             {
                 ++(*_inputArrayIters[i]);
             }
@@ -344,12 +344,25 @@ public:
                 _end = true;
                 return;
             }
-            for(size_t i =0; i<_nAttrs; ++i)
+            for(size_t i =0; i < _nAttrs; ++i)
             {
                 _inputChunkIters[i] = _inputArrayIters[i]->getChunk().getConstIterator(ConstChunkIterator::IGNORE_OVERLAPS | ConstChunkIterator::IGNORE_EMPTY_CELLS);
             }
         }
-        for(size_t i =0; i<_nAttrs; ++i)
+    }
+
+    void advance()
+    {
+        if (_end)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Internal error: iterating past end of cursor";
+        }
+        advanceChunkIters();
+        if (_end)
+        {
+            return;
+        }
+        for(size_t i = 0; i < _nAttrs; ++i)
         {
             _currentCell[i] = &(_inputChunkIters[i]->getItem());
         }
@@ -358,6 +371,11 @@ public:
     vector <Value const *> const& getCell()
     {
         return _currentCell;
+    }
+
+    Value const* getItem(size_t i)
+    {
+        return &(_inputChunkIters[i]->getItem());
     }
 
     Coordinates const& getPosition()
@@ -542,10 +560,9 @@ public:
                ((cellsPerChunk <= 0 && builder.getTotalSize() < bytesPerChunk) ||
                 (cellsPerChunk > 0 && nCells < cellsPerChunk)))
         {
-            vector<Value const*> const& cell = cursor.getCell();
             for (size_t i = 0; i < nAttrs; ++i)
             {
-                Value const* value = cell[i];
+                Value const* value = cursor.getItem(i);
                 switch (_inputTypes[i])
                 {
                 case TE_INT64:
@@ -584,7 +601,8 @@ public:
                      throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION) << error.str();
                 }
             }
-            cursor.advance();
+
+            cursor.advanceChunkIters();
             ++nCells;
         }
 
