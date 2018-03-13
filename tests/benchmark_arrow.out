@@ -9,39 +9,39 @@ Query was executed successfully
 3. save
 {i} z,y,x,w
 
-real	0m6.113s
-user	0m0.011s
+real	0m6.246s
+user	0m0.010s
 sys	0m0.006s
 500 MB (524288000 B)
 4. aio_save(binary)
 {chunk_no,dest_instance_id,source_instance_id} val
 
-real	0m2.487s
-user	0m0.011s
-sys	0m0.004s
+real	0m2.628s
+user	0m0.008s
+sys	0m0.006s
 500 MB (524288000 B)
 5. aio_save(arrow)
 {chunk_no,dest_instance_id,source_instance_id} val
 
-real	0m3.416s
-user	0m0.005s
+real	0m2.982s
+user	0m0.008s
 sys	0m0.006s
 500 MB (524289428 B)
 6. Arrow read
 
-real	0m0.555s
-user	0m0.499s
-sys	0m0.477s
+real	0m0.551s
+user	0m0.450s
+sys	0m0.530s
 7. SciDB-Py fetch
 
-real	0m7.266s
-user	0m1.937s
-sys	0m1.635s
+real	0m6.763s
+user	0m1.888s
+sys	0m1.654s
 8. SciDB-Py fetch w/ Arrow
 
-real	0m8.109s
-user	0m1.733s
-sys	0m1.630s
+real	0m8.358s
+user	0m1.712s
+sys	0m1.651s
 Query was executed successfully
 II. int64, int64, int64, int64, string('')
 1. store
@@ -50,41 +50,41 @@ Query was executed successfully
 {i} schema
 {0} 'foo<z:int64 NOT NULL,y:int64 NOT NULL,x:int64 NOT NULL,w:int64 NOT NULL,v:string NOT NULL> [i=1:16384000:0:1000000]'
 {inst,attid} att,count,bytes,chunks,min_count,avg_count,max_count,min_bytes,avg_bytes,max_bytes
-{0,0} 'all',16384000,524295054,102,384000,963765,1000000,48,5.14015e+06,8000088
+{0,0} 'all',16384000,524295038,102,384000,963765,1000000,48,5.14015e+06,8000072
 3. save
 {i} z,y,x,w,v
 
-real	0m9.458s
-user	0m0.005s
-sys	0m0.009s
+real	0m9.319s
+user	0m0.007s
+sys	0m0.004s
 578 MB (606208000 B)
 4. aio_save(binary)
 {chunk_no,dest_instance_id,source_instance_id} val
 
-real	0m3.354s
-user	0m0.011s
-sys	0m0.003s
+real	0m3.483s
+user	0m0.005s
+sys	0m0.009s
 578 MB (606208000 B)
 5. aio_save(arrow)
 {chunk_no,dest_instance_id,source_instance_id} val
 
-real	0m4.682s
-user	0m0.014s
+real	0m4.059s
+user	0m0.011s
 sys	0m0.003s
 562 MB (589825764 B)
 6. Arrow read
 
-real	0m0.762s
-user	0m0.672s
-sys	0m0.517s
+real	0m0.751s
+user	0m0.640s
+sys	0m0.538s
 7. SciDB-Py fetch
 
-real	11m20.983s
-user	11m6.498s
-sys	0m7.068s
+real	11m7.707s
+user	10m53.613s
+sys	0m6.711s
 8. SciDB-Py fetch w/ Arrow
 
-real	0m10.952s
-user	0m2.113s
-sys	0m2.007s
+real	0m9.921s
+user	0m2.039s
+sys	0m2.008s
 Query was executed successfully
