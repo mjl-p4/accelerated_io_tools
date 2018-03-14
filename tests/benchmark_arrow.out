@@ -20,22 +20,22 @@ Save
 ===
 Fix Size Schema (int64 only)
 ---
-Binary:   1.12 seconds 178.88 MB/second
-Arrow:    1.54 seconds 129.62 MB/second
+Binary:   1.21 seconds 165.67 MB/second
+Arrow:    1.35 seconds 148.59 MB/second
 
 Variable Size Schema (int64 and string)
 ---
-Binary:   1.47 seconds 136.39 MB/second
-Arrow:    2.12 seconds  94.42 MB/second
+Binary:   1.58 seconds 126.40 MB/second
+Arrow:    1.83 seconds 109.51 MB/second
 
 Download
 ===
 Fix Size Schema (int64 only)
 ---
-Binary:   2.44 seconds  81.92 MB/second
-Arrow:    2.94 seconds  67.92 MB/second
+Binary:   2.71 seconds  73.83 MB/second
+Arrow:    2.72 seconds  73.47 MB/second
 
 Variable Size Schema (int64 and string)
 ---
-Binary: 253.63 seconds   0.79 MB/second
-Arrow:    3.78 seconds  52.89 MB/second
+Binary: 252.10 seconds   0.79 MB/second
+Arrow:    3.50 seconds  57.22 MB/second
