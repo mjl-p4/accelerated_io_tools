@@ -1,90 +1,41 @@
-I. int64, int64, int64, int64
-1. store
-Query was executed successfully
-2. summary
-{i} schema
-{0} 'foo<z:int64 NOT NULL,y:int64 NOT NULL,x:int64 NOT NULL,w:int64 NOT NULL> [i=1:16384000:0:1000000]'
-{inst,attid} att,count,bytes,chunks,min_count,avg_count,max_count,min_bytes,avg_bytes,max_bytes
-{0,0} 'all',16384000,524293712,85,384000,963765,1000000,48,6.16816e+06,8000072
-3. save
-{i} z,y,x,w
 
-real	0m6.246s
-user	0m0.010s
-sys	0m0.006s
-500 MB (524288000 B)
-4. aio_save(binary)
-{chunk_no,dest_instance_id,source_instance_id} val
+Setup
+===
+Target size:    200.00 MB
+Number of runs:   3
 
-real	0m2.628s
-user	0m0.008s
-sys	0m0.006s
-500 MB (524288000 B)
-5. aio_save(arrow)
-{chunk_no,dest_instance_id,source_instance_id} val
+Fix Size Schema (int64 only)
+---
+SciDB size:     200.00 MB
+In-memory size: 200.00 MB
+File size:      200.00 MB
 
-real	0m2.982s
-user	0m0.008s
-sys	0m0.006s
-500 MB (524289428 B)
-6. Arrow read
+Variable Size Schema (int64 and string)
+---
+SciDB size:     200.00 MB
+In-memory size: 250.00 MB
+File size:      225.00 MB
 
-real	0m0.551s
-user	0m0.450s
-sys	0m0.530s
-7. SciDB-Py fetch
+Save
+===
+Fix Size Schema (int64 only)
+---
+Binary:   1.12 seconds 178.88 MB/second
+Arrow:    1.54 seconds 129.62 MB/second
 
-real	0m6.763s
-user	0m1.888s
-sys	0m1.654s
-8. SciDB-Py fetch w/ Arrow
+Variable Size Schema (int64 and string)
+---
+Binary:   1.47 seconds 136.39 MB/second
+Arrow:    2.12 seconds  94.42 MB/second
 
-real	0m8.358s
-user	0m1.712s
-sys	0m1.651s
-Query was executed successfully
-II. int64, int64, int64, int64, string('')
-1. store
-Query was executed successfully
-2. summary
-{i} schema
-{0} 'foo<z:int64 NOT NULL,y:int64 NOT NULL,x:int64 NOT NULL,w:int64 NOT NULL,v:string NOT NULL> [i=1:16384000:0:1000000]'
-{inst,attid} att,count,bytes,chunks,min_count,avg_count,max_count,min_bytes,avg_bytes,max_bytes
-{0,0} 'all',16384000,524295038,102,384000,963765,1000000,48,5.14015e+06,8000072
-3. save
-{i} z,y,x,w,v
+Download
+===
+Fix Size Schema (int64 only)
+---
+Binary:   2.44 seconds  81.92 MB/second
+Arrow:    2.94 seconds  67.92 MB/second
 
-real	0m9.319s
-user	0m0.007s
-sys	0m0.004s
-578 MB (606208000 B)
-4. aio_save(binary)
-{chunk_no,dest_instance_id,source_instance_id} val
-
-real	0m3.483s
-user	0m0.005s
-sys	0m0.009s
-578 MB (606208000 B)
-5. aio_save(arrow)
-{chunk_no,dest_instance_id,source_instance_id} val
-
-real	0m4.059s
-user	0m0.011s
-sys	0m0.003s
-562 MB (589825764 B)
-6. Arrow read
-
-real	0m0.751s
-user	0m0.640s
-sys	0m0.538s
-7. SciDB-Py fetch
-
-real	11m7.707s
-user	10m53.613s
-sys	0m6.711s
-8. SciDB-Py fetch w/ Arrow
-
-real	0m9.921s
-user	0m2.039s
-sys	0m2.008s
-Query was executed successfully
+Variable Size Schema (int64 and string)
+---
+Binary: 253.63 seconds   0.79 MB/second
+Arrow:    3.78 seconds  52.89 MB/second
