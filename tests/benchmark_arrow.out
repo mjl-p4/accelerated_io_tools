@@ -3,39 +3,28 @@ Setup
 ===
 Target size:    200.00 MB
 Number of runs:   3
+Chunk size:     100
 
 Fix Size Schema (int64 only)
 ---
-SciDB size:     200.00 MB
-In-memory size: 200.00 MB
+SciDB size:     221.00 MB
+In-memory size:   0.00 MB
 File size:      200.00 MB
 
 Variable Size Schema (int64 and string)
 ---
-SciDB size:     200.00 MB
-In-memory size: 250.00 MB
+SciDB size:     225.88 MB
+In-memory size:   0.00 MB
 File size:      225.00 MB
 
 Save
 ===
 Fix Size Schema (int64 only)
 ---
-Binary:   1.21 seconds 165.67 MB/second
-Arrow:    1.35 seconds 148.59 MB/second
+Binary:   6.39 seconds  31.31 MB/second
+Arrow:    6.59 seconds  30.34 MB/second
 
 Variable Size Schema (int64 and string)
 ---
-Binary:   1.58 seconds 126.40 MB/second
-Arrow:    1.83 seconds 109.51 MB/second
-
-Download
-===
-Fix Size Schema (int64 only)
----
-Binary:   2.71 seconds  73.83 MB/second
-Arrow:    2.72 seconds  73.47 MB/second
-
-Variable Size Schema (int64 and string)
----
-Binary: 252.10 seconds   0.79 MB/second
-Arrow:    3.50 seconds  57.22 MB/second
+Binary:   8.86 seconds  22.56 MB/second
+Arrow:    9.08 seconds  22.04 MB/second
