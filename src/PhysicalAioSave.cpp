@@ -540,9 +540,9 @@ public:
         for(size_t i = 0; i < nAttrs; ++i) {
             _inputTypes[i] = typeId2TypeEnum(_inputAttrs[i].getType(), true);
 
-	    THROW_NOT_OK(
-		arrow::MakeBuilder(
-		    _arrowPool,
+            THROW_NOT_OK(
+                arrow::MakeBuilder(
+                    _arrowPool,
                     _arrowSchema->field(i)->type(),
                     &_arrowBuilders[i]));
         }
@@ -570,65 +570,65 @@ public:
             {
                 shared_ptr<ConstChunkIterator> citer = cursor.getChunkIter(i);
 
-		switch (_inputTypes[i])
-		{
-		case TE_INT64:
-		{
-		    while (!citer->end())
-		    {
-			Value const& value = citer->getItem();
-			if(value.isNull())
-			{
-			    THROW_NOT_OK(
-				static_cast<arrow::Int64Builder*>(
-				    _arrowBuilders[i].get())->AppendNull());
-			}
-			else
-			{
-			    THROW_NOT_OK(
-				static_cast<arrow::Int64Builder*>(
-				    _arrowBuilders[i].get())->Append(
-					value.getInt64()));
-			}
-			++(*citer);
-		    }
-		    break;
-		}
-		case TE_STRING:
-		{
-		    while (!citer->end())
-		    {
-			Value const& value = citer->getItem();
-			if(value.isNull())
-			{
-			    THROW_NOT_OK(
-				static_cast<arrow::StringBuilder*>(
-				    _arrowBuilders[i].get())->AppendNull());
-			}
-			else
-			{
-			    THROW_NOT_OK(
-				static_cast<arrow::StringBuilder*>(
-				    _arrowBuilders[i].get())->Append(
-					value.getString()));
-			}
-			++(*citer);
+                switch (_inputTypes[i])
+                {
+                case TE_INT64:
+                {
+                    while (!citer->end())
+                    {
+                        Value const& value = citer->getItem();
+                        if(value.isNull())
+                        {
+                            THROW_NOT_OK(
+                                static_cast<arrow::Int64Builder*>(
+                                    _arrowBuilders[i].get())->AppendNull());
+                        }
+                        else
+                        {
+                            THROW_NOT_OK(
+                                static_cast<arrow::Int64Builder*>(
+                                    _arrowBuilders[i].get())->Append(
+                                        value.getInt64()));
+                        }
+                        ++(*citer);
                     }
-		    break;
-		}
-		default:
-		{
-		    ostringstream error;
-		    error << "Type " << _inputAttrs[i].getType() << " not supported in arrow format";
-		    throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION) << error.str();
-		}
+                    break;
+                }
+                case TE_STRING:
+                {
+                    while (!citer->end())
+                    {
+                        Value const& value = citer->getItem();
+                        if(value.isNull())
+                        {
+                            THROW_NOT_OK(
+                                static_cast<arrow::StringBuilder*>(
+                                    _arrowBuilders[i].get())->AppendNull());
+                        }
+                        else
+                        {
+                            THROW_NOT_OK(
+                                static_cast<arrow::StringBuilder*>(
+                                    _arrowBuilders[i].get())->Append(
+                                        value.getString()));
+                        }
+                        ++(*citer);
+                    }
+                    break;
+                }
+                default:
+                {
+                    ostringstream error;
+                    error << "Type " << _inputAttrs[i].getType() << " not supported in arrow format";
+                    throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION) << error.str();
+                }
                 }
 
-		if (i == 0)
-		{
-		    ++nCells;
-		}
-	    }
+                if (i == 0)
+                {
+                    ++nCells;
+                }
+            }
 
             cursor.advanceChunkIters();
         }
@@ -636,8 +636,8 @@ public:
         // Finalize Arrow Builders and populate Arrow Arrays (resets builders)
         for (size_t i = 0; i < nAttrs; ++i)
         {
-	    THROW_NOT_OK(
-		_arrowBuilders[i]->Finish(&_arrowArrays[i])); // Resets builder
+            THROW_NOT_OK(
+                _arrowBuilders[i]->Finish(&_arrowArrays[i])); // Resets builder
         }
 
         // Create Arrow Record Batch
@@ -647,16 +647,16 @@ public:
         // Stream Arrow Record Batch to Arrow Pool Buffer using Arrow Record
         // Batch Writer and Arrow Buffer Output Stream
         std::shared_ptr<arrow::PoolBuffer> arrowBuffer(
-	    new arrow::PoolBuffer(_arrowPool));
+            new arrow::PoolBuffer(_arrowPool));
         // std::shared_ptr<arrow::PoolBuffer> arrowBuffer =
         //   make_shared<arrow::PoolBuffer>(_arrowPool);
         arrow::io::BufferOutputStream arrowStream(arrowBuffer);
         std::shared_ptr<arrow::ipc::RecordBatchWriter> arrowWriter;
-	THROW_NOT_OK(
-	    arrow::ipc::RecordBatchStreamWriter::Open(
-		&arrowStream, _arrowSchema, &arrowWriter));
-	THROW_NOT_OK(
-	    arrowWriter->WriteRecordBatch(*arrowBatch));
+        THROW_NOT_OK(
+            arrow::ipc::RecordBatchStreamWriter::Open(
+                &arrowStream, _arrowSchema, &arrowWriter));
+        THROW_NOT_OK(
+            arrowWriter->WriteRecordBatch(*arrowBatch));
         THROW_NOT_OK(arrowWriter->Close());
         THROW_NOT_OK(arrowStream.Close());
 
@@ -1100,7 +1100,7 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
     {
         std::shared_ptr<arrow::io::FileOutputStream> arrowFile;
         auto arrowStatus = arrow::io::FileOutputStream::Open(
-	    fileName, append, &arrowFile);
+            fileName, append, &arrowFile);
         if (!arrowStatus.ok())
         {
             auto str = arrowStatus.ToString().c_str();
@@ -1140,22 +1140,22 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
             arrow::io::BufferReader arrowBufferReader(
                 reinterpret_cast<const uint8_t*>(data), size); // zero copy
 
-	    // Read Record Batch
+            // Read Record Batch
             // THROW_NOT_OK(
             //     arrow::ipc::ReadRecordBatch(
             //         arrowSchema, &arrowBufferReader, &arrowBatch));
 
             // Read Record Batch using Stream Reader
-	    THROW_NOT_OK(
-	        arrow::ipc::RecordBatchStreamReader::Open(
-	            &arrowBufferReader, &arrowReader));
+            THROW_NOT_OK(
+                arrow::ipc::RecordBatchStreamReader::Open(
+                    &arrowBufferReader, &arrowReader));
             THROW_NOT_OK(arrowReader->ReadNext(&arrowBatch));
 
-	    // Write Record Batch to stream
-	    THROW_NOT_OK_FILE(
-		arrowWriter->WriteRecordBatch(*arrowBatch));
+            // Write Record Batch to stream
+            THROW_NOT_OK_FILE(
+                arrowWriter->WriteRecordBatch(*arrowBatch));
 
-	    ++(*arrayIter);
+            ++(*arrayIter);
         }
     }
     catch (AwIoError& e)
@@ -1173,7 +1173,7 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
             arrowStream->Close();
         }
         throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR)
-	    << ::strerror(e.error) << e.error;
+            << ::strerror(e.error) << e.error;
     }
 
     LOG4CXX_DEBUG(logger, "ALT_SAVE>> wrote "<< bytesWritten<< " bytes, closing");
@@ -1276,16 +1276,16 @@ public:
             if(thisInstanceSavesData)
             {
                 string const& path = iter->second;
-		if (settings.isArrowFormat())
-		{
-		    saveToDiskArrow(
-			outArray, path, query, false, settings, inputSchema);
-		}
-		else
-		{
-		    saveToDisk(
-			outArray, path, query, false, settings, inputSchema);
-		}
+                if (settings.isArrowFormat())
+                {
+                    saveToDiskArrow(
+                        outArray, path, query, false, settings, inputSchema);
+                }
+                else
+                {
+                    saveToDisk(
+                        outArray, path, query, false, settings, inputSchema);
+                }
             }
             return shared_ptr<Array>(new MemArray(_schema, query));
         }
@@ -1300,16 +1300,16 @@ public:
         if (thisInstanceSavesData)
         {
             string const& path = iter->second;
-	    if (settings.isArrowFormat())
-	    {
-		saveToDiskArrow(
-		    outArrayRedist, path, query, false, settings, inputSchema);
-	    }
-	    else
-	    {
-		saveToDisk(
-		    outArrayRedist, path, query, false, settings, inputSchema);
-	    }
+            if (settings.isArrowFormat())
+            {
+                saveToDiskArrow(
+                    outArrayRedist, path, query, false, settings, inputSchema);
+            }
+            else
+            {
+                saveToDisk(
+                    outArrayRedist, path, query, false, settings, inputSchema);
+            }
         }
         if (wasConverted)
         {
