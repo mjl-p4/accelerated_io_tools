@@ -121,15 +121,21 @@ std::shared_ptr<arrow::Schema> attributes2ArrowSchema(Attributes const& attrs)
         switch (typeEnum)
         {
         case TE_INT64:
+        {
             arrowType = arrow::int64();
             break;
+        }
         case TE_STRING:
+        {
             arrowType = arrow::utf8();
             break;
+        }
         default:
+        {
             ostringstream error;
             error << "Type " << type << " not supported in arrow format";
             throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION) << error.str();
+        }
         }
 
         arrowFields[i] = arrow::field(attrs[i].getName(), arrowType);
