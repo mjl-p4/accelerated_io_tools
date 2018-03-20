@@ -574,24 +574,36 @@ public:
                 {
                 case TE_INT64:
                 {
+                    vector<int64_t> values;
+                    vector<bool> is_valid;
+
                     while (!citer->end())
                     {
                         Value const& value = citer->getItem();
                         if(value.isNull())
                         {
-                            THROW_NOT_OK(
-                                static_cast<arrow::Int64Builder*>(
-                                    _arrowBuilders[i].get())->AppendNull());
+                            // THROW_NOT_OK(
+                            //     static_cast<arrow::Int64Builder*>(
+                            //         _arrowBuilders[i].get())->AppendNull());
+                            values.push_back(-1);
+                            is_valid.push_back(false);
                         }
                         else
                         {
-                            THROW_NOT_OK(
-                                static_cast<arrow::Int64Builder*>(
-                                    _arrowBuilders[i].get())->Append(
-                                        value.getInt64()));
+                            // THROW_NOT_OK(
+                            //     static_cast<arrow::Int64Builder*>(
+                            //         _arrowBuilders[i].get())->Append(
+                            //             value.getInt64()));
+                            values.push_back(value.getInt64());
+                            is_valid.push_back(true);
                         }
                         ++(*citer);
                     }
+
+                    THROW_NOT_OK(
+                        static_cast<arrow::Int64Builder*>(
+                            _arrowBuilders[i].get())->Append(values, is_valid));
+
                     break;
                 }
                 case TE_STRING:
