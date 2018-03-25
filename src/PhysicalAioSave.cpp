@@ -519,6 +519,7 @@ class ArrowChunkPopulator
 private:
     Attributes const&                                 _inputAttrs;
     std::vector<TypeEnum>                             _inputTypes;
+    std::vector<size_t>                               _inputSizes;
     std::shared_ptr<arrow::Schema>                    _arrowSchema;
     std::vector<std::unique_ptr<arrow::ArrayBuilder>> _arrowBuilders;
     std::vector<std::shared_ptr<arrow::Array>>        _arrowArrays;
@@ -533,12 +534,15 @@ public:
         const size_t nAttrs = _inputAttrs.size();
 
         _inputTypes.resize(nAttrs);
+        _inputSizes.resize(nAttrs);
         _arrowBuilders.resize(nAttrs);
         _arrowArrays.resize(nAttrs);
 
         // Create Arrow Builders
         for(size_t i = 0; i < nAttrs; ++i) {
             _inputTypes[i] = typeId2TypeEnum(_inputAttrs[i].getType(), true);
+            _inputSizes[i] = _inputAttrs[i].getSize() +
+                (_inputAttrs[i].isNullable() ? 1 : 0);
 
             THROW_NOT_OK(
                 arrow::MakeBuilder(
@@ -561,9 +565,10 @@ public:
 
         // Append to Arrow Builders
         int64_t nCells = 0;
+        size_t bytesCount = 0;
 
         while (!cursor.end() &&
-               ((cellsPerChunk <= 0 && builder.getTotalSize() < bytesPerChunk) ||
+               ((cellsPerChunk <= 0 && bytesCount < bytesPerChunk) ||
                 (cellsPerChunk > 0 && nCells < cellsPerChunk)))
         {
             for (size_t i = 0; i < nAttrs; ++i)
@@ -597,6 +602,7 @@ public:
                             values.push_back(value.getInt64());
                             is_valid.push_back(true);
                         }
+                        bytesCount += _inputSizes[i];
                         ++(*citer);
                     }
 
@@ -624,6 +630,7 @@ public:
                                     _arrowBuilders[i].get())->Append(
                                         value.getString()));
                         }
+                        bytesCount += _inputSizes[i] + value.size();
                         ++(*citer);
                     }
                     break;
