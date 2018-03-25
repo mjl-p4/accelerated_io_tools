@@ -6,8 +6,8 @@ import timeit
 
 ar_names = ('bm_fix', 'bm_var')
 ar_schemas = [None, None]
-chunk_size = 10000
-buffer_size = chunk_size * 8 * 4
+chunk_size = 100000
+buffer_size = 50 * 1024 * 1024
 
 
 def setup(mb):
