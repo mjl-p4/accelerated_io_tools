@@ -6,7 +6,7 @@ import timeit
 
 ar_names = ('bm_fix', 'bm_var')
 ar_schemas = [None, None]
-chunk_size = 100000
+chunk_size = 10000
 buffer_size = chunk_size * 8 * 4
 
 
