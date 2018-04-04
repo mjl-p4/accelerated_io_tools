@@ -125,6 +125,11 @@ std::shared_ptr<arrow::Schema> attributes2ArrowSchema(Attributes const& attrs)
             arrowType = arrow::int64();
             break;
         }
+        case TE_DOUBLE:
+        {
+            arrowType = arrow::float64();
+            break;
+        }
         case TE_STRING:
         {
             arrowType = arrow::utf8();
@@ -608,6 +613,34 @@ public:
 
                     THROW_NOT_OK(
                         static_cast<arrow::Int64Builder*>(
+                            _arrowBuilders[i].get())->Append(values, is_valid));
+
+                    break;
+                }
+                case TE_DOUBLE:
+                {
+                    vector<double> values;
+                    vector<bool> is_valid;
+
+                    while (!citer->end())
+                    {
+                        Value const& value = citer->getItem();
+                        if(value.isNull())
+                        {
+                            values.push_back(-1);
+                            is_valid.push_back(false);
+                        }
+                        else
+                        {
+                            values.push_back(value.getDouble());
+                            is_valid.push_back(true);
+                        }
+                        bytesCount += _inputSizes[i];
+                        ++(*citer);
+                    }
+
+                    THROW_NOT_OK(
+                        static_cast<arrow::DoubleBuilder*>(
                             _arrowBuilders[i].get())->Append(values, is_valid));
 
                     break;
