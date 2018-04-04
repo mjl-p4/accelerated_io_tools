@@ -125,6 +125,50 @@ x      y
 100  100.0
 {chunk_no,dest_instance_id,source_instance_id} val
 x     y
+ 1.0   NaN
+ 2.0   2.0
+ 3.0   NaN
+ 4.0   4.0
+ 5.0   NaN
+ 6.0   6.0
+ 7.0   NaN
+ 8.0   8.0
+ 9.0   NaN
+10.0  10.0
+11.0   NaN
+12.0  12.0
+13.0   NaN
+14.0  14.0
+15.0   NaN
+16.0  16.0
+17.0   NaN
+18.0  18.0
+19.0   NaN
+20.0  20.0
+{chunk_no,dest_instance_id,source_instance_id} val
+x     y
+ 1.0   NaN
+ 2.0   2.0
+ 3.0   NaN
+ 4.0   4.0
+ 5.0   NaN
+ 6.0   6.0
+ 7.0   NaN
+ 8.0   8.0
+ 9.0   NaN
+10.0  10.0
+11.0   NaN
+12.0  12.0
+13.0   NaN
+14.0  14.0
+15.0   NaN
+16.0  16.0
+17.0   NaN
+18.0  18.0
+19.0   NaN
+20.0  20.0
+{chunk_no,dest_instance_id,source_instance_id} val
+x     y
  1  None
  2     2
  3  None
@@ -146,6 +190,28 @@ x     y
 19  None
 20    20
 {chunk_no,dest_instance_id,source_instance_id} val
+x     y     z
+ 1   NaN  None
+ 2   2.0     2
+ 3   NaN  None
+ 4   4.0     4
+ 5   NaN  None
+ 6   6.0     6
+ 7   NaN  None
+ 8   8.0     8
+ 9   NaN  None
+10  10.0    10
+11   NaN  None
+12  12.0    12
+13   NaN  None
+14  14.0    14
+15   NaN  None
+16  16.0    16
+17   NaN  None
+18  18.0    18
+19   NaN  None
+20  20.0    20
+{chunk_no,dest_instance_id,source_instance_id} val
 x
  1
  2
@@ -161,6 +227,39 @@ x
 {chunk_no,dest_instance_id,source_instance_id} val
 {chunk_no,dest_instance_id,source_instance_id} val
 {chunk_no,dest_instance_id,source_instance_id} val
+UserException in file: PhysicalAioSave.cpp function: attributes2ArrowSchema
+Error id: scidb::SCIDB_SE_ARRAY_WRITER::SCIDB_LE_ILLEGAL_OPERATION
+Error description: Error while saving array. Illegal operation: Type bool not supported in arrow format.
+UserException in file: PhysicalAioSave.cpp function: attributes2ArrowSchema
+Error id: scidb::SCIDB_SE_ARRAY_WRITER::SCIDB_LE_ILLEGAL_OPERATION
+Error description: Error while saving array. Illegal operation: Type char not supported in arrow format.
+UserException in file: PhysicalAioSave.cpp function: attributes2ArrowSchema
+Error id: scidb::SCIDB_SE_ARRAY_WRITER::SCIDB_LE_ILLEGAL_OPERATION
+Error description: Error while saving array. Illegal operation: Type datetime not supported in arrow format.
+UserException in file: PhysicalAioSave.cpp function: attributes2ArrowSchema
+Error id: scidb::SCIDB_SE_ARRAY_WRITER::SCIDB_LE_ILLEGAL_OPERATION
+Error description: Error while saving array. Illegal operation: Type datetimetz not supported in arrow format.
+UserException in file: PhysicalAioSave.cpp function: attributes2ArrowSchema
+Error id: scidb::SCIDB_SE_ARRAY_WRITER::SCIDB_LE_ILLEGAL_OPERATION
+Error description: Error while saving array. Illegal operation: Type float not supported in arrow format.
+UserException in file: PhysicalAioSave.cpp function: attributes2ArrowSchema
+Error id: scidb::SCIDB_SE_ARRAY_WRITER::SCIDB_LE_ILLEGAL_OPERATION
+Error description: Error while saving array. Illegal operation: Type int8 not supported in arrow format.
+UserException in file: PhysicalAioSave.cpp function: attributes2ArrowSchema
+Error id: scidb::SCIDB_SE_ARRAY_WRITER::SCIDB_LE_ILLEGAL_OPERATION
+Error description: Error while saving array. Illegal operation: Type int16 not supported in arrow format.
+UserException in file: PhysicalAioSave.cpp function: attributes2ArrowSchema
+Error id: scidb::SCIDB_SE_ARRAY_WRITER::SCIDB_LE_ILLEGAL_OPERATION
+Error description: Error while saving array. Illegal operation: Type int32 not supported in arrow format.
+UserException in file: PhysicalAioSave.cpp function: attributes2ArrowSchema
+Error id: scidb::SCIDB_SE_ARRAY_WRITER::SCIDB_LE_ILLEGAL_OPERATION
+Error description: Error while saving array. Illegal operation: Type uint8 not supported in arrow format.
+UserException in file: PhysicalAioSave.cpp function: attributes2ArrowSchema
+Error id: scidb::SCIDB_SE_ARRAY_WRITER::SCIDB_LE_ILLEGAL_OPERATION
+Error description: Error while saving array. Illegal operation: Type uint16 not supported in arrow format.
+UserException in file: PhysicalAioSave.cpp function: attributes2ArrowSchema
+Error id: scidb::SCIDB_SE_ARRAY_WRITER::SCIDB_LE_ILLEGAL_OPERATION
+Error description: Error while saving array. Illegal operation: Type uint32 not supported in arrow format.
 UserException in file: PhysicalAioSave.cpp function: attributes2ArrowSchema
 Error id: scidb::SCIDB_SE_ARRAY_WRITER::SCIDB_LE_ILLEGAL_OPERATION
 Error description: Error while saving array. Illegal operation: Type uint64 not supported in arrow format.
