@@ -38,7 +38,7 @@ install:
   - docker exec scidb /accelerated_io_tools/tests/docker-install.sh
   - docker exec scidb bash -c "echo aio=1 > /var/lib/shim/conf"
   - docker exec scidb make --directory=/accelerated_io_tools/shim-master service
-  - docker exec scidb pip install --upgrade /accelerated_io_tools/SciDB-Py-master
+  - docker exec scidb bash -c "source /opt/rh/python27/enable; pip install --upgrade /accelerated_io_tools/SciDB-Py-master"
 
 script:
   - docker exec scidb /accelerated_io_tools/tests/test.sh
