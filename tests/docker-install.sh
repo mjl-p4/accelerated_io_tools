@@ -4,29 +4,52 @@ set -o errexit
 
 
 # Install prerequisites
+if [ `lsb_release --id | cut --fields=2` = "CentOS" ]
+then
+    yum install --assumeyes                                                    \
+        https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm
 
-## https://github.com/red-data-tools/packages.red-data-tools.org#ubuntu
-## No packages for Debian jessie, use Ubuntu trusty
-# cat <<APT_LINE | tee /etc/apt/sources.list.d/red-data-tools.list
-# deb https://packages.red-data-tools.org/ubuntu/ trusty universe
-# APT_LINE
-# apt-get update
-# apt-get install --assume-yes --no-install-recommends --allow-unauthenticated \
-#         red-data-tools-keyring
+    ## https://github.com/red-data-tools/packages.red-data-tools.org#centos
+    # yum install --assumeyes \
+    #     https://packages.red-data-tools.org/centos/red-data-tools-release-1.0.0-1.noarch.rpm
 
-## Use Bintray packages:
-## - Compiled with g++ 4.9
-## - Compiled without ORC support (avoid Protocol Buffers conflict)
-cat <<APT_LINE | tee /etc/apt/sources.list.d/bintray.list
+    ## Use Bintray packages:
+    ## - Compiled without ORC support (avoid Protocol Buffers conflict)
+    wget --output-document /etc/yum.repos.d/bintray-rvernica-rpm.repo \
+         https://bintray.com/rvernica/rpm/rpm
+
+    yum install --assumeyes \
+        arrow-devel         \
+        libpqxx-devel       \
+        python27
+
+    source /opt/rh/python27/enable
+else
+    ## https://github.com/red-data-tools/packages.red-data-tools.org#ubuntu
+    ## No packages for Debian jessie, use Ubuntu trusty
+    # cat <<APT_LINE | tee /etc/apt/sources.list.d/red-data-tools.list
+    # deb https://packages.red-data-tools.org/ubuntu/ trusty universe
+    # APT_LINE
+    # apt-get update
+    # apt-get install                                                      \
+    #         --assume-yes --no-install-recommends --allow-unauthenticated \
+    #         red-data-tools-keyring
+
+    ## Use Bintray packages:
+    ## - Compiled with g++ 4.9
+    ## - Compiled without ORC support (avoid Protocol Buffers conflict)
+    cat <<APT_LINE | tee /etc/apt/sources.list.d/bintray.list
 deb https://dl.bintray.com/rvernica/deb trusty universe
 APT_LINE
-apt-key adv --keyserver hkp://keyserver.ubuntu.com --recv 46BD98A354BA5235
+    apt-key adv --keyserver hkp://keyserver.ubuntu.com --recv 46BD98A354BA5235
 
-apt-get update
-apt-get install --assume-yes --no-install-recommends \
-        libarrow-dev=$ARROW_VER                      \
-        libarrow0=$ARROW_VER                         \
-        libpqxx-dev
+    apt-get update
+    apt-get install                              \
+            --assume-yes --no-install-recommends \
+            libarrow-dev=$ARROW_VER              \
+            libarrow0=$ARROW_VER                 \
+            libpqxx-dev
+fi
 
 
 wget --no-verbose https://bootstrap.pypa.io/get-pip.py
