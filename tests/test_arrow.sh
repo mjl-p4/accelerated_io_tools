@@ -11,6 +11,8 @@ function iq() {
     $IQ "$1" >> $TEST_OUT
 }
 
+# Load Python 2.7 (CentOS only)
+source /opt/rh/python27/enable || :
 
 : > $TEST_OUT                   # Reset output file
 
