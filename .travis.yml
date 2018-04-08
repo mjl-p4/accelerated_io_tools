@@ -5,7 +5,12 @@ language: python
 python:
   - "3.6"
 
-env: SCIDB_VER=18.1 SCIDB_IMG=18.1 ARROW_VER=0.9.0-1
+env:
+  global: SCIDB_VER=18.1 ARROW_VER=0.9.0-1
+  matrix:
+    - SCIDB_IMG=18.1
+    - SCIDB_IMG=18.1-trusty
+    - SCIDB_IMG=18.1-centos-6
 
 services:
   - docker
