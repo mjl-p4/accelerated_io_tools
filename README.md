@@ -179,7 +179,7 @@ Other than `attribute_no` (when `split_on_dimension=1`) the dimensions are not i
 # Scalar functions that may be useful in loading data
 
 ## dcast(): error-tolerant casting
-SciDB supports regular type casting but the behavior is to fail the entire query if any cast is unsuccessful. This may not be desirable when the user expects a small percentage of error values and has a different strategy for handling them, converting to null for example. In thos cases, `dcast` can be used to cast a string to a double, float, bool, int{64,32,16,8} or uint{64,32,16,8}, substituting in a special default value to return if the cast fails. The two arguments to the function are:
+SciDB supports regular type casting but the behavior is to fail the entire query if any cast is unsuccessful. This may not be desirable when the user expects a small percentage of error values and has a different strategy for handling them, converting to null for example. In those cases, `dcast` can be used to cast a string to a double, float, bool, int{64,32,16,8} or uint{64,32,16,8}, substituting in a special default value to return if the cast fails. The two arguments to the function are:
  * the string value to cast
  * the default value to use if the cast fails (often a null).
 The SciDB typesystem and the type of the second value can be used to dispatch the right dcast return type.
@@ -227,7 +227,7 @@ $ iquery -aq "apply(aio_input('/tmp/foo.tsv', 'num_attributes=2'), d0, dcast(a0,
 {4,0,0} '5error_no_tab',null,'short',-1
 ```
 
-dcast ignores any whitespace preceding or following the numeric value. When converting to an unsigned type, a negative input is considered non-convertible and the supplied defaul is returned. An input out of range is also considered non-convertible for integers (overflow will not happen). When converting to float or double, all ranges of values are supported but inf or -inf may be returned if the input exceeds machine limits. When converting to bool, values of 0,N,NO,F,FALSE or 1,Y,YES,T,TRUE (ignore case) are supported. Internally strtod, strtoll, strtoull are used - see those routines for details on locale sensitivity and what "whitespace" means.
+dcast ignores any whitespace preceding or following the numeric value. When converting to an unsigned type, a negative input is considered non-convertible and the supplied default is returned. An input out of range is also considered non-convertible for integers (overflow will not happen). When converting to float or double, all ranges of values are supported but inf or -inf may be returned if the input exceeds machine limits. When converting to bool, values of 0,N,NO,F,FALSE or 1,Y,YES,T,TRUE (ignore case) are supported. Internally strtod, strtoll, strtoull are used - see those routines for details on locale sensitivity and what "whitespace" means.
 
 ## trim() removes specific characters from the beginning and end of a string:
 ```
@@ -382,6 +382,11 @@ Example save to a binary file:
 iquery -anq "aio_save( bar, '/tmp/bar.out', 'format=(int64, double null, string null)')"
 ```
 
+Example save to a binary file using Apache Arrow format:
+```
+iquery -anq "aio_save( bar, '/tmp/bar.out', 'format=arrow')"
+```
+
 Example save to two TSV files:
 ```
 iquery -anq "aio_save(
@@ -406,8 +411,8 @@ By default, the file is saved to a path on the query coordinator instance. You c
 * `instances=0;1;..`: multiple instance ID's for saving from different instances, separated by semicolon. Must be specified along with `paths` and have an equal number of unique terms. Either `instance` or `instances` must be specified, but not both.
 
 ## Other settings:
-* `format=F`: the format string, may be either `tdv` (token-delimited values) or a scidb-style binary format spec like `(int64, double null,...)`. Default is `tdv`.
-* `attributes_delimiter=A`: the character to write between array attributes. Default is a tab. Applies when fomat is set to `tdv`.
+* `format=F`: the format string, may be either `tdv` (token-delimited values), a scidb-style binary format spec like `(int64, double null,...)`, or `arrow` for the Apache Arrow format. Default is `tdv`.
+* `attributes_delimiter=A`: the character to write between array attributes. Default is a tab. Applies when format is set to `tdv`.
 * `line_delimiter=L`: the character to write between array cells. Default is a newline. Applies when format is set to `tdv`.
 * `cells_per_chunk=C`: the maximum number of array cells to place in each chunk before saving to disk. By default, binary accounting is used but this can be enabled to force an exact number of cells. See notes on saving data in order below.
 * `buffer_size=B`: the amount of data to pack into a single buffer before transferring and saving to disk. Default is 8 MB. This setting is not honored if `cells_per_chunk` is specified.
@@ -438,17 +443,59 @@ aio_save(
 
 # Installation
 
-You will need the `-dev` or `-devel` package of Protobuf in order to get headers. On Debian/Ubuntu:
+## Install prerequisites
+
+The following libraries are required to build the plugin:
+
+* SciDB development libraries
+* Protocol Buffers development library
+* PostgreSQL development library
+* Apache Arrow development library
+
+[//]: # "Follow distribution specific instructions to install the"
+[//]: # "[red-data-tools](https://github.com/red-data-tools/packages.red-data-tools.org/blob/master/README.md#package-repository)"
+[//]: # "package repository and the"
+[//]: # "[Apache Arrow C++](https://github.com/red-data-tools/packages.red-data-tools.org/blob/master/README.md#apache-arrow-c)"
+[//]: # "development library. For Red Hat Enterprise Linux use CentOS"
+[//]: # "instructions."
+
+Due to a version conflict with the Protocol Buffers library included
+with the official Apache Arrow packages, we use Apache Arrow packages
+custom built for SciDB.
+
+### CentOS
 ```
-sudo apt-get install libprotobuf-dev protobuf-compiler
+> sudo yum install scidb-18.1-dev scidb-18.1-libboost-devel log4cxx-devel protobuf-devel libpqxx-devel
 ```
 
-Follow distribution specific instructions to install the
-[red-data-tools](https://github.com/red-data-tools/packages.red-data-tools.org/blob/master/README.md#package-repository)
-package repository and the
-[Apache Arrow C++](https://github.com/red-data-tools/packages.red-data-tools.org/blob/master/README.md#apache-arrow-c)
-development library. For Red Hat Enterprise Linux use CentOS
-instructions.
+For Apache Arrow:
+```
+# CentOS 6
+> sudo yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm
+# CentOS 7
+> sudo yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+
+> sudo wget --output-document /etc/yum.repos.d/bintray-rvernica-rpm.repo https://bintray.com/rvernica/rpm/rpm
+> sudo yum install arrow-devel
+```
+
+### Ubuntu
+```
+> sudo apt-get install scidb-18.1-dev libprotobuf-dev libpqxx-dev
+```
+
+For Apache Arrow:
+```
+> cat <<APT_LINE | tee /etc/apt/sources.list.d/bintray-rvernica.list
+deb https://dl.bintray.com/rvernica/deb trusty universe
+APT_LINE
+
+> apt-key adv --keyserver hkp://keyserver.ubuntu.com --recv 46BD98A354BA5235
+> apt-get update
+> apt-get install libarrow-dev libarrow0
+```
+
+## Install plug-in
 
 After that, follow instructions https://github.com/paradigm4/dev_tools to get dev_tools first. Then:
 ```
@@ -461,8 +508,29 @@ Warning: if you were previously using `prototype_load_tools` you will need to un
  * restart the cluster
  * `iquery -aq "load_library('accelerated_io_tools')"`
 
-If you are using shim together with SciDB, note that you can configure shim to use aio_save after it is installed to speed up data exports.
-See: https://github.com/paradigm4/shim
+If you are using Shim together with SciDB, note that you can configure
+shim to use `aio_save` after it is installed to speed up data exports.
+See Shim [Help](http://paradigm4.github.io/shim/help.html#aio-plugin)
+page for instructions.
+
+## Update Shim and SciDB-Py
+
+In order to take advantage of the Apache Arrow format in `aio_save`,
+[Shim](https://github.com/Paradigm4/shim) and
+[SciDB-Py](https://github.com/Paradigm4/SciDB-Py) need to be updated
+to the latest development versions.
+
+### Shim
+
+Download the Shim source code from GitHub and follow the *Manual
+Building* instructions from the Shim
+[README](https://github.com/Paradigm4/shim#manual-building) page.
+
+### SciDB-Py
+
+Follow the *Install development version from GitHub* instructions on the SciDB-Py [README](https://github.com/Paradigm4/SciDB-Py#installation)
+page.
+
 
 ## Note: use the right branch for your version
 The git branches of accelerated_io_tools follow different versions of SciDB - with the master branch used for the most recent version. Note also changes in behavior are possible between versions.

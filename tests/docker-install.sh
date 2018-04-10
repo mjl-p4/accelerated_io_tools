@@ -38,7 +38,7 @@ else
     ## Use Bintray packages:
     ## - Compiled with g++ 4.9
     ## - Compiled without ORC support (avoid Protocol Buffers conflict)
-    cat <<APT_LINE | tee /etc/apt/sources.list.d/bintray.list
+    cat <<APT_LINE | tee /etc/apt/sources.list.d/bintray-rvernica.list
 deb https://dl.bintray.com/rvernica/deb trusty universe
 APT_LINE
     apt-key adv --keyserver hkp://keyserver.ubuntu.com --recv 46BD98A354BA5235

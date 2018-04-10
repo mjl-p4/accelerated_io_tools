@@ -544,7 +544,8 @@ public:
         _arrowArrays.resize(nAttrs);
 
         // Create Arrow Builders
-        for(size_t i = 0; i < nAttrs; ++i) {
+        for(size_t i = 0; i < nAttrs; ++i)
+        {
             _inputTypes[i] = typeId2TypeEnum(_inputAttrs[i].getType(), true);
             _inputSizes[i] = _inputAttrs[i].getSize() +
                 (_inputAttrs[i].isNullable() ? 1 : 0);
