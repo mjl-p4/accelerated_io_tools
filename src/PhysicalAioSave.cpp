@@ -120,14 +120,54 @@ std::shared_ptr<arrow::Schema> attributes2ArrowSchema(Attributes const& attrs)
 
         switch (typeEnum)
         {
+        case TE_DOUBLE:
+        {
+            arrowType = arrow::float64();
+            break;
+        }
+        case TE_FLOAT:
+        {
+            arrowType = arrow::float32();
+            break;
+        }
+        case TE_INT8:
+        {
+            arrowType = arrow::int8();
+            break;
+        }
+        case TE_INT16:
+        {
+            arrowType = arrow::int16();
+            break;
+        }
+        case TE_INT32:
+        {
+            arrowType = arrow::int32();
+            break;
+        }
         case TE_INT64:
         {
             arrowType = arrow::int64();
             break;
         }
-        case TE_DOUBLE:
+        case TE_UINT8:
         {
-            arrowType = arrow::float64();
+            arrowType = arrow::uint8();
+            break;
+        }
+        case TE_UINT16:
+        {
+            arrowType = arrow::uint16();
+            break;
+        }
+        case TE_UINT32:
+        {
+            arrowType = arrow::uint32();
+            break;
+        }
+        case TE_UINT64:
+        {
+            arrowType = arrow::uint64();
             break;
         }
         case TE_STRING:
@@ -583,6 +623,146 @@ public:
 
                 switch (_inputTypes[i])
                 {
+                case TE_DOUBLE:
+                {
+                    vector<double> values;
+                    vector<bool> is_valid;
+
+                    while (!citer->end())
+                    {
+                        Value const& value = citer->getItem();
+                        if(value.isNull())
+                        {
+                            values.push_back(-1);
+                            is_valid.push_back(false);
+                        }
+                        else
+                        {
+                            values.push_back(value.getDouble());
+                            is_valid.push_back(true);
+                        }
+                        bytesCount += _inputSizes[i];
+                        ++(*citer);
+                    }
+
+                    THROW_NOT_OK(
+                        static_cast<arrow::DoubleBuilder*>(
+                            _arrowBuilders[i].get())->Append(values, is_valid));
+
+                    break;
+                }
+                case TE_FLOAT:
+                {
+                    vector<float> values;
+                    vector<bool> is_valid;
+
+                    while (!citer->end())
+                    {
+                        Value const& value = citer->getItem();
+                        if(value.isNull())
+                        {
+                            values.push_back(-1);
+                            is_valid.push_back(false);
+                        }
+                        else
+                        {
+                            values.push_back(value.getFloat());
+                            is_valid.push_back(true);
+                        }
+                        bytesCount += _inputSizes[i];
+                        ++(*citer);
+                    }
+
+                    THROW_NOT_OK(
+                        static_cast<arrow::FloatBuilder*>(
+                            _arrowBuilders[i].get())->Append(values, is_valid));
+
+                    break;
+                }
+                case TE_INT8:
+                {
+                    vector<int8_t> values;
+                    vector<bool> is_valid;
+
+                    while (!citer->end())
+                    {
+                        Value const& value = citer->getItem();
+                        if(value.isNull())
+                        {
+                            values.push_back(-1);
+                            is_valid.push_back(false);
+                        }
+                        else
+                        {
+                            values.push_back(value.getInt8());
+                            is_valid.push_back(true);
+                        }
+                        bytesCount += _inputSizes[i];
+                        ++(*citer);
+                    }
+
+                    THROW_NOT_OK(
+                        static_cast<arrow::Int8Builder*>(
+                            _arrowBuilders[i].get())->Append(values, is_valid));
+
+                    break;
+                }
+                case TE_INT16:
+                {
+                    vector<int16_t> values;
+                    vector<bool> is_valid;
+
+                    while (!citer->end())
+                    {
+                        Value const& value = citer->getItem();
+                        if(value.isNull())
+                        {
+                            values.push_back(-1);
+                            is_valid.push_back(false);
+                        }
+                        else
+                        {
+                            values.push_back(value.getInt16());
+                            is_valid.push_back(true);
+                        }
+                        bytesCount += _inputSizes[i];
+                        ++(*citer);
+                    }
+
+                    THROW_NOT_OK(
+                        static_cast<arrow::Int16Builder*>(
+                            _arrowBuilders[i].get())->Append(values, is_valid));
+
+                    break;
+                }
+                case TE_INT32:
+                {
+                    vector<int32_t> values;
+                    vector<bool> is_valid;
+
+                    while (!citer->end())
+                    {
+                        Value const& value = citer->getItem();
+                        if(value.isNull())
+                        {
+                            values.push_back(-1);
+                            is_valid.push_back(false);
+                        }
+                        else
+                        {
+                            values.push_back(value.getInt32());
+                            is_valid.push_back(true);
+                        }
+                        bytesCount += _inputSizes[i];
+                        ++(*citer);
+                    }
+
+                    THROW_NOT_OK(
+                        static_cast<arrow::Int32Builder*>(
+                            _arrowBuilders[i].get())->Append(values, is_valid));
+
+                    break;
+                }
                 case TE_INT64:
                 {
                     vector<int64_t> values;
@@ -618,34 +798,6 @@ public:
 
                     break;
                 }
-                case TE_DOUBLE:
-                {
-                    vector<double> values;
-                    vector<bool> is_valid;
-
-                    while (!citer->end())
-                    {
-                        Value const& value = citer->getItem();
-                        if(value.isNull())
-                        {
-                            values.push_back(-1);
-                            is_valid.push_back(false);
-                        }
-                        else
-                        {
-                            values.push_back(value.getDouble());
-                            is_valid.push_back(true);
-                        }
-                        bytesCount += _inputSizes[i];
-                        ++(*citer);
-                    }
-
-                    THROW_NOT_OK(
-                        static_cast<arrow::DoubleBuilder*>(
-                            _arrowBuilders[i].get())->Append(values, is_valid));
-
-                    break;
-                }
                 case TE_STRING:
                 {
                     while (!citer->end())
@@ -667,6 +819,118 @@ public:
                         bytesCount += _inputSizes[i] + value.size();
                         ++(*citer);
                     }
+                    break;
+                }
+                case TE_UINT8:
+                {
+                    vector<uint8_t> values;
+                    vector<bool> is_valid;
+
+                    while (!citer->end())
+                    {
+                        Value const& value = citer->getItem();
+                        if(value.isNull())
+                        {
+                            values.push_back(-1);
+                            is_valid.push_back(false);
+                        }
+                        else
+                        {
+                            values.push_back(value.getUint8());
+                            is_valid.push_back(true);
+                        }
+                        bytesCount += _inputSizes[i];
+                        ++(*citer);
+                    }
+
+                    THROW_NOT_OK(
+                        static_cast<arrow::UInt8Builder*>(
+                            _arrowBuilders[i].get())->Append(values, is_valid));
+
+                    break;
+                }
+                case TE_UINT16:
+                {
+                    vector<uint16_t> values;
+                    vector<bool> is_valid;
+
+                    while (!citer->end())
+                    {
+                        Value const& value = citer->getItem();
+                        if(value.isNull())
+                        {
+                            values.push_back(-1);
+                            is_valid.push_back(false);
+                        }
+                        else
+                        {
+                            values.push_back(value.getUint16());
+                            is_valid.push_back(true);
+                        }
+                        bytesCount += _inputSizes[i];
+                        ++(*citer);
+                    }
+
+                    THROW_NOT_OK(
+                        static_cast<arrow::UInt16Builder*>(
+                            _arrowBuilders[i].get())->Append(values, is_valid));
+
+                    break;
+                }
+                case TE_UINT32:
+                {
+                    vector<uint32_t> values;
+                    vector<bool> is_valid;
+
+                    while (!citer->end())
+                    {
+                        Value const& value = citer->getItem();
+                        if(value.isNull())
+                        {
+                            values.push_back(-1);
+                            is_valid.push_back(false);
+                        }
+                        else
+                        {
+                            values.push_back(value.getUint32());
+                            is_valid.push_back(true);
+                        }
+                        bytesCount += _inputSizes[i];
+                        ++(*citer);
+                    }
+
+                    THROW_NOT_OK(
+                        static_cast<arrow::UInt32Builder*>(
+                            _arrowBuilders[i].get())->Append(values, is_valid));
+
+                    break;
+                }
+                case TE_UINT64:
+                {
+                    vector<uint64_t> values;
+                    vector<bool> is_valid;
+
+                    while (!citer->end())
+                    {
+                        Value const& value = citer->getItem();
+                        if(value.isNull())
+                        {
+                            values.push_back(-1);
+                            is_valid.push_back(false);
+                        }
+                        else
+                        {
+                            values.push_back(value.getUint64());
+                            is_valid.push_back(true);
+                        }
+                        bytesCount += _inputSizes[i];
+                        ++(*citer);
+                    }
+
+                    THROW_NOT_OK(
+                        static_cast<arrow::UInt64Builder*>(
+                            _arrowBuilders[i].get())->Append(values, is_valid));
+
                     break;
                 }
                 default:

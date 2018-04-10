@@ -33,27 +33,67 @@ iq "aio_save(apply(build(<x:double>[i=1:20:0:4], i), y, iif(i%2=0, double(i), do
 python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
     >> $TEST_OUT
 
-echo "4. int64"
+echo "4. float"
+iq "aio_save(apply(build(<x:float>[i=1:20:0:4], i), y, iif(i%2=0, float(i), float(null))), '$F', 'format=arrow')"
+python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
+    >> $TEST_OUT
+
+echo "5. int8"
+iq "aio_save(apply(build(<x:double>[i=1:20:0:4], i), y, iif(i%2=0, int8(i), int8(null))), '$F', 'format=arrow')"
+python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
+    >> $TEST_OUT
+
+echo "6. int16"
+iq "aio_save(apply(build(<x:double>[i=1:20:0:4], i), y, iif(i%2=0, int16(i), int16(null))), '$F', 'format=arrow')"
+python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
+    >> $TEST_OUT
+
+echo "7. int32"
+iq "aio_save(apply(build(<x:double>[i=1:20:0:4], i), y, iif(i%2=0, int32(i), int32(null))), '$F', 'format=arrow')"
+python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
+    >> $TEST_OUT
+
+echo "8. int64"
 iq "aio_save(apply(build(<x:double>[i=1:20:0:4], i), y, iif(i%2=0, int64(i), int64(null))), '$F', 'format=arrow')"
 python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
     >> $TEST_OUT
 
-echo "5. string"
+echo "9. string"
 iq "aio_save(apply(build(<x:int64>[i=1:20:0:4], i), y, iif(i%2=0, string(i), string(null))), '$F', 'format=arrow')"
 python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
     >> $TEST_OUT
 
-echo "6. int64, double, string"
+echo "10. uint8"
+iq "aio_save(apply(build(<x:double>[i=1:20:0:4], i), y, iif(i%2=0, uint8(i), uint8(null))), '$F', 'format=arrow')"
+python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
+    >> $TEST_OUT
+
+echo "11. uint16"
+iq "aio_save(apply(build(<x:double>[i=1:20:0:4], i), y, iif(i%2=0, uint16(i), uint16(null))), '$F', 'format=arrow')"
+python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
+    >> $TEST_OUT
+
+echo "12. uint32"
+iq "aio_save(apply(build(<x:double>[i=1:20:0:4], i), y, iif(i%2=0, uint32(i), uint32(null))), '$F', 'format=arrow')"
+python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
+    >> $TEST_OUT
+
+echo "13. uint64"
+iq "aio_save(apply(build(<x:double>[i=1:20:0:4], i), y, iif(i%2=0, uint64(i), uint64(null))), '$F', 'format=arrow')"
+python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
+    >> $TEST_OUT
+
+echo "14. int64, double, string"
 iq "aio_save(apply(build(<x:int64>[i=1:20:0:4], i), y, iif(i%2=0, double(i), double(null)), z, iif(i%2=0, string(i), string(null))), '$F', 'format=arrow')"
 python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
     >> $TEST_OUT
 
-echo "7. Empty chunk"
+echo "15. Empty chunk"
 iq "aio_save(filter(build(<x:int64>[i=1:20:0:4], i), x < 6 or x > 14), '$F', 'format=arrow')"
 python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
     >> $TEST_OUT
 
-echo "6. Different output sinks"
+echo "16. Different output sinks"
 $IQ "aio_save(build(<x:int64>[i=0:0], i), 'console', 'format=arrow')" \
     >> $TEST_OUT
 $IQ "aio_save(build(<x:int64>[i=0:0], i), 'stdout', 'format=arrow')" \
@@ -82,46 +122,6 @@ $IQ "aio_save(build(<x:datetime>[i=0:0], i), '$F', 'format=arrow')" 2>&1 \
 $IQ "aio_save(build(<x:datetimetz>[i=0:0], apply_offset(datetime(i), 0)), '$F', 'format=arrow')" 2>&1 \
     |  sed --expression='s/ line: [0-9]\+//g'                                                         \
     |  grep --invert-match "Failed query id:" >> $TEST_OUT                                            \
-    || echo "expected exception"
-
-$IQ "aio_save(build(<x:float>[i=0:0], i), '$F', 'format=arrow')" 2>&1 \
-    |  sed --expression='s/ line: [0-9]\+//g'                         \
-    |  grep --invert-match "Failed query id:" >> $TEST_OUT            \
-    || echo "expected exception"
-
-$IQ "aio_save(build(<x:int8>[i=0:0], i), '$F', 'format=arrow')" 2>&1 \
-    |  sed --expression='s/ line: [0-9]\+//g'                        \
-    |  grep --invert-match "Failed query id:" >> $TEST_OUT           \
-    || echo "expected exception"
-
-$IQ "aio_save(build(<x:int16>[i=0:0], i), '$F', 'format=arrow')" 2>&1 \
-    |  sed --expression='s/ line: [0-9]\+//g'                         \
-    |  grep --invert-match "Failed query id:" >> $TEST_OUT            \
-    || echo "expected exception"
-
-$IQ "aio_save(build(<x:int32>[i=0:0], i), '$F', 'format=arrow')" 2>&1 \
-    |  sed --expression='s/ line: [0-9]\+//g'                         \
-    |  grep --invert-match "Failed query id:" >> $TEST_OUT            \
-    || echo "expected exception"
-
-$IQ "aio_save(build(<x:uint8>[i=0:0], i), '$F', 'format=arrow')" 2>&1 \
-    |  sed --expression='s/ line: [0-9]\+//g'                         \
-    |  grep --invert-match "Failed query id:" >> $TEST_OUT            \
-    || echo "expected exception"
-
-$IQ "aio_save(build(<x:uint16>[i=0:0], i), '$F', 'format=arrow')" 2>&1 \
-    |  sed --expression='s/ line: [0-9]\+//g'                          \
-    |  grep --invert-match "Failed query id:" >> $TEST_OUT             \
-    || echo "expected exception"
-
-$IQ "aio_save(build(<x:uint32>[i=0:0], i), '$F', 'format=arrow')" 2>&1 \
-    |  sed --expression='s/ line: [0-9]\+//g'                          \
-    |  grep --invert-match "Failed query id:" >> $TEST_OUT             \
-    || echo "expected exception"
-
-$IQ "aio_save(build(<x:uint64>[i=0:0], i), '$F', 'format=arrow')" 2>&1 \
-    |  sed --expression='s/ line: [0-9]\+//g'                          \
-    |  grep --invert-match "Failed query id:" >> $TEST_OUT             \
     || echo "expected exception"
 
 echo -e "\nIII. int64, int64(null)"
