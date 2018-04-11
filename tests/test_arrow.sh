@@ -28,72 +28,88 @@ iq "aio_save(apply(build(<x:int64>[i=1:100:0:20], i), y, iif(i%2=0, i, int64(nul
 python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
     >> $TEST_OUT
 
-echo "3. double"
-iq "aio_save(apply(build(<x:double>[i=1:20:0:4], i), y, iif(i%2=0, double(i), double(null))), '$F', 'format=arrow')"
+echo "3. binary - not supported"
+
+echo "4. bool"
+iq "aio_save(apply(build(<x:bool not null>[i=1:20:0:4], i), y, iif(i%2=0, bool(i), bool(null))), '$F', 'format=arrow')"
 python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
     >> $TEST_OUT
 
-echo "4. float"
-iq "aio_save(apply(build(<x:float>[i=1:20:0:4], i), y, iif(i%2=0, float(i), float(null))), '$F', 'format=arrow')"
+echo "5. char"
+iq "aio_save(apply(build(<x:char not null>[i=1:20:0:4], 48 + i), y, iif(i%2=0, char(48 + i), char(null))), '$F', 'format=arrow')"
 python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
     >> $TEST_OUT
 
-echo "5. int8"
-iq "aio_save(apply(build(<x:double>[i=1:20:0:4], i), y, iif(i%2=0, int8(i), int8(null))), '$F', 'format=arrow')"
+echo "6. datetime - not supported"
+
+echo "7. datetimetz - not supported"
+
+echo "8. double"
+iq "aio_save(apply(build(<x:double not null>[i=1:20:0:4], i), y, iif(i%2=0, double(i), double(null))), '$F', 'format=arrow')"
 python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
     >> $TEST_OUT
 
-echo "6. int16"
-iq "aio_save(apply(build(<x:double>[i=1:20:0:4], i), y, iif(i%2=0, int16(i), int16(null))), '$F', 'format=arrow')"
+echo "9. float"
+iq "aio_save(apply(build(<x:float not null>[i=1:20:0:4], i), y, iif(i%2=0, float(i), float(null))), '$F', 'format=arrow')"
 python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
     >> $TEST_OUT
 
-echo "7. int32"
-iq "aio_save(apply(build(<x:double>[i=1:20:0:4], i), y, iif(i%2=0, int32(i), int32(null))), '$F', 'format=arrow')"
+echo "10. int8"
+iq "aio_save(apply(build(<x:int8 not null>[i=1:20:0:4], i), y, iif(i%2=0, int8(i), int8(null))), '$F', 'format=arrow')"
 python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
     >> $TEST_OUT
 
-echo "8. int64"
-iq "aio_save(apply(build(<x:double>[i=1:20:0:4], i), y, iif(i%2=0, int64(i), int64(null))), '$F', 'format=arrow')"
+echo "11. int16"
+iq "aio_save(apply(build(<x:int16 not null>[i=1:20:0:4], i), y, iif(i%2=0, int16(i), int16(null))), '$F', 'format=arrow')"
 python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
     >> $TEST_OUT
 
-echo "9. string"
-iq "aio_save(apply(build(<x:int64>[i=1:20:0:4], i), y, iif(i%2=0, string(i), string(null))), '$F', 'format=arrow')"
+echo "12. int32"
+iq "aio_save(apply(build(<x:int32 not null>[i=1:20:0:4], i), y, iif(i%2=0, int32(i), int32(null))), '$F', 'format=arrow')"
 python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
     >> $TEST_OUT
 
-echo "10. uint8"
-iq "aio_save(apply(build(<x:double>[i=1:20:0:4], i), y, iif(i%2=0, uint8(i), uint8(null))), '$F', 'format=arrow')"
+echo "13. int64"
+iq "aio_save(apply(build(<x:int64 not null>[i=1:20:0:4], i), y, iif(i%2=0, int64(i), int64(null))), '$F', 'format=arrow')"
 python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
     >> $TEST_OUT
 
-echo "11. uint16"
-iq "aio_save(apply(build(<x:double>[i=1:20:0:4], i), y, iif(i%2=0, uint16(i), uint16(null))), '$F', 'format=arrow')"
+echo "14. string"
+iq "aio_save(apply(build(<x:string not null>[i=1:20:0:4], i), y, iif(i%2=0, string(i), string(null))), '$F', 'format=arrow')"
 python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
     >> $TEST_OUT
 
-echo "12. uint32"
-iq "aio_save(apply(build(<x:double>[i=1:20:0:4], i), y, iif(i%2=0, uint32(i), uint32(null))), '$F', 'format=arrow')"
+echo "15. uint8"
+iq "aio_save(apply(build(<x:uint8 not null>[i=1:20:0:4], i), y, iif(i%2=0, uint8(i), uint8(null))), '$F', 'format=arrow')"
 python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
     >> $TEST_OUT
 
-echo "13. uint64"
-iq "aio_save(apply(build(<x:double>[i=1:20:0:4], i), y, iif(i%2=0, uint64(i), uint64(null))), '$F', 'format=arrow')"
+echo "16. uint16"
+iq "aio_save(apply(build(<x:uint16 not null>[i=1:20:0:4], i), y, iif(i%2=0, uint16(i), uint16(null))), '$F', 'format=arrow')"
 python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
     >> $TEST_OUT
 
-echo "14. int64, double, string"
+echo "17. uint32"
+iq "aio_save(apply(build(<x:uint32 not null>[i=1:20:0:4], i), y, iif(i%2=0, uint32(i), uint32(null))), '$F', 'format=arrow')"
+python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
+    >> $TEST_OUT
+
+echo "18. uint64"
+iq "aio_save(apply(build(<x:uint64 not null>[i=1:20:0:4], i), y, iif(i%2=0, uint64(i), uint64(null))), '$F', 'format=arrow')"
+python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
+    >> $TEST_OUT
+
+echo "19. int64, double, string"
 iq "aio_save(apply(build(<x:int64>[i=1:20:0:4], i), y, iif(i%2=0, double(i), double(null)), z, iif(i%2=0, string(i), string(null))), '$F', 'format=arrow')"
 python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
     >> $TEST_OUT
 
-echo "15. Empty chunk"
+echo "20. Empty chunk"
 iq "aio_save(filter(build(<x:int64>[i=1:20:0:4], i), x < 6 or x > 14), '$F', 'format=arrow')"
 python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
     >> $TEST_OUT
 
-echo "16. Different output sinks"
+echo "21. Different output sinks"
 $IQ "aio_save(build(<x:int64>[i=0:0], i), 'console', 'format=arrow')" \
     >> $TEST_OUT
 $IQ "aio_save(build(<x:int64>[i=0:0], i), 'stdout', 'format=arrow')" \
@@ -103,16 +119,6 @@ $IQ "aio_save(build(<x:int64>[i=0:0], i), 'stderr', 'format=arrow')" \
 
 
 echo -e "\nII. Exceptions"
-
-$IQ "aio_save(build(<x:bool>[i=0:0], i), '$F', 'format=arrow')" 2>&1 \
-    |  sed --expression='s/ line: [0-9]\+//g'                        \
-    |  grep --invert-match "Failed query id:" >> $TEST_OUT           \
-    || echo "expected exception"
-
-$IQ "aio_save(build(<x:char>[i=0:0], i), '$F', 'format=arrow')" 2>&1 \
-    |  sed --expression='s/ line: [0-9]\+//g'                        \
-    |  grep --invert-match "Failed query id:" >> $TEST_OUT           \
-    || echo "expected exception"
 
 $IQ "aio_save(build(<x:datetime>[i=0:0], i), '$F', 'format=arrow')" 2>&1 \
     |  sed --expression='s/ line: [0-9]\+//g'                            \

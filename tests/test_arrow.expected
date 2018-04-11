@@ -125,26 +125,48 @@ x      y
 100  100.0
 {chunk_no,dest_instance_id,source_instance_id} val
 x     y
- 1.0   NaN
- 2.0   2.0
- 3.0   NaN
- 4.0   4.0
- 5.0   NaN
- 6.0   6.0
- 7.0   NaN
- 8.0   8.0
- 9.0   NaN
-10.0  10.0
-11.0   NaN
-12.0  12.0
-13.0   NaN
-14.0  14.0
-15.0   NaN
-16.0  16.0
-17.0   NaN
-18.0  18.0
-19.0   NaN
-20.0  20.0
+True  None
+True  True
+True  None
+True  True
+True  None
+True  True
+True  None
+True  True
+True  None
+True  True
+True  None
+True  True
+True  None
+True  True
+True  None
+True  True
+True  None
+True  True
+True  None
+True  True
+{chunk_no,dest_instance_id,source_instance_id} val
+x     y
+1  None
+2     2
+3  None
+4     4
+5  None
+6     6
+7  None
+8     8
+9  None
+:     :
+;  None
+<     <
+=  None
+>     >
+?  None
+@     @
+A  None
+B     B
+C  None
+D     D
 {chunk_no,dest_instance_id,source_instance_id} val
 x     y
  1.0   NaN
@@ -191,81 +213,95 @@ x     y
 20.0  20.0
 {chunk_no,dest_instance_id,source_instance_id} val
 x     y
- 1.0   NaN
- 2.0   2.0
- 3.0   NaN
- 4.0   4.0
- 5.0   NaN
- 6.0   6.0
- 7.0   NaN
- 8.0   8.0
- 9.0   NaN
-10.0  10.0
-11.0   NaN
-12.0  12.0
-13.0   NaN
-14.0  14.0
-15.0   NaN
-16.0  16.0
-17.0   NaN
-18.0  18.0
-19.0   NaN
-20.0  20.0
+ 1   NaN
+ 2   2.0
+ 3   NaN
+ 4   4.0
+ 5   NaN
+ 6   6.0
+ 7   NaN
+ 8   8.0
+ 9   NaN
+10  10.0
+11   NaN
+12  12.0
+13   NaN
+14  14.0
+15   NaN
+16  16.0
+17   NaN
+18  18.0
+19   NaN
+20  20.0
 {chunk_no,dest_instance_id,source_instance_id} val
 x     y
- 1.0   NaN
- 2.0   2.0
- 3.0   NaN
- 4.0   4.0
- 5.0   NaN
- 6.0   6.0
- 7.0   NaN
- 8.0   8.0
- 9.0   NaN
-10.0  10.0
-11.0   NaN
-12.0  12.0
-13.0   NaN
-14.0  14.0
-15.0   NaN
-16.0  16.0
-17.0   NaN
-18.0  18.0
-19.0   NaN
-20.0  20.0
+ 1   NaN
+ 2   2.0
+ 3   NaN
+ 4   4.0
+ 5   NaN
+ 6   6.0
+ 7   NaN
+ 8   8.0
+ 9   NaN
+10  10.0
+11   NaN
+12  12.0
+13   NaN
+14  14.0
+15   NaN
+16  16.0
+17   NaN
+18  18.0
+19   NaN
+20  20.0
 {chunk_no,dest_instance_id,source_instance_id} val
 x     y
- 1.0   NaN
- 2.0   2.0
- 3.0   NaN
- 4.0   4.0
- 5.0   NaN
- 6.0   6.0
- 7.0   NaN
- 8.0   8.0
- 9.0   NaN
-10.0  10.0
-11.0   NaN
-12.0  12.0
-13.0   NaN
-14.0  14.0
-15.0   NaN
-16.0  16.0
-17.0   NaN
-18.0  18.0
-19.0   NaN
-20.0  20.0
+ 1   NaN
+ 2   2.0
+ 3   NaN
+ 4   4.0
+ 5   NaN
+ 6   6.0
+ 7   NaN
+ 8   8.0
+ 9   NaN
+10  10.0
+11   NaN
+12  12.0
+13   NaN
+14  14.0
+15   NaN
+16  16.0
+17   NaN
+18  18.0
+19   NaN
+20  20.0
+{chunk_no,dest_instance_id,source_instance_id} val
+x     y
+ 1   NaN
+ 2   2.0
+ 3   NaN
+ 4   4.0
+ 5   NaN
+ 6   6.0
+ 7   NaN
+ 8   8.0
+ 9   NaN
+10  10.0
+11   NaN
+12  12.0
+13   NaN
+14  14.0
+15   NaN
+16  16.0
+17   NaN
+18  18.0
+19   NaN
+20  20.0
 {chunk_no,dest_instance_id,source_instance_id} val
 x     y
  1  None
- 2     2
- 3  None
- 4     4
- 5  None
- 6     6
- 7  None
- 8     8
- 9  None
 10    10
 11  None
 12    12
@@ -276,95 +312,103 @@ x     y
 17  None
 18    18
 19  None
+ 2     2
 20    20
+ 3  None
+ 4     4
+ 5  None
+ 6     6
+ 7  None
+ 8     8
+ 9  None
 {chunk_no,dest_instance_id,source_instance_id} val
 x     y
- 1.0   NaN
- 2.0   2.0
- 3.0   NaN
- 4.0   4.0
- 5.0   NaN
- 6.0   6.0
- 7.0   NaN
- 8.0   8.0
- 9.0   NaN
-10.0  10.0
-11.0   NaN
-12.0  12.0
-13.0   NaN
-14.0  14.0
-15.0   NaN
-16.0  16.0
-17.0   NaN
-18.0  18.0
-19.0   NaN
-20.0  20.0
+ 1   NaN
+ 2   2.0
+ 3   NaN
+ 4   4.0
+ 5   NaN
+ 6   6.0
+ 7   NaN
+ 8   8.0
+ 9   NaN
+10  10.0
+11   NaN
+12  12.0
+13   NaN
+14  14.0
+15   NaN
+16  16.0
+17   NaN
+18  18.0
+19   NaN
+20  20.0
 {chunk_no,dest_instance_id,source_instance_id} val
 x     y
- 1.0   NaN
- 2.0   2.0
- 3.0   NaN
- 4.0   4.0
- 5.0   NaN
- 6.0   6.0
- 7.0   NaN
- 8.0   8.0
- 9.0   NaN
-10.0  10.0
-11.0   NaN
-12.0  12.0
-13.0   NaN
-14.0  14.0
-15.0   NaN
-16.0  16.0
-17.0   NaN
-18.0  18.0
-19.0   NaN
-20.0  20.0
+ 1   NaN
+ 2   2.0
+ 3   NaN
+ 4   4.0
+ 5   NaN
+ 6   6.0
+ 7   NaN
+ 8   8.0
+ 9   NaN
+10  10.0
+11   NaN
+12  12.0
+13   NaN
+14  14.0
+15   NaN
+16  16.0
+17   NaN
+18  18.0
+19   NaN
+20  20.0
 {chunk_no,dest_instance_id,source_instance_id} val
 x     y
- 1.0   NaN
- 2.0   2.0
- 3.0   NaN
- 4.0   4.0
- 5.0   NaN
- 6.0   6.0
- 7.0   NaN
- 8.0   8.0
- 9.0   NaN
-10.0  10.0
-11.0   NaN
-12.0  12.0
-13.0   NaN
-14.0  14.0
-15.0   NaN
-16.0  16.0
-17.0   NaN
-18.0  18.0
-19.0   NaN
-20.0  20.0
+ 1   NaN
+ 2   2.0
+ 3   NaN
+ 4   4.0
+ 5   NaN
+ 6   6.0
+ 7   NaN
+ 8   8.0
+ 9   NaN
+10  10.0
+11   NaN
+12  12.0
+13   NaN
+14  14.0
+15   NaN
+16  16.0
+17   NaN
+18  18.0
+19   NaN
+20  20.0
 {chunk_no,dest_instance_id,source_instance_id} val
 x     y
- 1.0   NaN
- 2.0   2.0
- 3.0   NaN
- 4.0   4.0
- 5.0   NaN
- 6.0   6.0
- 7.0   NaN
- 8.0   8.0
- 9.0   NaN
-10.0  10.0
-11.0   NaN
-12.0  12.0
-13.0   NaN
-14.0  14.0
-15.0   NaN
-16.0  16.0
-17.0   NaN
-18.0  18.0
-19.0   NaN
-20.0  20.0
+ 1   NaN
+ 2   2.0
+ 3   NaN
+ 4   4.0
+ 5   NaN
+ 6   6.0
+ 7   NaN
+ 8   8.0
+ 9   NaN
+10  10.0
+11   NaN
+12  12.0
+13   NaN
+14  14.0
+15   NaN
+16  16.0
+17   NaN
+18  18.0
+19   NaN
+20  20.0
 {chunk_no,dest_instance_id,source_instance_id} val
 x     y     z
  1   NaN  None
@@ -403,12 +447,6 @@ x
 {chunk_no,dest_instance_id,source_instance_id} val
 {chunk_no,dest_instance_id,source_instance_id} val
 {chunk_no,dest_instance_id,source_instance_id} val
-UserException in file: PhysicalAioSave.cpp function: attributes2ArrowSchema
-Error id: scidb::SCIDB_SE_ARRAY_WRITER::SCIDB_LE_ILLEGAL_OPERATION
-Error description: Error while saving array. Illegal operation: Type bool not supported in arrow format.
-UserException in file: PhysicalAioSave.cpp function: attributes2ArrowSchema
-Error id: scidb::SCIDB_SE_ARRAY_WRITER::SCIDB_LE_ILLEGAL_OPERATION
-Error description: Error while saving array. Illegal operation: Type char not supported in arrow format.
 UserException in file: PhysicalAioSave.cpp function: attributes2ArrowSchema
 Error id: scidb::SCIDB_SE_ARRAY_WRITER::SCIDB_LE_ILLEGAL_OPERATION
 Error description: Error while saving array. Illegal operation: Type datetime not supported in arrow format.

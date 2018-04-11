@@ -120,6 +120,16 @@ std::shared_ptr<arrow::Schema> attributes2ArrowSchema(Attributes const& attrs)
 
         switch (typeEnum)
         {
+        case TE_BOOL:
+        {
+            arrowType = arrow::boolean();
+            break;
+        }
+        case TE_CHAR:
+        {
+            arrowType = arrow::utf8();
+            break;
+        }
         case TE_DOUBLE:
         {
             arrowType = arrow::float64();
@@ -623,6 +633,59 @@ public:
 
                 switch (_inputTypes[i])
                 {
+                case TE_BOOL:
+                {
+                    vector<bool> values;
+                    vector<bool> is_valid;
+
+                    while (!citer->end())
+                    {
+                        Value const& value = citer->getItem();
+                        if(value.isNull())
+                        {
+                            values.push_back(0);
+                            is_valid.push_back(false);
+                        }
+                        else
+                        {
+                            values.push_back(value.getBool());
+                            is_valid.push_back(true);
+                        }
+                        bytesCount += _inputSizes[i];
+                        ++(*citer);
+                    }
+
+                    THROW_NOT_OK(
+                        static_cast<arrow::BooleanBuilder*>(
+                            _arrowBuilders[i].get())->Append(values, is_valid));
+
+                    break;
+                }
+                case TE_CHAR:
+                {
+                    // TODO Use Append(vector<... when 0.10.0 is
+                    // released due to ARROW-2351 and ARROW-2388
+                    while (!citer->end())
+                    {
+                        Value const& value = citer->getItem();
+                        if(value.isNull())
+                        {
+                            THROW_NOT_OK(
+                                static_cast<arrow::StringBuilder*>(
+                                    _arrowBuilders[i].get())->AppendNull());
+                        }
+                        else
+                        {
+                            THROW_NOT_OK(
+                                static_cast<arrow::StringBuilder*>(
+                                    _arrowBuilders[i].get())->Append(
+                                        string(1, value.getChar())));
+                        }
+                        bytesCount += _inputSizes[i] + value.size();
+                        ++(*citer);
+                    }
+                    break;
+                }
                 case TE_DOUBLE:
                 {
                     vector<double> values;
@@ -633,7 +696,7 @@ public:
                         Value const& value = citer->getItem();
                         if(value.isNull())
                         {
-                            values.push_back(-1);
+                            values.push_back(0);
                             is_valid.push_back(false);
                         }
                         else
@@ -661,7 +724,7 @@ public:
                         Value const& value = citer->getItem();
                         if(value.isNull())
                         {
-                            values.push_back(-1);
+                            values.push_back(0);
                             is_valid.push_back(false);
                         }
                         else
@@ -689,7 +752,7 @@ public:
                         Value const& value = citer->getItem();
                         if(value.isNull())
                         {
-                            values.push_back(-1);
+                            values.push_back(0);
                             is_valid.push_back(false);
                         }
                         else
@@ -717,7 +780,7 @@ public:
                         Value const& value = citer->getItem();
                         if(value.isNull())
                         {
-                            values.push_back(-1);
+                            values.push_back(0);
                             is_valid.push_back(false);
                         }
                         else
@@ -745,7 +808,7 @@ public:
                         Value const& value = citer->getItem();
                         if(value.isNull())
                         {
-                            values.push_back(-1);
+                            values.push_back(0);
                             is_valid.push_back(false);
                         }
                         else
@@ -776,7 +839,7 @@ public:
                             // THROW_NOT_OK(
                             //     static_cast<arrow::Int64Builder*>(
                             //         _arrowBuilders[i].get())->AppendNull());
-                            values.push_back(-1);
+                            values.push_back(0);
                             is_valid.push_back(false);
                         }
                         else
@@ -800,6 +863,8 @@ public:
                 }
                 case TE_STRING:
                 {
+                    // TODO Use Append(vector<... when 0.10.0 is
+                    // released due to ARROW-2351 and ARROW-2388
                     while (!citer->end())
                     {
                         Value const& value = citer->getItem();
@@ -831,7 +896,7 @@ public:
                         Value const& value = citer->getItem();
                         if(value.isNull())
                         {
-                            values.push_back(-1);
+                            values.push_back(0);
                             is_valid.push_back(false);
                         }
                         else
@@ -859,7 +924,7 @@ public:
                         Value const& value = citer->getItem();
                         if(value.isNull())
                         {
-                            values.push_back(-1);
+                            values.push_back(0);
                             is_valid.push_back(false);
                         }
                         else
@@ -887,7 +952,7 @@ public:
                         Value const& value = citer->getItem();
                         if(value.isNull())
                         {
-                            values.push_back(-1);
+                            values.push_back(0);
                             is_valid.push_back(false);
                         }
                         else
@@ -915,7 +980,7 @@ public:
                         Value const& value = citer->getItem();
                         if(value.isNull())
                         {
-                            values.push_back(-1);
+                            values.push_back(0);
                             is_valid.push_back(false);
                         }
                         else
