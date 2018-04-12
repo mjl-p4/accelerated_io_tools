@@ -28,7 +28,11 @@ iq "aio_save(apply(build(<x:int64>[i=1:100:0:20], i), y, iif(i%2=0, i, int64(nul
 python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
     >> $TEST_OUT
 
-echo "3. binary - not supported"
+echo "3. binary"
+python -c "import numpy, scidbpy; scidbpy.connect().input('<x:binary not null>[i=1:20:0:4]', upload_data=numpy.array([bytes(['b', 'i', 'n'])] * 20, dtype='object')).apply('y', 'iif(i%2=0, x, binary(null))').store('bin')"
+iq "aio_save(bin, '$F', 'format=arrow')"
+python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
+    >> $TEST_OUT
 
 echo "4. bool"
 iq "aio_save(apply(build(<x:bool not null>[i=1:20:0:4], i), y, iif(i%2=0, bool(i), bool(null))), '$F', 'format=arrow')"

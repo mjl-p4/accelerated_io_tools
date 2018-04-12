@@ -120,6 +120,11 @@ std::shared_ptr<arrow::Schema> attributes2ArrowSchema(Attributes const& attrs)
 
         switch (typeEnum)
         {
+        case TE_BINARY:
+        {
+            arrowType = arrow::binary();
+            break;
+        }
         case TE_BOOL:
         {
             arrowType = arrow::boolean();
@@ -633,6 +638,31 @@ public:
 
                 switch (_inputTypes[i])
                 {
+                case TE_BINARY:
+                {
+                    while (!citer->end())
+                    {
+                        Value const& value = citer->getItem();
+                        if(value.isNull())
+                        {
+                            THROW_NOT_OK(
+                                static_cast<arrow::BinaryBuilder*>(
+                                    _arrowBuilders[i].get())->AppendNull());
+                        }
+                        else
+                        {
+                            THROW_NOT_OK(
+                                static_cast<arrow::BinaryBuilder*>(
+                                    _arrowBuilders[i].get())->Append(
+                                        reinterpret_cast<const char*>(
+                                            value.data()),
+                                        value.size()));
+                        }
+                        bytesCount += _inputSizes[i] + value.size();
+                        ++(*citer);
+                    }
+                    break;
+                }
                 case TE_BOOL:
                 {
                     vector<bool> values;

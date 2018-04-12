@@ -124,6 +124,28 @@ x      y
  99    NaN
 100  100.0
 {chunk_no,dest_instance_id,source_instance_id} val
+x                y
+['b', 'i', 'n']             None
+['b', 'i', 'n']  ['b', 'i', 'n']
+['b', 'i', 'n']             None
+['b', 'i', 'n']  ['b', 'i', 'n']
+['b', 'i', 'n']             None
+['b', 'i', 'n']  ['b', 'i', 'n']
+['b', 'i', 'n']             None
+['b', 'i', 'n']  ['b', 'i', 'n']
+['b', 'i', 'n']             None
+['b', 'i', 'n']  ['b', 'i', 'n']
+['b', 'i', 'n']             None
+['b', 'i', 'n']  ['b', 'i', 'n']
+['b', 'i', 'n']             None
+['b', 'i', 'n']  ['b', 'i', 'n']
+['b', 'i', 'n']             None
+['b', 'i', 'n']  ['b', 'i', 'n']
+['b', 'i', 'n']             None
+['b', 'i', 'n']  ['b', 'i', 'n']
+['b', 'i', 'n']             None
+['b', 'i', 'n']  ['b', 'i', 'n']
+{chunk_no,dest_instance_id,source_instance_id} val
 x     y
 True  None
 True  True
