@@ -45,6 +45,7 @@
 #include <arrow/record_batch.h>
 #include <arrow/status.h>
 #include <arrow/type.h>
+#include <arrow/util/io-util.h>
 
 #include <query/TypeSystem.h>
 #include <query/FunctionDescription.h>
@@ -207,54 +208,6 @@ std::shared_ptr<arrow::Schema> attributes2ArrowSchema(Attributes const& attrs)
     }
     return arrow::schema(arrowFields);
 }
-
-// Workaround for https://issues.apache.org/jira/browse/ARROW-2179
-// Addapted from arrow/util/io-util.h
-// Output stream that just writes to stdout.
-class StdoutStream : public arrow::io::OutputStream {
- public:
-  StdoutStream() : pos_(0) { set_mode(arrow::io::FileMode::WRITE); }
-  ~StdoutStream() override {}
-
-  arrow::Status Close() override { return arrow::Status::OK(); }
-
-  arrow::Status Tell(int64_t* position) const override {
-    *position = pos_;
-    return arrow::Status::OK();
-  }
-
-  arrow::Status Write(const void* data, int64_t nbytes) override {
-    pos_ += nbytes;
-    std::cout.write(reinterpret_cast<const char*>(data), nbytes);
-    return arrow::Status::OK();
-  }
-
- private:
-  int64_t pos_;
-};
-
-// Output stream that just writes to stderr.
-class StderrStream : public arrow::io::OutputStream {
- public:
-  StderrStream() : pos_(0) { set_mode(arrow::io::FileMode::WRITE); }
-  ~StderrStream() override {}
-
-  arrow::Status Close() override { return arrow::Status::OK(); }
-
-  arrow::Status Tell(int64_t* position) const override {
-    *position = pos_;
-    return arrow::Status::OK();
-  }
-
-  arrow::Status Write(const void* data, int64_t nbytes) override {
-    pos_ += nbytes;
-    std::cerr.write(reinterpret_cast<const char*>(data), nbytes);
-    return arrow::Status::OK();
-  }
-
- private:
-  int64_t pos_;
-};
 
 class MemChunkBuilder
 {
@@ -1535,11 +1488,11 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
     std::shared_ptr<arrow::io::OutputStream> arrowStream;
     if (fileName == "console" || fileName == "stdout")
     {
-        arrowStream.reset(new StdoutStream());
+        arrowStream.reset(new arrow::io::StdoutStream());
     }
     else if (fileName == "stderr")
     {
-        arrowStream.reset(new StderrStream());
+        arrowStream.reset(new arrow::io::StderrStream());
     }
     else
     {
