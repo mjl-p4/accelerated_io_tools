@@ -44,7 +44,10 @@ iq "aio_save(apply(build(<x:char not null>[i=1:20:0:4], 48 + i), y, iif(i%2=0, c
 python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
     >> $TEST_OUT
 
-echo "6. datetime - not supported"
+echo "6. datetime"
+iq "aio_save(apply(build(<x:datetime not null>[i=1:20:0:4], i), y, iif(i%2=0, datetime(i), datetime(null))), '$F', 'format=arrow')"
+python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
+    >> $TEST_OUT
 
 echo "7. datetimetz - not supported"
 
@@ -123,11 +126,6 @@ $IQ "aio_save(build(<x:int64>[i=0:0], i), 'stderr', 'format=arrow')" \
 
 
 echo -e "\nII. Exceptions"
-
-$IQ "aio_save(build(<x:datetime>[i=0:0], i), '$F', 'format=arrow')" 2>&1 \
-    |  sed --expression='s/ line: [0-9]\+//g'                            \
-    |  grep --invert-match "Failed query id:" >> $TEST_OUT               \
-    || echo "expected exception"
 
 $IQ "aio_save(build(<x:datetimetz>[i=0:0], apply_offset(datetime(i), 0)), '$F', 'format=arrow')" 2>&1 \
     |  sed --expression='s/ line: [0-9]\+//g'                                                         \

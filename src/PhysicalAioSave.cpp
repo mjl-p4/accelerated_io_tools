@@ -135,6 +135,11 @@ std::shared_ptr<arrow::Schema> attributes2ArrowSchema(Attributes const& attrs)
             arrowType = arrow::utf8();
             break;
         }
+        case TE_DATETIME:
+        {
+            arrowType = arrow::timestamp(arrow::TimeUnit::SECOND);
+            break;
+        }
         case TE_DOUBLE:
         {
             arrowType = arrow::float64();
@@ -714,6 +719,34 @@ public:
                         bytesCount += _inputSizes[i] + value.size();
                         ++(*citer);
                     }
+                    break;
+                }
+                case TE_DATETIME:
+                {
+                    vector<int64_t> values;
+                    vector<bool> is_valid;
+
+                    while (!citer->end())
+                    {
+                        Value const& value = citer->getItem();
+                        if(value.isNull())
+                        {
+                            values.push_back(0);
+                            is_valid.push_back(false);
+                        }
+                        else
+                        {
+                            values.push_back(value.getDateTime());
+                            is_valid.push_back(true);
+                        }
+                        bytesCount += _inputSizes[i];
+                        ++(*citer);
+                    }
+
+                    THROW_NOT_OK(
+                        static_cast<arrow::Date64Builder*>(
+                            _arrowBuilders[i].get())->Append(values, is_valid));
+
                     break;
                 }
                 case TE_DOUBLE:
