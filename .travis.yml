@@ -20,10 +20,10 @@ before_install:
   # - wget --no-verbose --output-document -
   #   https://github.com/Paradigm4/shim/archive/master.tar.gz
   #   | tar --extract --gzip --directory=.
-  - mkdir scidb-py
-  - wget --no-verbose --output-document -
-    https://github.com/Paradigm4/scidb-py/archive/master.tar.gz
-    | tar --extract --gzip --directory=.
+  # - mkdir scidb-py
+  # - wget --no-verbose --output-document -
+  #   https://github.com/Paradigm4/scidb-py/archive/master.tar.gz
+  #   | tar --extract --gzip --directory=.
   - docker pull rvernica/scidb:${SCIDB_IMG}
   - docker run
     --name scidb
@@ -37,7 +37,7 @@ before_install:
 install:
   - docker exec scidb /accelerated_io_tools/tests/docker-install.sh
   # - docker exec scidb make --directory=/accelerated_io_tools/shim-master service
-  - docker exec scidb bash -c "source /opt/rh/python27/enable; pip install --upgrade /accelerated_io_tools/SciDB-Py-master"
+  # - docker exec scidb bash -c "source /opt/rh/python27/enable; pip install --upgrade /accelerated_io_tools/SciDB-Py-master"
 
 script:
   - docker exec scidb /accelerated_io_tools/tests/test.sh
