@@ -67,6 +67,11 @@ scidb.py startall $SCIDB_NAME
 iquery --afl --query "list('instances')"
 
 
+# Turn on aio in Shim
+echo aio=1 > /var/lib/shim/conf
+service shimsvc restart
+
+
 # Compile and install plugin
 scidb.py stopall $SCIDB_NAME
 make --directory /accelerated_io_tools
