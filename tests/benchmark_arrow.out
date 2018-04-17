@@ -3,7 +3,7 @@ Setup
 ===
 Number of runs:          3
 Target size:           200.00 MB
-Buffer size:            50.00 MB
+Buffer size:             3.00 MB
 Chunk size:         100000
 Number of records: 6553600
 Number of chunks:       66
@@ -14,20 +14,9 @@ SciDB size:         200.02 MB
 In-memory size:       0.00 MB
 File size:          200.01 MB
 
-Variable Size Schema (int64 and string)
----
-SciDB size:         200.03 MB
-In-memory size:       0.00 MB
-File size:          225.01 MB
-
 Save
 ===
 Fix Size Schema (int64 only)
 ---
-Binary:   1.51 seconds 132.80 MB/second
-Arrow:    1.58 seconds 126.41 MB/second
-
-Variable Size Schema (int64 and string)
----
-Binary:   1.94 seconds 103.18 MB/second
-Arrow:    2.00 seconds 100.18 MB/second
+Binary:   1.23 seconds 163.27 MB/second
+Arrow:    1.41 seconds 142.04 MB/second
