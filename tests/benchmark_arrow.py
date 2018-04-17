@@ -17,11 +17,11 @@ def setup(mb, runs):
     print("""
 Setup
 ===
-Number of runs:    {:7d}
-Target size:       {:10.2f} MB
-Buffer size:       {:10.2f} MB
-Chunk size:        {:7d}
-Number of records: {:7d}""".format(
+Number of runs:    {:8d}
+Target size:       {:11.2f} MB
+Buffer size:       {:11.2f} MB
+Chunk size:        {:8d}
+Number of records: {:8d}""".format(
     runs,
     mb,
     buffer_size / 1024. / 1024,
@@ -48,7 +48,7 @@ Number of records: {:7d}""".format(
         ar_name, "'/dev/shm/{}'".format(ar_name), "'format=arrow'").fetch()
     file_bytes_fix = os.path.getsize('/dev/shm/' + ar_name)
 
-    print("""Number of chunks:  {:7d}
+    print("""Number of chunks:  {:8d}
 
 Fix Size Schema (int64 only)
 ---
