@@ -10,10 +10,24 @@ chunk_size = 100000
 buffer_size = 50 * 1024 * 1024
 
 
-def setup(mb):
+def setup(mb, runs):
     cnt = mb * 1024 * 1024 / 8 / 4
-
     db = scidbpy.connect()
+
+    print("""
+Setup
+===
+Number of runs:    {:7d}
+Target size:       {:10.2f} MB
+Buffer size:       {:10.2f} MB
+Chunk size:        {:7d}
+Number of records: {:7d}""".format(
+    runs,
+    mb,
+    buffer_size / 1024. / 1024,
+    chunk_size,
+    cnt))
+
 
     ar_name = ar_names[0]
     db.build('<z:int64 not null>[i=1:{}:0:{}]'.format(cnt, chunk_size),
@@ -34,6 +48,19 @@ def setup(mb):
         ar_name, "'/dev/shm/{}'".format(ar_name), "'format=arrow'").fetch()
     file_bytes_fix = os.path.getsize('/dev/shm/' + ar_name)
 
+    print("""Number of chunks:  {:7d}
+
+Fix Size Schema (int64 only)
+---
+SciDB size:        {:7.2f} MB
+In-memory size:    {:7.2f} MB
+File size:         {:7.2f} MB""".format(
+    chunks,
+    scidb_bytes_fix / 1024. / 1024,
+    mem_bytes_fix / 1024. / 1024,
+    file_bytes_fix / 1024. / 1024))
+
+
     ar_name = ar_names[1]
     db.build('<z:int64 not null>[i=1:{}:0:{}]'.format(cnt, chunk_size),
              'random()'
@@ -52,35 +79,11 @@ def setup(mb):
     file_bytes_var = os.path.getsize('/dev/shm/' + ar_name)
 
     print("""
-Setup
-===
-Number of runs:    {:7d}
-Target size:       {:10.2f} MB
-Buffer size:       {:10.2f} MB
-Chunk size:        {:7d}
-Number of records: {:7d}
-Number of chunks:  {:7d}
-
-Fix Size Schema (int64 only)
----
-SciDB size:        {:7.2f} MB
-In-memory size:    {:7.2f} MB
-File size:         {:7.2f} MB
-
 Variable Size Schema (int64 and string)
 ---
 SciDB size:        {:7.2f} MB
 In-memory size:    {:7.2f} MB
 File size:         {:7.2f} MB""".format(
-    runs,
-    mb,
-    buffer_size / 1024. / 1024,
-    chunk_size,
-    cnt,
-    chunks,
-    scidb_bytes_fix / 1024. / 1024,
-    mem_bytes_fix / 1024. / 1024,
-    file_bytes_fix / 1024. / 1024,
     scidb_bytes_var / 1024. / 1024,
     mem_bytes_var / 1024. / 1024,
     file_bytes_var / 1024. / 1024))
@@ -123,6 +126,7 @@ db.iquery("aio_save({ar_name}, '/dev/shm/{ar_name}', 'format={fmt}', 'buffer_siz
     print("""\
 Arrow:  {:6.2f} seconds {:6.2f} MB/second""".format(
       rt, mb / rt))
+
 
     ar_name = ar_names[1]
     print("""
@@ -190,6 +194,7 @@ db.iquery('scan({})',
 Arrow:  {:6.2f} seconds {:6.2f} MB/second""".format(
       rt, mb / rt))
 
+
     i = 1
     print("""
 Variable Size Schema (int64 and string)
@@ -219,7 +224,10 @@ Arrow:  {:6.2f} seconds {:6.2f} MB/second""".format(
 
 def cleanup(db):
     for ar_name in ar_names:
-        db.remove(ar_name)
+        try:
+            db.remove(ar_name)
+        except:
+            pass
 
 
 if __name__ == "__main__":
@@ -229,7 +237,7 @@ if __name__ == "__main__":
         mb = 5                      # MB
     runs = 3
 
-    db = setup(mb)
+    db = setup(mb, runs)
 
     save(mb, runs)
     # download(mb, runs)
