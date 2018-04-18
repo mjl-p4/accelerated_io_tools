@@ -12,11 +12,11 @@ Fix Size Schema (int64 only)
 ---
 SciDB size:         500.05 MB
 In-memory size:       0.00 MB
-File size:            0.02 MB
+File size:          500.02 MB
 
 Save
 ===
 Fix Size Schema (int64 only)
 ---
-Binary:   2.99 seconds 167.36 MB/second
-Arrow:    2.05 seconds 243.65 MB/second
+Binary:   2.99 seconds 167.45 MB/second
+Arrow:    3.32 seconds 150.54 MB/second

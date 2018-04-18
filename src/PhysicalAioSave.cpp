@@ -871,9 +871,9 @@ public:
                         ++(*citer);
                     }
 
-                    // THROW_NOT_OK(
-                    //     static_cast<arrow::Int64Builder*>(
-                    //         _arrowBuilders[i].get())->Append(values, is_valid));
+                    THROW_NOT_OK(
+                        static_cast<arrow::Int64Builder*>(
+                            _arrowBuilders[i].get())->Append(values, is_valid));
 
                     break;
                 }
