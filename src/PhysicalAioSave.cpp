@@ -1036,8 +1036,6 @@ public:
         {
             THROW_NOT_OK(
                 _arrowBuilders[i]->Finish(&_arrowArrays[i])); // Resets builder
-            THROW_NOT_OK(
-                _arrowBuilders[i]->Finish(&_arrowArrays[i])); // Resets builder
         }
 
         // Create Arrow Record Batch
@@ -1545,15 +1543,15 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
             //     arrow::ipc::ReadRecordBatch(
             //         arrowSchema, &arrowBufferReader, &arrowBatch));
 
-            // Read Record Batch using Stream Reader
-            THROW_NOT_OK(
-                arrow::ipc::RecordBatchStreamReader::Open(
-                    &arrowBufferReader, &arrowReader));
-            THROW_NOT_OK(arrowReader->ReadNext(&arrowBatch));
+            // // Read Record Batch using Stream Reader
+            // THROW_NOT_OK(
+            //     arrow::ipc::RecordBatchStreamReader::Open(
+            //         &arrowBufferReader, &arrowReader));
+            // THROW_NOT_OK(arrowReader->ReadNext(&arrowBatch));
 
-            // Write Record Batch to stream
-            THROW_NOT_OK_FILE(
-                arrowWriter->WriteRecordBatch(*arrowBatch));
+            // // Write Record Batch to stream
+            // THROW_NOT_OK_FILE(
+            //     arrowWriter->WriteRecordBatch(*arrowBatch));
 
             ++(*arrayIter);
         }
