@@ -844,32 +844,38 @@ public:
                 }
                 case TE_INT64:
                 {
-                    vector<int64_t> values;
-                    vector<bool> is_valid;
+                    size_t cnt = 100000;
+                    vector<int64_t> values(cnt);
+                    vector<bool> is_valid(cnt);
+                    bytesCount += cnt * _inputSizes[i];
+                    citer->setPosition(citer->getLastPosition());
 
-                    while (!citer->end())
-                    {
-                        Value const& value = citer->getItem();
-                        if(value.isNull())
-                        {
-                            // THROW_NOT_OK(
-                            //     static_cast<arrow::Int64Builder*>(
-                            //         _arrowBuilders[i].get())->AppendNull());
-                            values.push_back(0);
-                            is_valid.push_back(false);
-                        }
-                        else
-                        {
-                            // THROW_NOT_OK(
-                            //     static_cast<arrow::Int64Builder*>(
-                            //         _arrowBuilders[i].get())->Append(
-                            //             value.getInt64()));
-                            values.push_back(value.getInt64());
-                            is_valid.push_back(true);
-                        }
-                        bytesCount += _inputSizes[i];
-                        ++(*citer);
-                    }
+                    // vector<int64_t> values;
+                    // vector<bool> is_valid;
+
+                    // while (!citer->end())
+                    // {
+                    //     Value const& value = citer->getItem();
+                    //     if(value.isNull())
+                    //     {
+                    //         // THROW_NOT_OK(
+                    //         //     static_cast<arrow::Int64Builder*>(
+                    //         //         _arrowBuilders[i].get())->AppendNull());
+                    //         values.push_back(0);
+                    //         is_valid.push_back(false);
+                    //     }
+                    //     else
+                    //     {
+                    //         // THROW_NOT_OK(
+                    //         //     static_cast<arrow::Int64Builder*>(
+                    //         //         _arrowBuilders[i].get())->Append(
+                    //         //             value.getInt64()));
+                    //         values.push_back(value.getInt64());
+                    //         is_valid.push_back(true);
+                    //     }
+                    //     bytesCount += _inputSizes[i];
+                    //     ++(*citer);
+                    // }
 
                     THROW_NOT_OK(
                         static_cast<arrow::Int64Builder*>(
