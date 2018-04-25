@@ -18,9 +18,9 @@ then
     wget --output-document /etc/yum.repos.d/bintray-rvernica-rpm.repo \
          https://bintray.com/rvernica/rpm/rpm
 
-    yum install --assumeyes \
-        arrow-devel         \
-        libpqxx-devel       \
+    yum install --assumeyes        \
+        arrow-devel-$ARROW_VER.el6 \
+        libpqxx-devel              \
         python27
 
     source /opt/rh/python27/enable
