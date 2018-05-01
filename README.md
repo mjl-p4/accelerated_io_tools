@@ -452,13 +452,6 @@ The following libraries are required to build the plugin:
 * PostgreSQL development library
 * Apache Arrow development library
 
-[//]: # "Follow distribution specific instructions to install the"
-[//]: # "[red-data-tools](https://github.com/red-data-tools/packages.red-data-tools.org/blob/master/README.md#package-repository)"
-[//]: # "package repository and the"
-[//]: # "[Apache Arrow C++](https://github.com/red-data-tools/packages.red-data-tools.org/blob/master/README.md#apache-arrow-c)"
-[//]: # "development library. For Red Hat Enterprise Linux use CentOS"
-[//]: # "instructions."
-
 Due to a version conflict with the Protocol Buffers library included
 with the official Apache Arrow packages, we use Apache Arrow packages
 custom built for SciDB.
@@ -481,7 +474,7 @@ Install Apache Arrow:
 > sudo yum install arrow-devel
 ```
 
-##### CentOS 7
+#### CentOS 7
 ```bash
 > sudo yum install \
      https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
