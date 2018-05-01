@@ -528,9 +528,10 @@ Building* instructions from the Shim
 
 ### SciDB-Py
 
-Follow the *Install development version from GitHub* instructions on the SciDB-Py [README](https://github.com/Paradigm4/SciDB-Py#installation)
-page.
-
+Install SciDB-Py version `18.1.2` or newer:
+```bash
+> pip install "scidb-py>=18.1.2"
+```
 
 ## Note: use the right branch for your version
 The git branches of accelerated_io_tools follow different versions of SciDB - with the master branch used for the most recent version. Note also changes in behavior are possible between versions.
