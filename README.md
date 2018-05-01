@@ -464,28 +464,39 @@ with the official Apache Arrow packages, we use Apache Arrow packages
 custom built for SciDB.
 
 ### CentOS
-```
-> sudo yum install scidb-18.1-dev scidb-18.1-libboost-devel log4cxx-devel protobuf-devel libpqxx-devel
+```bash
+> sudo yum install scidb-18.1-dev scidb-18.1-libboost-devel \
+    log4cxx-devel protobuf-devel libpqxx-devel
 ```
 
-For Apache Arrow:
-```
-# CentOS 6
-> sudo yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm
-# CentOS 7
-> sudo yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+Install Apache Arrow:
 
-> sudo wget --output-document /etc/yum.repos.d/bintray-rvernica-rpm.repo https://bintray.com/rvernica/rpm/rpm
+#### CentOS 6
+```bash
+> sudo yum install \
+    https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm
+> sudo wget --output-document /etc/yum.repos.d/bintray-rvernica-rpm.repo \
+    https://bintray.com/rvernica/rpm/rpm
+> sudo yum install arrow-devel
+```
+
+##### CentOS 7
+```bash
+> sudo yum install \
+     https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+
+> sudo wget --output-document /etc/yum.repos.d/bintray-rvernica-rpm.repo \
+    https://bintray.com/rvernica/rpm/rpm
 > sudo yum install arrow-devel
 ```
 
 ### Ubuntu
-```
+```bash
 > sudo apt-get install scidb-18.1-dev libprotobuf-dev libpqxx-dev
 ```
 
-For Apache Arrow:
-```
+Install Apache Arrow:
+```bash
 > cat <<APT_LINE | tee /etc/apt/sources.list.d/bintray-rvernica.list
 deb https://dl.bintray.com/rvernica/deb trusty universe
 APT_LINE
@@ -498,9 +509,9 @@ APT_LINE
 ## Install plug-in
 
 After that, follow instructions https://github.com/paradigm4/dev_tools to get dev_tools first. Then:
-```
-iquery -aq "install_github('paradigm4/accelerated_io_tools')"
-iquery -aq "load_library('accelerated_io_tools')"
+```bash
+> iquery -aq "install_github('paradigm4/accelerated_io_tools')"
+> iquery -aq "load_library('accelerated_io_tools')"
 ```
 
 Warning: if you were previously using `prototype_load_tools` you will need to unload that library and restart the cluster:
