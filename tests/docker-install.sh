@@ -3,11 +3,14 @@
 set -o errexit
 
 
+wget -O- https://paradigm4.github.io/extra-scidb-libs/install.sh \
+|  sh -s -- --only-prereq
+
 # Install prerequisites
 if [ `lsb_release --id | cut --fields=2` = "CentOS" ]
 then
-    yum install --assumeyes                                                    \
-        https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm
+    # yum install --assumeyes                                                    \
+    #     https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm
 
     ## https://github.com/red-data-tools/packages.red-data-tools.org#centos
     # yum install --assumeyes \
@@ -15,8 +18,8 @@ then
 
     ## Use Bintray packages:
     ## - Compiled without ORC support (avoid Protocol Buffers conflict)
-    wget --output-document /etc/yum.repos.d/bintray-rvernica-rpm.repo \
-         https://bintray.com/rvernica/rpm/rpm
+    # wget --output-document /etc/yum.repos.d/bintray-rvernica-rpm.repo \
+    #      https://bintray.com/rvernica/rpm/rpm
 
     yum install --assumeyes        \
         arrow-devel-$ARROW_VER.el6 \
@@ -38,10 +41,10 @@ else
     ## Use Bintray packages:
     ## - Compiled with g++ 4.9
     ## - Compiled without ORC support (avoid Protocol Buffers conflict)
-    cat <<APT_LINE | tee /etc/apt/sources.list.d/bintray-rvernica.list
-deb https://dl.bintray.com/rvernica/deb trusty universe
-APT_LINE
-    apt-key adv --keyserver hkp://keyserver.ubuntu.com --recv 46BD98A354BA5235
+#     cat <<APT_LINE | tee /etc/apt/sources.list.d/bintray-rvernica.list
+# deb https://dl.bintray.com/rvernica/deb trusty universe
+# APT_LINE
+#     apt-key adv --keyserver hkp://keyserver.ubuntu.com --recv 46BD98A354BA5235
 
     apt-get update
     apt-get install                              \
