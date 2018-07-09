@@ -77,6 +77,7 @@ private:
     bool                        _quoteStrings;
     bool                        _writeHeader;
     int32_t                     _precision;
+    bool                        _attsOnly;
 
 public:
     static const size_t MAX_PARAMETERS = 6;
@@ -97,7 +98,8 @@ public:
                 _printCoordinates(false),
                 _quoteStrings(false),
                 _writeHeader(false),
-                _precision(std::numeric_limits<double>::digits10)
+                _precision(std::numeric_limits<double>::digits10),
+                _attsOnly(true)
     {
         string const bufferSizeHeader              = "buffer_size=";
         string const cellsPerChunkHeader           = "cells_per_chunk=";
@@ -110,6 +112,7 @@ public:
         string const instancesHeader               = "instances=";
         string const nullPatternHeader             = "null_pattern=";
         string const precisionHeader               = "precision=";
+        string const attsOnlyHeader                = "atts_only=";
         size_t const nParams = operatorParameters.size();
         bool  cellsPerChunkSet      = false;
         bool  bufferSizeSet         = false;
@@ -123,6 +126,7 @@ public:
             _precision = 6;
         }
         bool  precisionSet          = false;
+        bool  attsOnlySet           = false;
         vector<string>     filePaths;
         vector<InstanceID> instanceIds;
         if (nParams > MAX_PARAMETERS)
@@ -417,6 +421,24 @@ public:
                 }
                 precisionSet = true;
             }
+            else if (starts_with(parameterString, attsOnlyHeader))
+            {
+                if (attsOnlySet)
+                {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set atts_only multiple times";
+                }
+                string paramContent = parameterString.substr(attsOnlyHeader.size());
+                trim(paramContent);
+                try
+                {
+                    _attsOnly = lexical_cast<bool>(paramContent);
+                }
+                catch (bad_lexical_cast const& exn)
+                {
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse atts_only";
+                }
+                attsOnlySet = true;
+            }
             else
             {
                 string path = parameterString;
@@ -515,6 +537,11 @@ public:
     bool isArrowFormat() const
     {
         return _format == ARROW;
+    }
+
+    bool isAttsOnly() const
+    {
+        return _attsOnly;
     }
 
     string const& getBinaryFormatString() const

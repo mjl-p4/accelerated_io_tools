@@ -19,7 +19,7 @@ source /opt/rh/python27/enable || :
 
 echo -e "\nI. Basic"
 echo "1. Single chunk (int64)"
-iq "aio_save(apply(build(<x:int64>[i=-10:10], i), y, iif(i%2=0, i, int64(null))), '$F', 'format=arrow')"
+iq "aio_save(apply(build(<x:int64>[i=-10:10:0:21], i), y, iif(i%2=0, i, int64(null))), '$F', 'format=arrow')"
 python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas())" \
     >> $TEST_OUT
 
@@ -126,11 +126,24 @@ $IQ "aio_save(build(<x:int64>[i=0:0], i), 'stderr', 'format=arrow')" \
 
 
 echo -e "\nII. Exceptions"
-
+echo "1. datetimetz not supported"
 $IQ "aio_save(build(<x:datetimetz>[i=0:0], apply_offset(datetime(i), 0)), '$F', 'format=arrow')" 2>&1 \
     |  sed --expression='s/ line: [0-9]\+//g'                                                         \
     |  grep --invert-match "Failed query id:" >> $TEST_OUT                                            \
     || echo "expected exception"
+
+echo "2. atts_only value"
+$IQ "aio_save(build(<x:int64>[i=-10:10:0:21], i), '$F', 'format=arrow', 'atts_only=foo')" 2>&1  \
+    |  sed --expression='s/ line: [0-9]\+//g'                                                   \
+    |  grep --invert-match "Failed query id:" >> $TEST_OUT                                      \
+    || echo "expected exception"
+
+echo "3. atts_only repeat"
+$IQ "aio_save(build(<x:int64>[i=-10:10:0:21], i), '$F', 'atts_only=1', 'format=arrow', 'atts_only=0')" 2>&1     \
+    |  sed --expression='s/ line: [0-9]\+//g'                                                                   \
+    |  grep --invert-match "Failed query id:" >> $TEST_OUT                                                      \
+    || echo "expected exception"
+
 
 echo -e "\nIII. int64, int64(null)"
 echo "1. store"
@@ -215,6 +228,28 @@ time python -c "import scidbpy; print(len(scidbpy.connect().arrays.foo.fetch(att
 
 
 iq "remove(foo)"
+
+
+echo -e "\nIV. atts_only"
+echo "1. Single chunk (atts_only=1)"
+iq "aio_save(apply(build(<x:int64>[i=-10:10:0:21], i), y, iif(i%2=0, i, int64(null))), '$F', 'format=arrow', 'atts_only=1')"
+python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas())" \
+    >> $TEST_OUT
+
+echo "2. Single chunk (atts_only=0)"
+iq "aio_save(apply(build(<x:int64>[i=-10:10:0:21], i), y, iif(i%2=0, i, int64(null))), '$F', 'format=arrow', 'atts_only=0')"
+python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas())" \
+    >> $TEST_OUT
+
+echo "3. Multiple chunks (atts_only=1)"
+iq "aio_save(apply(build(<x:int64>[i=1:100:0:20], i), y, iif(i%2=0, i, int64(null))), '$F', 'format=arrow', 'atts_only=1')"
+python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
+    >> $TEST_OUT
+
+echo "4. Multiple chunks (atts_only=0)"
+iq "aio_save(apply(build(<x:int64>[i=1:100:0:20], i), y, iif(i%2=0, i, int64(null))), '$F', 'format=arrow', 'atts_only=0')"
+python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
+    >> $TEST_OUT
 
 
 diff $TEST_OUT $DIR/test_arrow.expected

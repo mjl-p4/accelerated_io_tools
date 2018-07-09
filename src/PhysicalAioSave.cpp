@@ -108,12 +108,18 @@ static void EXCEPTION_ASSERT(bool cond)
     }
 }
 
-std::shared_ptr<arrow::Schema> attributes2ArrowSchema(Attributes const& attrs)
+std::shared_ptr<arrow::Schema> attributes2ArrowSchema(ArrayDesc const &arrayDesc,
+                                                      bool attsOnly)
 {
-    size_t nAttrs = attrs.size();
+    Attributes const &attrs = arrayDesc.getAttributes(true);
+    Dimensions const &dims = arrayDesc.getDimensions();
 
-    std::vector<std::shared_ptr<arrow::Field>> arrowFields(nAttrs);
-    for(size_t i = 0; i < nAttrs; ++i)
+    size_t nAttrs = attrs.size();
+    size_t nDims = dims.size();
+
+    std::vector<std::shared_ptr<arrow::Field>> arrowFields(
+        nAttrs + (attsOnly ? 0 : nDims));
+    for (size_t i = 0; i < nAttrs; ++i)
     {
         auto type = attrs[i].getType();
         auto typeEnum = typeId2TypeEnum(type, true);
@@ -206,6 +212,14 @@ std::shared_ptr<arrow::Schema> attributes2ArrowSchema(Attributes const& attrs)
 
         arrowFields[i] = arrow::field(attrs[i].getName(), arrowType);
     }
+    if (!attsOnly)
+    {
+        for (size_t i = 0; i < nDims; ++i)
+        {
+            arrowFields[nAttrs + i] = arrow::field(dims[i].getBaseName(), arrow::int64());
+        }
+    }
+
     return arrow::schema(arrowFields);
 }
 
@@ -535,7 +549,8 @@ class ArrowChunkPopulator
 {
 
 private:
-    Attributes const&                                 _inputAttrs;
+    ArrayDesc const&                                  _inputArrayDesc;
+    bool                                              _attsOnly;
     std::vector<TypeEnum>                             _inputTypes;
     std::vector<size_t>                               _inputSizes;
     std::shared_ptr<arrow::Schema>                    _arrowSchema;
@@ -546,28 +561,44 @@ private:
 public:
     ArrowChunkPopulator(ArrayDesc const& inputArrayDesc,
                         AioSaveSettings const& settings):
-        _inputAttrs(inputArrayDesc.getAttributes(true)),
-        _arrowSchema(attributes2ArrowSchema(_inputAttrs))
+        _inputArrayDesc(inputArrayDesc),
+        _attsOnly(settings.isAttsOnly()),
+        _arrowSchema(attributes2ArrowSchema(inputArrayDesc, _attsOnly))
     {
-        const size_t nAttrs = _inputAttrs.size();
+        Attributes const &attrs = inputArrayDesc.getAttributes(true);
+        Dimensions const &dims = inputArrayDesc.getDimensions();
+
+        const size_t nAttrs = attrs.size();
+        const size_t nDims = dims.size();
 
         _inputTypes.resize(nAttrs);
         _inputSizes.resize(nAttrs);
-        _arrowBuilders.resize(nAttrs);
-        _arrowArrays.resize(nAttrs);
+        _arrowBuilders.resize(nAttrs + (_attsOnly ? 0 : nDims));
+        _arrowArrays.resize(nAttrs + (_attsOnly ? 0 : nDims));
 
         // Create Arrow Builders
         for(size_t i = 0; i < nAttrs; ++i)
         {
-            _inputTypes[i] = typeId2TypeEnum(_inputAttrs[i].getType(), true);
-            _inputSizes[i] = _inputAttrs[i].getSize() +
-                (_inputAttrs[i].isNullable() ? 1 : 0);
+            _inputTypes[i] = typeId2TypeEnum(attrs[i].getType(), true);
+            _inputSizes[i] = attrs[i].getSize() +
+                (attrs[i].isNullable() ? 1 : 0);
 
             THROW_NOT_OK(
                 arrow::MakeBuilder(
                     _arrowPool,
                     _arrowSchema->field(i)->type(),
                     &_arrowBuilders[i]));
+        }
+        if (!_attsOnly)
+        {
+            for(size_t i = nAttrs; i < nAttrs + nDims; ++i)
+            {
+                THROW_NOT_OK(
+                    arrow::MakeBuilder(
+                        _arrowPool,
+                        _arrowSchema->field(i)->type(),
+                        &_arrowBuilders[i]));
+            }
         }
     }
 
@@ -581,6 +612,7 @@ public:
     {
         // Basic setup
         const size_t nAttrs = _inputTypes.size();
+        const size_t nDims = _inputArrayDesc.getDimensions().size();
 
         // Append to Arrow Builders
         int64_t nCells = 0;
@@ -1017,7 +1049,9 @@ public:
                 default:
                 {
                     ostringstream error;
-                    error << "Type " << _inputAttrs[i].getType() << " not supported in arrow format";
+                    error << "Type "
+                          << _inputArrayDesc.getAttributes(true)[i].getType()
+                          << " not supported in arrow format";
                     throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION) << error.str();
                 }
                 }
@@ -1028,11 +1062,36 @@ public:
                 }
             }
 
+            if (!_attsOnly)
+            {
+                for (size_t i = 0; i < nDims; ++i)
+                {
+                    shared_ptr<ConstChunkIterator> citer = cursor.getChunkIter(0);
+                    citer->restart();
+
+                    vector<int64_t> values;
+                    vector<bool> is_valid;
+
+                    while (!citer->end())
+                    {
+                        Coordinates const &coords = citer->getPosition();
+                        values.push_back(coords[i]);
+                        is_valid.push_back(true);
+                        bytesCount += 8;
+                        ++(*citer);
+                    }
+
+                    THROW_NOT_OK(
+                        static_cast<arrow::Int64Builder*>(
+                            _arrowBuilders[nAttrs + i].get())->Append(values, is_valid));
+                }
+            }
+
             cursor.advanceChunkIters();
         }
 
         // Finalize Arrow Builders and populate Arrow Arrays (resets builders)
-        for (size_t i = 0; i < nAttrs; ++i)
+        for (size_t i = 0; i < nAttrs + (_attsOnly ? 0 : nDims); ++i)
         {
             THROW_NOT_OK(
                 _arrowBuilders[i]->Finish(&_arrowArrays[i])); // Resets builder
@@ -1519,7 +1578,7 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
     try
     {
         std::shared_ptr<arrow::Schema> arrowSchema = attributes2ArrowSchema(
-            inputSchema.getAttributes(true));
+            inputSchema, settings.isAttsOnly());
         THROW_NOT_OK_FILE(
             arrow::ipc::RecordBatchStreamWriter::Open(
                 arrowStream.get(), arrowSchema, &arrowWriter));
@@ -1593,9 +1652,9 @@ class PhysicalAioSave : public PhysicalOperator
 {
 public:
     PhysicalAioSave(std::string const& logicalName,
-                  std::string const& physicalName,
-                  Parameters const& parameters,
-                   ArrayDesc const& schema):
+                    std::string const& physicalName,
+                    Parameters const& parameters,
+                    ArrayDesc const& schema):
         PhysicalOperator(logicalName, physicalName, parameters, schema)
     {}
 
