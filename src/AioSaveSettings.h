@@ -161,6 +161,7 @@ public:
                 {
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse cells_per_chunk";
                 }
+                cellsPerChunkSet = true;
             }
             else if (starts_with(parameterString, bufferSizeHeader))
             {
@@ -185,6 +186,7 @@ public:
                 {
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse buffer_size";
                 }
+                bufferSizeSet = true;
             }             //some day I'll make this function smaller, I swear!
             else if (starts_with(parameterString, attributeDelimiterHeader))
             {
@@ -289,7 +291,7 @@ public:
                     }
                     _binaryFormatString = paramContent;
                 }
-                formatSet=true;
+                formatSet = true;
             }
             else if (starts_with (parameterString, filePathHeader))
             {
@@ -413,6 +415,7 @@ public:
                 {
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse precision";
                 }
+                precisionSet = true;
             }
             else
             {
