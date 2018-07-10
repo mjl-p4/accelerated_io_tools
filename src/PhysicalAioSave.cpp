@@ -557,6 +557,7 @@ private:
     std::vector<std::unique_ptr<arrow::ArrayBuilder>> _arrowBuilders;
     std::vector<std::shared_ptr<arrow::Array>>        _arrowArrays;
     arrow::MemoryPool*                                _arrowPool = arrow::default_memory_pool();
+    std::vector<std::vector<int64_t>>                 _dimsValues;
 
 public:
     ArrowChunkPopulator(ArrayDesc const& inputArrayDesc,
@@ -599,6 +600,9 @@ public:
                         _arrowSchema->field(i)->type(),
                         &_arrowBuilders[i]));
             }
+
+            // Setup coordinates buffers
+            _dimsValues = std::vector<std::vector<int64_t>>(nDims);
         }
     }
 
@@ -625,6 +629,15 @@ public:
             for (size_t i = 0; i < nAttrs; ++i)
             {
                 shared_ptr<ConstChunkIterator> citer = cursor.getChunkIter(i);
+
+                // Reset coordinate buffers (skip first time)
+                if (!_attsOnly && i == 0 && nCells > 0)
+                {
+                    for (size_t i = 0; i < nDims; ++i)
+                    {
+                        _dimsValues[i].clear();
+                    }
+                }
 
                 switch (_inputTypes[i])
                 {
@@ -753,6 +766,18 @@ public:
                             is_valid.push_back(true);
                         }
                         bytesCount += _inputSizes[i];
+
+                        // Store coordinates in the buffer
+                        if (!_attsOnly && i == 0 )
+                        {
+                            Coordinates const &coords = citer->getPosition();
+                            for (size_t j = 0; j < nDims; ++j)
+                            {
+                                _dimsValues[j].push_back(coords[j]);
+                                bytesCount += 8;
+                            }
+                        }
+
                         ++(*citer);
                     }
 
@@ -900,6 +925,18 @@ public:
                             is_valid.push_back(true);
                         }
                         bytesCount += _inputSizes[i];
+
+                        // Store coordinates in the buffer
+                        if (!_attsOnly && i == 0 )
+                        {
+                            Coordinates const &coords = citer->getPosition();
+                            for (size_t j = 0; j < nDims; ++j)
+                            {
+                                _dimsValues[j].push_back(coords[j]);
+                                bytesCount += 8;
+                            }
+                        }
+
                         ++(*citer);
                     }
 
@@ -1059,31 +1096,17 @@ public:
                 if (i == 0)
                 {
                     ++nCells;
-                }
-            }
 
-            if (!_attsOnly)
-            {
-                for (size_t i = 0; i < nDims; ++i)
-                {
-                    shared_ptr<ConstChunkIterator> citer = cursor.getChunkIter(0);
-                    citer->restart();
-
-                    vector<int64_t> values;
-                    vector<bool> is_valid;
-
-                    while (!citer->end())
+                    // Store coordinates in Arrow arrays
+                    if (!_attsOnly)
                     {
-                        Coordinates const &coords = citer->getPosition();
-                        values.push_back(coords[i]);
-                        is_valid.push_back(true);
-                        bytesCount += 8;
-                        ++(*citer);
+                        for (size_t j = 0; j < nDims; ++j)
+                        {
+                            THROW_NOT_OK(
+                                static_cast<arrow::Int64Builder*>(
+                                    _arrowBuilders[nAttrs + j].get())->Append(_dimsValues[j]));
+                        }
                     }
-
-                    THROW_NOT_OK(
-                        static_cast<arrow::Int64Builder*>(
-                            _arrowBuilders[nAttrs + i].get())->Append(values, is_valid));
                 }
             }
 
