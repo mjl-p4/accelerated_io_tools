@@ -20,14 +20,27 @@ SciDB size:         200.03 MB
 In-memory size:       0.00 MB
 File size:          225.01 MB
 
+Multi-Dimensional Schema (3-dimensional, double)
+---
+SciDB size:         762.95 MB
+In-memory size:       0.00 MB
+File size:          762.95 MB
+
 Save
 ===
 Fix Size Schema (int64 only)
 ---
-Binary:   1.51 seconds 132.80 MB/second
-Arrow:    1.58 seconds 126.41 MB/second
+Binary:   1.55 seconds 128.87 MB/second
+Arrow:    1.62 seconds 123.35 MB/second
 
 Variable Size Schema (int64 and string)
 ---
-Binary:   1.94 seconds 103.18 MB/second
-Arrow:    2.00 seconds 100.18 MB/second
+Binary:   2.03 seconds  98.28 MB/second
+Arrow:    2.06 seconds  96.87 MB/second
+
+Multi-Dimensional Schema (3-dimensional, double)
+---
+TSV/apply:         9.20 seconds  21.75 MB/second
+Arrow/apply:       2.68 seconds  74.55 MB/second
+CSV+:              3.38 seconds  59.22 MB/second
+Arrow/atts_only:   1.98 seconds 100.84 MB/second

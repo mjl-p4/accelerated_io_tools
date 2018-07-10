@@ -4,8 +4,8 @@ import sys
 import timeit
 
 
-ar_names = ('bm_fix', 'bm_var')
-ar_schemas = [None, None]
+ar_names = ('bm_fix', 'bm_var', 'bm_ap')
+ar_schemas = [None, None, None]
 chunk_size = 100000
 buffer_size = 50 * 1024 * 1024
 
@@ -88,6 +88,29 @@ File size:         {:7.2f} MB""".format(
     mem_bytes_var / 1024. / 1024,
     file_bytes_var / 1024. / 1024))
 
+
+    ar_name = ar_names[2]
+    db.create_array(ar_name, '<x:double>[i=1:100:0:1; j=1:1000:0:1000; k=1:1000:0:1000]')
+    db.build(ar_name, 'random()').store(ar_name)
+    ar_schemas[2] = db.arrays[ar_name].schema()
+    scidb_bytes_var = db.summarize(ar_name).project('bytes')['bytes'][0]
+    mem_bytes_var = 0
+    # mem_bytes_var = db.scan(ar_name).fetch(atts_only=True,
+    #                                        as_dataframe=False).nbytes
+    db.aio_save(
+        ar_name, "'/dev/shm/{}'".format(ar_name), "'format=arrow'").fetch()
+    file_bytes_var = os.path.getsize('/dev/shm/' + ar_name)
+
+    print("""
+Multi-Dimensional Schema (3-dimensional, double)
+---
+SciDB size:        {:7.2f} MB
+In-memory size:    {:7.2f} MB
+File size:         {:7.2f} MB""".format(
+    scidb_bytes_var / 1024. / 1024,
+    mem_bytes_var / 1024. / 1024,
+    file_bytes_var / 1024. / 1024))
+
     return db
 
 
@@ -154,6 +177,62 @@ db.iquery("aio_save({ar_name}, '/dev/shm/{ar_name}', 'format={fmt}', 'buffer_siz
     rt = timeit.Timer(stmt=stmt, setup=setup).timeit(number=runs) / runs
     print("""\
 Arrow:  {:6.2f} seconds {:6.2f} MB/second""".format(
+      rt, mb / rt))
+
+
+    ar_name = ar_names[2]
+    print("""
+Multi-Dimensional Schema (3-dimensional, double)
+---""")
+    stmt = """
+db.iquery("                                     \
+  aio_save(                                     \
+    apply(                                      \
+      filter(                                   \
+        {ar_name},                              \
+        i = 23 or i = 10 or i = 50),            \
+      ival, i,                                  \
+      jval, j,                                  \
+      kval, k),                                 \
+    '/dev/shm/{ar_name}',                       \
+    'format={fmt}')")"""
+
+    rt = timeit.Timer(stmt=stmt.format(ar_name=ar_name,
+                                       fmt='tsv'),
+                      setup=setup).timeit(number=runs) / runs
+    print("""\
+TSV/apply:       {:6.2f} seconds {:6.2f} MB/second""".format(
+      rt, mb / rt))
+
+
+    rt = timeit.Timer(stmt=stmt.format(ar_name=ar_name,
+                                       fmt='arrow'),
+                      setup=setup).timeit(number=runs) / runs
+    print("""\
+Arrow/apply:     {:6.2f} seconds {:6.2f} MB/second""".format(
+      rt, mb / rt))
+
+
+    stmt = """
+db.iquery("                                     \
+  aio_save(                                     \
+    filter(                                     \
+      {ar_name},                                \
+      i = 23 or i = 10 or i = 50),              \
+    '/dev/shm/{ar_name}',                       \
+    'format={fmt}')")"""
+    rt = timeit.Timer(stmt=stmt.format(ar_name=ar_name,
+                                       fmt='csv+'),
+                      setup=setup).timeit(number=runs) / runs
+    print("""\
+CSV+:            {:6.2f} seconds {:6.2f} MB/second""".format(
+      rt, mb / rt))
+
+    rt = timeit.Timer(stmt=stmt.format(ar_name=ar_name,
+                                       fmt="arrow', 'atts_only=0"),
+                      setup=setup).timeit(number=runs) / runs
+    print("""\
+Arrow/atts_only: {:6.2f} seconds {:6.2f} MB/second""".format(
       rt, mb / rt))
 
 
