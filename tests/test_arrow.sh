@@ -251,5 +251,34 @@ iq "aio_save(apply(build(<x:int64>[i=1:100:0:20], i), y, iif(i%2=0, i, int64(nul
 python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
     >> $TEST_OUT
 
+echo "5. datetime (atts_only=0)"
+iq "aio_save(apply(build(<x:datetime not null>[i=1:20:0:4], i), y, iif(i%2=0, datetime(i), datetime(null))), '$F', 'format=arrow', 'atts_only=0')"
+python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
+    >> $TEST_OUT
+
+echo "6. double (atts_only=0)"
+iq "aio_save(apply(build(<x:double not null>[i=1:20:0:4], i), y, iif(i%2=0, double(i), double(null))), '$F', 'format=arrow', 'atts_only=0')"
+python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
+    >> $TEST_OUT
+
+echo "7. float (atts_only=0)"
+iq "aio_save(apply(build(<x:float not null>[i=1:20:0:4], i), y, iif(i%2=0, float(i), float(null))), '$F', 'format=arrow', 'atts_only=0')"
+python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
+    >> $TEST_OUT
+
+echo "8. int8 (atts_only=0)"
+iq "aio_save(apply(build(<x:int8 not null>[i=1:20:0:4], i), y, iif(i%2=0, int8(i), int8(null))), '$F', 'format=arrow', 'atts_only=0')"
+python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
+    >> $TEST_OUT
+
+echo "9. string (atts_only=0)"
+iq "aio_save(apply(build(<x:string not null>[i=1:20:0:4], i), y, iif(i%2=0, string(i), string(null))), '$F', 'format=arrow', 'atts_only=0')"
+python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
+    >> $TEST_OUT
+
+echo "10. uint32 (atts_only=0)"
+iq "aio_save(apply(build(<x:uint32 not null>[i=1:20:0:4], i), y, iif(i%2=0, uint32(i), uint32(null))), '$F', 'format=arrow', 'atts_only=0')"
+python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
+    >> $TEST_OUT
 
 diff $TEST_OUT $DIR/test_arrow.expected
