@@ -668,30 +668,12 @@ public:
                 }
                 case TE_BOOL:
                 {
-                    vector<bool> values;
-                    vector<bool> is_valid;
-
-                    while (!citer->end())
-                    {
-                        Value const& value = citer->getItem();
-                        if(value.isNull())
-                        {
-                            values.push_back(0);
-                            is_valid.push_back(false);
-                        }
-                        else
-                        {
-                            values.push_back(value.getBool());
-                            is_valid.push_back(true);
-                        }
-                        bytesCount += _inputSizes[i];
-                        ++(*citer);
-                    }
-
-                    THROW_NOT_OK(
-                        static_cast<arrow::BooleanBuilder*>(
-                            _arrowBuilders[i].get())->Append(values, is_valid));
-
+                    populateCell<bool,
+                                 arrow::BooleanBuilder>(citer,
+                                                        &Value::getBool,
+                                                        nDims,
+                                                        i,
+                                                        bytesCount);
                     break;
                 }
                 case TE_CHAR:
@@ -721,229 +703,72 @@ public:
                 }
                 case TE_DATETIME:
                 {
-                    vector<int64_t> values;
-                    vector<bool> is_valid;
-
-                    while (!citer->end())
-                    {
-                        Value const& value = citer->getItem();
-                        if(value.isNull())
-                        {
-                            values.push_back(0);
-                            is_valid.push_back(false);
-                        }
-                        else
-                        {
-                            values.push_back(value.getDateTime());
-                            is_valid.push_back(true);
-                        }
-                        bytesCount += _inputSizes[i];
-                        ++(*citer);
-                    }
-
-                    THROW_NOT_OK(
-                        static_cast<arrow::Date64Builder*>(
-                            _arrowBuilders[i].get())->Append(values, is_valid));
-
+                    populateCell<int64_t,
+                                 arrow::Date64Builder>(citer,
+                                                       &Value::getDateTime,
+                                                       nDims,
+                                                       i,
+                                                       bytesCount);
                     break;
                 }
                 case TE_DOUBLE:
                 {
-                    vector<double> values;
-                    vector<bool> is_valid;
-
-                    while (!citer->end())
-                    {
-                        Value const& value = citer->getItem();
-                        if(value.isNull())
-                        {
-                            values.push_back(0);
-                            is_valid.push_back(false);
-                        }
-                        else
-                        {
-                            values.push_back(value.getDouble());
-                            is_valid.push_back(true);
-                        }
-                        bytesCount += _inputSizes[i];
-
-                        // Store coordinates in the buffer
-                        if (!_attsOnly && i == 0 )
-                        {
-                            Coordinates const &coords = citer->getPosition();
-                            for (size_t j = 0; j < nDims; ++j)
-                            {
-                                _dimsValues[j].push_back(coords[j]);
-                                bytesCount += 8;
-                            }
-                        }
-
-                        ++(*citer);
-                    }
-
-                    THROW_NOT_OK(
-                        static_cast<arrow::DoubleBuilder*>(
-                            _arrowBuilders[i].get())->Append(values, is_valid));
-
+                    populateCell<double,
+                                 arrow::DoubleBuilder>(citer,
+                                                       &Value::getDouble,
+                                                       nDims,
+                                                       i,
+                                                       bytesCount);
                     break;
                 }
                 case TE_FLOAT:
                 {
-                    vector<float> values;
-                    vector<bool> is_valid;
-
-                    while (!citer->end())
-                    {
-                        Value const& value = citer->getItem();
-                        if(value.isNull())
-                        {
-                            values.push_back(0);
-                            is_valid.push_back(false);
-                        }
-                        else
-                        {
-                            values.push_back(value.getFloat());
-                            is_valid.push_back(true);
-                        }
-                        bytesCount += _inputSizes[i];
-                        ++(*citer);
-                    }
-
-                    THROW_NOT_OK(
-                        static_cast<arrow::FloatBuilder*>(
-                            _arrowBuilders[i].get())->Append(values, is_valid));
-
+                    populateCell<float,
+                                 arrow::FloatBuilder>(citer,
+                                                      &Value::getFloat,
+                                                      nDims,
+                                                      i,
+                                                      bytesCount);
                     break;
                 }
                 case TE_INT8:
                 {
-                    vector<int8_t> values;
-                    vector<bool> is_valid;
-
-                    while (!citer->end())
-                    {
-                        Value const& value = citer->getItem();
-                        if(value.isNull())
-                        {
-                            values.push_back(0);
-                            is_valid.push_back(false);
-                        }
-                        else
-                        {
-                            values.push_back(value.getInt8());
-                            is_valid.push_back(true);
-                        }
-                        bytesCount += _inputSizes[i];
-                        ++(*citer);
-                    }
-
-                    THROW_NOT_OK(
-                        static_cast<arrow::Int8Builder*>(
-                            _arrowBuilders[i].get())->Append(values, is_valid));
-
+                    populateCell<int8_t,
+                                 arrow::Int8Builder>(citer,
+                                                     &Value::getInt8,
+                                                     nDims,
+                                                     i,
+                                                     bytesCount);
                     break;
                 }
                 case TE_INT16:
                 {
-                    vector<int16_t> values;
-                    vector<bool> is_valid;
-
-                    while (!citer->end())
-                    {
-                        Value const& value = citer->getItem();
-                        if(value.isNull())
-                        {
-                            values.push_back(0);
-                            is_valid.push_back(false);
-                        }
-                        else
-                        {
-                            values.push_back(value.getInt16());
-                            is_valid.push_back(true);
-                        }
-                        bytesCount += _inputSizes[i];
-                        ++(*citer);
-                    }
-
-                    THROW_NOT_OK(
-                        static_cast<arrow::Int16Builder*>(
-                            _arrowBuilders[i].get())->Append(values, is_valid));
-
+                    populateCell<int16_t,
+                                 arrow::Int16Builder>(citer,
+                                                      &Value::getInt16,
+                                                      nDims,
+                                                      i,
+                                                      bytesCount);
                     break;
                 }
                 case TE_INT32:
                 {
-                    vector<int32_t> values;
-                    vector<bool> is_valid;
-
-                    while (!citer->end())
-                    {
-                        Value const& value = citer->getItem();
-                        if(value.isNull())
-                        {
-                            values.push_back(0);
-                            is_valid.push_back(false);
-                        }
-                        else
-                        {
-                            values.push_back(value.getInt32());
-                            is_valid.push_back(true);
-                        }
-                        bytesCount += _inputSizes[i];
-                        ++(*citer);
-                    }
-
-                    THROW_NOT_OK(
-                        static_cast<arrow::Int32Builder*>(
-                            _arrowBuilders[i].get())->Append(values, is_valid));
-
+                    populateCell<int32_t,
+                                 arrow::Int32Builder>(citer,
+                                                      &Value::getInt32,
+                                                      nDims,
+                                                      i,
+                                                      bytesCount);
                     break;
                 }
                 case TE_INT64:
                 {
-                    vector<int64_t> values;
-                    vector<bool> is_valid;
-
-                    while (!citer->end())
-                    {
-                        Value const& value = citer->getItem();
-                        if(value.isNull())
-                        {
-                            // THROW_NOT_OK(
-                            //     static_cast<arrow::Int64Builder*>(
-                            //         _arrowBuilders[i].get())->AppendNull());
-                            values.push_back(0);
-                            is_valid.push_back(false);
-                        }
-                        else
-                        {
-                            // THROW_NOT_OK(
-                            //     static_cast<arrow::Int64Builder*>(
-                            //         _arrowBuilders[i].get())->Append(
-                            //             value.getInt64()));
-                            values.push_back(value.getInt64());
-                            is_valid.push_back(true);
-                        }
-                        bytesCount += _inputSizes[i];
-
-                        // Store coordinates in the buffer
-                        if (!_attsOnly && i == 0 )
-                        {
-                            Coordinates const &coords = citer->getPosition();
-                            for (size_t j = 0; j < nDims; ++j)
-                            {
-                                _dimsValues[j].push_back(coords[j]);
-                                bytesCount += 8;
-                            }
-                        }
-
-                        ++(*citer);
-                    }
-
-                    THROW_NOT_OK(
-                        static_cast<arrow::Int64Builder*>(
-                            _arrowBuilders[i].get())->Append(values, is_valid));
-
+                    populateCell<int64_t,
+                                 arrow::Int64Builder>(citer,
+                                                      &Value::getInt64,
+                                                      nDims,
+                                                      i,
+                                                      bytesCount);
                     break;
                 }
                 case TE_STRING:
@@ -973,114 +798,42 @@ public:
                 }
                 case TE_UINT8:
                 {
-                    vector<uint8_t> values;
-                    vector<bool> is_valid;
-
-                    while (!citer->end())
-                    {
-                        Value const& value = citer->getItem();
-                        if(value.isNull())
-                        {
-                            values.push_back(0);
-                            is_valid.push_back(false);
-                        }
-                        else
-                        {
-                            values.push_back(value.getUint8());
-                            is_valid.push_back(true);
-                        }
-                        bytesCount += _inputSizes[i];
-                        ++(*citer);
-                    }
-
-                    THROW_NOT_OK(
-                        static_cast<arrow::UInt8Builder*>(
-                            _arrowBuilders[i].get())->Append(values, is_valid));
-
+                    populateCell<uint8_t,
+                                 arrow::UInt8Builder>(citer,
+                                                      &Value::getUint8,
+                                                      nDims,
+                                                      i,
+                                                      bytesCount);
                     break;
                 }
                 case TE_UINT16:
                 {
-                    vector<uint16_t> values;
-                    vector<bool> is_valid;
-
-                    while (!citer->end())
-                    {
-                        Value const& value = citer->getItem();
-                        if(value.isNull())
-                        {
-                            values.push_back(0);
-                            is_valid.push_back(false);
-                        }
-                        else
-                        {
-                            values.push_back(value.getUint16());
-                            is_valid.push_back(true);
-                        }
-                        bytesCount += _inputSizes[i];
-                        ++(*citer);
-                    }
-
-                    THROW_NOT_OK(
-                        static_cast<arrow::UInt16Builder*>(
-                            _arrowBuilders[i].get())->Append(values, is_valid));
-
+                    populateCell<uint16_t,
+                                 arrow::UInt16Builder>(citer,
+                                                       &Value::getUint16,
+                                                       nDims,
+                                                       i,
+                                                       bytesCount);
                     break;
                 }
                 case TE_UINT32:
                 {
-                    vector<uint32_t> values;
-                    vector<bool> is_valid;
-
-                    while (!citer->end())
-                    {
-                        Value const& value = citer->getItem();
-                        if(value.isNull())
-                        {
-                            values.push_back(0);
-                            is_valid.push_back(false);
-                        }
-                        else
-                        {
-                            values.push_back(value.getUint32());
-                            is_valid.push_back(true);
-                        }
-                        bytesCount += _inputSizes[i];
-                        ++(*citer);
-                    }
-
-                    THROW_NOT_OK(
-                        static_cast<arrow::UInt32Builder*>(
-                            _arrowBuilders[i].get())->Append(values, is_valid));
-
+                    populateCell<uint32_t,
+                                 arrow::UInt32Builder>(citer,
+                                                       &Value::getUint32,
+                                                       nDims,
+                                                       i,
+                                                       bytesCount);
                     break;
                 }
                 case TE_UINT64:
                 {
-                    vector<uint64_t> values;
-                    vector<bool> is_valid;
-
-                    while (!citer->end())
-                    {
-                        Value const& value = citer->getItem();
-                        if(value.isNull())
-                        {
-                            values.push_back(0);
-                            is_valid.push_back(false);
-                        }
-                        else
-                        {
-                            values.push_back(value.getUint64());
-                            is_valid.push_back(true);
-                        }
-                        bytesCount += _inputSizes[i];
-                        ++(*citer);
-                    }
-
-                    THROW_NOT_OK(
-                        static_cast<arrow::UInt64Builder*>(
-                            _arrowBuilders[i].get())->Append(values, is_valid));
-
+                    populateCell<uint64_t,
+                                 arrow::UInt64Builder>(citer,
+                                                       &Value::getUint64,
+                                                       nDims,
+                                                       i,
+                                                       bytesCount);
                     break;
                 }
                 default:
@@ -1143,6 +896,53 @@ public:
         // Copy data to Mem Chunk Builder
         builder.addData(reinterpret_cast<const char*>(arrowBuffer->data()),
                         arrowBuffer->size());
+    }
+
+private:
+    template <typename SciDBType,
+              typename ArrowBuilder,
+              typename ValueFunc> inline
+    void populateCell(shared_ptr<ConstChunkIterator> citer,
+                      ValueFunc valueGetter,
+                      const size_t nDims,
+                      const size_t i,
+                      size_t &bytesCount)
+    {
+        vector<SciDBType> values;
+        vector<bool> is_valid;
+
+        while (!citer->end())
+        {
+            Value const& value = citer->getItem();
+            if(value.isNull())
+            {
+                values.push_back(0);
+                is_valid.push_back(false);
+            }
+            else
+            {
+                values.push_back((value.*valueGetter)());
+                is_valid.push_back(true);
+            }
+            bytesCount += _inputSizes[i];
+
+            // Store coordinates in the buffer
+            if (!_attsOnly && i == 0 )
+            {
+                Coordinates const &coords = citer->getPosition();
+                for (size_t j = 0; j < nDims; ++j)
+                {
+                    _dimsValues[j].push_back(coords[j]);
+                    bytesCount += 8;
+                }
+            }
+
+            ++(*citer);
+        }
+
+        THROW_NOT_OK(
+            static_cast<ArrowBuilder*>(
+                _arrowBuilders[i].get())->Append(values, is_valid));
     }
 };
 
