@@ -666,14 +666,29 @@ public:
                     }
                     break;
                 }
-                case TE_BOOL:
+                case TE_STRING:
                 {
-                    populateCell<bool,
-                                 arrow::BooleanBuilder>(citer,
-                                                        &Value::getBool,
-                                                        nDims,
-                                                        i,
-                                                        bytesCount);
+                    // TODO Use Append(vector<... when 0.10.0 is
+                    // released due to ARROW-2351 and ARROW-2388
+                    while (!citer->end())
+                    {
+                        Value const& value = citer->getItem();
+                        if(value.isNull())
+                        {
+                            THROW_NOT_OK(
+                                static_cast<arrow::StringBuilder*>(
+                                    _arrowBuilders[i].get())->AppendNull());
+                        }
+                        else
+                        {
+                            THROW_NOT_OK(
+                                static_cast<arrow::StringBuilder*>(
+                                    _arrowBuilders[i].get())->Append(
+                                        value.getString()));
+                        }
+                        bytesCount += _inputSizes[i] + value.size();
+                        ++(*citer);
+                    }
                     break;
                 }
                 case TE_CHAR:
@@ -699,6 +714,16 @@ public:
                         bytesCount += _inputSizes[i] + value.size();
                         ++(*citer);
                     }
+                    break;
+                }
+                case TE_BOOL:
+                {
+                    populateCell<bool,
+                                 arrow::BooleanBuilder>(citer,
+                                                        &Value::getBool,
+                                                        nDims,
+                                                        i,
+                                                        bytesCount);
                     break;
                 }
                 case TE_DATETIME:
@@ -769,31 +794,6 @@ public:
                                                       nDims,
                                                       i,
                                                       bytesCount);
-                    break;
-                }
-                case TE_STRING:
-                {
-                    // TODO Use Append(vector<... when 0.10.0 is
-                    // released due to ARROW-2351 and ARROW-2388
-                    while (!citer->end())
-                    {
-                        Value const& value = citer->getItem();
-                        if(value.isNull())
-                        {
-                            THROW_NOT_OK(
-                                static_cast<arrow::StringBuilder*>(
-                                    _arrowBuilders[i].get())->AppendNull());
-                        }
-                        else
-                        {
-                            THROW_NOT_OK(
-                                static_cast<arrow::StringBuilder*>(
-                                    _arrowBuilders[i].get())->Append(
-                                        value.getString()));
-                        }
-                        bytesCount += _inputSizes[i] + value.size();
-                        ++(*citer);
-                    }
                     break;
                 }
                 case TE_UINT8:
