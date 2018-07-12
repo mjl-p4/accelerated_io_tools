@@ -662,6 +662,18 @@ public:
                                         value.size()));
                         }
                         bytesCount += _inputSizes[i] + value.size();
+
+                        // Store coordinates in the buffer
+                        if (!_attsOnly && i == 0 )
+                        {
+                            Coordinates const &coords = citer->getPosition();
+                            for (size_t j = 0; j < nDims; ++j)
+                            {
+                                _dimsValues[j].push_back(coords[j]);
+                                bytesCount += 8;
+                            }
+                        }
+
                         ++(*citer);
                     }
                     break;
@@ -687,6 +699,18 @@ public:
                                         value.getString()));
                         }
                         bytesCount += _inputSizes[i] + value.size();
+
+                        // Store coordinates in the buffer
+                        if (!_attsOnly && i == 0 )
+                        {
+                            Coordinates const &coords = citer->getPosition();
+                            for (size_t j = 0; j < nDims; ++j)
+                            {
+                                _dimsValues[j].push_back(coords[j]);
+                                bytesCount += 8;
+                            }
+                        }
+
                         ++(*citer);
                     }
                     break;
@@ -712,6 +736,18 @@ public:
                                         string(1, value.getChar())));
                         }
                         bytesCount += _inputSizes[i] + value.size();
+
+                        // Store coordinates in the buffer
+                        if (!_attsOnly && i == 0 )
+                        {
+                            Coordinates const &coords = citer->getPosition();
+                            for (size_t j = 0; j < nDims; ++j)
+                            {
+                                _dimsValues[j].push_back(coords[j]);
+                                bytesCount += 8;
+                            }
+                        }
+
                         ++(*citer);
                     }
                     break;
