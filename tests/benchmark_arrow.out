@@ -30,17 +30,17 @@ Save
 ===
 Fix Size Schema (int64 only)
 ---
-Binary:   1.49 seconds 134.50 MB/second
-Arrow:    1.59 seconds 125.51 MB/second
+Binary:   1.52 seconds 131.97 MB/second
+Arrow:    1.70 seconds 117.72 MB/second
 
 Variable Size Schema (int64 and string)
 ---
-Binary:   1.99 seconds 100.69 MB/second
-Arrow:    2.03 seconds  98.30 MB/second
+Binary:   1.99 seconds 100.43 MB/second
+Arrow:    2.13 seconds  93.69 MB/second
 
 Multi-Dimensional Schema (3-dimensional, double)
 ---
-TSV/apply:         9.05 seconds  22.11 MB/second
-Arrow/apply:       2.61 seconds  76.57 MB/second
-CSV+:              3.14 seconds  63.75 MB/second
-Arrow/atts_only:   1.67 seconds 119.46 MB/second
+TSV/apply:         9.08 seconds  22.03 MB/second
+Arrow/apply:       2.67 seconds  74.78 MB/second
+CSV+:              3.25 seconds  61.63 MB/second
+Arrow/atts_only:   1.70 seconds 117.83 MB/second
