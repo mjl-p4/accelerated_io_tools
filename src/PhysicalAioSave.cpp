@@ -223,6 +223,27 @@ std::shared_ptr<arrow::Schema> attributes2ArrowSchema(ArrayDesc const &arrayDesc
     return arrow::schema(arrowFields);
 }
 
+ArrayDesc const addDimensionsToArrayDesc(ArrayDesc const& arrayDesc,
+                                         bool attsOnly,
+                                         size_t nAttrs)
+{
+    ArrayDesc arrayDescWithDim(arrayDesc);
+
+    Dimensions const &dims = arrayDesc.getDimensions();
+    const size_t nDims = dims.size();
+
+    for (size_t i = 0; i < nDims; ++i)
+    {
+        arrayDescWithDim.addAttribute(
+            AttributeDesc((AttributeID)(nAttrs + i),
+                          dims[i].getBaseName() + "val",
+                          TID_INT64,
+                          0,
+                          CompressorType::NONE));
+    }
+    return arrayDescWithDim;
+}
+
 class MemChunkBuilder
 {
 private:
@@ -425,8 +446,10 @@ public:
 class BinaryChunkPopulator
 {
 private:
-    ExchangeTemplate _templ;
+    bool             _attsOnly;
     size_t const     _nAttrs;
+    size_t const     _nDims;
+    ExchangeTemplate _templ;
     size_t const     _nColumns;
     vector< Value >  _cnvValues;
     vector< char >   _padBuffer;
@@ -440,8 +463,13 @@ private:
 public:
     BinaryChunkPopulator(ArrayDesc const& inputArrayDesc,
                          AioSaveSettings const& settings):
-        _templ(TemplateParser::parse(inputArrayDesc, settings.getBinaryFormatString(), false)),
+        _attsOnly(settings.isAttsOnly()),
         _nAttrs(inputArrayDesc.getAttributes(true).size()),
+        _nDims(inputArrayDesc.getDimensions().size()),
+        _templ(TemplateParser::parse(
+                   _attsOnly ? inputArrayDesc : addDimensionsToArrayDesc(inputArrayDesc, _attsOnly, _nAttrs),
+                   settings.getBinaryFormatString(),
+                   false)),
         _nColumns(_templ.columns.size()),
         _cnvValues(_nAttrs),
         _padBuffer(sizeof(uint64_t) + 1, '\0')
@@ -478,65 +506,77 @@ public:
         while( !cursor.end() && ((cellsPerChunk<=0 && builder.getTotalSize() < bytesPerChunk) || (cellsPerChunk > 0 && nCells < cellsPerChunk)))
         {
             vector <Value const *> const& cell = cursor.getCell();
+            Coordinates const &coords = cursor.getPosition();
+
             for (size_t c = 0, i = 0; c < _nColumns; ++c)
             {
-                ExchangeTemplate::Column const& column = _templ.columns[c];
-                if (column.skip)
+                if (c < _nAttrs)
                 {
-                    size_t pad = skip_bytes(column);
-                    builder.addData(&(_padBuffer[0]), _padBuffer.size());
-                }
-                else
-                {
-                    Value const* v = cell[i];
-                    if (column.nullable)
+                    ExchangeTemplate::Column const& column = _templ.columns[c];
+                    if (column.skip)
                     {
-                        int8_t missingReason = (int8_t)v->getMissingReason();
-                        builder.addData( (char*) (&missingReason), sizeof(missingReason));
-                    }
-                    if (v->isNull())
-                    {
-                        if (!column.nullable)
-                        {
-                            throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ASSIGNING_NULL_TO_NON_NULLABLE);
-                        }
-                        // for varying size type write 4-bytes counter
-                        size_t size = column.fixedSize ? column.fixedSize : sizeof(uint32_t);
-                        builder.addData( &(_padBuffer[0]), size);
+                        size_t pad = skip_bytes(column);
+                        builder.addData(&(_padBuffer[0]), _padBuffer.size());
                     }
                     else
                     {
-                        if (column.converter)
+                        Value const* v = cell[i];
+                        if (column.nullable)
                         {
-                            column.converter(&v, &_cnvValues[i], NULL);
-                            v = &_cnvValues[i];
+                            int8_t missingReason = (int8_t)v->getMissingReason();
+                            builder.addData( (char*) (&missingReason), sizeof(missingReason));
                         }
-                        if (v->size() > numeric_limits<uint32_t>::max())
+                        if (v->isNull())
                         {
-                            throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_TRUNCATION) << v->size() << numeric_limits<uint32_t>::max();
-                        }
-                        uint32_t size = (uint32_t)v->size();
-                        if (column.fixedSize == 0)
-                        { // varying size type
-                            builder.addData( (char*) (&size), sizeof(size));
-                            builder.addData( (char*) v->data(), size);
+                            if (!column.nullable)
+                            {
+                                throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ASSIGNING_NULL_TO_NON_NULLABLE);
+                            }
+                            // for varying size type write 4-bytes counter
+                            size_t size = column.fixedSize ? column.fixedSize : sizeof(uint32_t);
+                            builder.addData( &(_padBuffer[0]), size);
                         }
                         else
                         {
-                            if (size > column.fixedSize)
+                            if (column.converter)
                             {
-                                throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_TRUNCATION) << size << column.fixedSize;
+                                column.converter(&v, &_cnvValues[i], NULL);
+                                v = &_cnvValues[i];
                             }
-                            builder.addData( (char*) v->data(), size);
-                            if (size < column.fixedSize)
+                            if (v->size() > numeric_limits<uint32_t>::max())
                             {
-                                size_t padSize = column.fixedSize - size;
-                                assert(padSize <= _padBuffer.size());
-                                builder.addData(&(_padBuffer[0]), padSize);
+                                throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_TRUNCATION) << v->size() << numeric_limits<uint32_t>::max();
+                            }
+                            uint32_t size = (uint32_t)v->size();
+                            if (column.fixedSize == 0)
+                            { // varying size type
+                                builder.addData( (char*) (&size), sizeof(size));
+                                builder.addData( (char*) v->data(), size);
+                            }
+                            else
+                            {
+                                if (size > column.fixedSize)
+                                {
+                                    throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_TRUNCATION) << size << column.fixedSize;
+                                }
+                                builder.addData( (char*) v->data(), size);
+                                if (size < column.fixedSize)
+                                {
+                                    size_t padSize = column.fixedSize - size;
+                                    assert(padSize <= _padBuffer.size());
+                                    builder.addData(&(_padBuffer[0]), padSize);
+                                }
                             }
                         }
+                        ++i;
                     }
-                    ++i;
+                }
+                else
+                {
+                    if (_attsOnly)
+                    {
+                        builder.addData((char*)(&coords[c - _nAttrs]), 8);
+                    }
                 }
             }
             cursor.advance();
