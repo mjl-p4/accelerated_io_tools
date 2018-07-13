@@ -124,6 +124,8 @@ $IQ "aio_save(build(<x:int64>[i=0:0], i), 'stdout', 'format=arrow')" \
 $IQ "aio_save(build(<x:int64>[i=0:0], i), 'stderr', 'format=arrow')" \
     >> $TEST_OUT
 
+iq "remove(bin)"
+
 
 echo -e "\nII. Exceptions"
 echo "1. datetimetz not supported"

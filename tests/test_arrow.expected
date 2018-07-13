@@ -491,6 +491,7 @@ x
 {chunk_no,dest_instance_id,source_instance_id} val
 {chunk_no,dest_instance_id,source_instance_id} val
 {chunk_no,dest_instance_id,source_instance_id} val
+Query was executed successfully
 UserException in file: PhysicalAioSave.cpp function: attributes2ArrowSchema
 Error id: scidb::SCIDB_SE_ARRAY_WRITER::SCIDB_LE_ILLEGAL_OPERATION
 Error description: Error while saving array. Illegal operation: Type datetimetz not supported in arrow format.
