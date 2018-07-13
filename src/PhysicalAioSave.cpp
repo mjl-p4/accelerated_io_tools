@@ -549,11 +549,13 @@ class ArrowChunkPopulator
 {
 
 private:
-    ArrayDesc const&                                  _inputArrayDesc;
-    bool                                              _attsOnly;
+    const Attributes&                                 _attrs;
+    const size_t                                      _nDims;
+    const bool                                        _attsOnly;
+    const std::shared_ptr<arrow::Schema>              _arrowSchema;
+
     std::vector<TypeEnum>                             _inputTypes;
     std::vector<size_t>                               _inputSizes;
-    std::shared_ptr<arrow::Schema>                    _arrowSchema;
     std::vector<std::unique_ptr<arrow::ArrayBuilder>> _arrowBuilders;
     std::vector<std::shared_ptr<arrow::Array>>        _arrowArrays;
     arrow::MemoryPool*                                _arrowPool = arrow::default_memory_pool();
@@ -562,27 +564,24 @@ private:
 public:
     ArrowChunkPopulator(ArrayDesc const& inputArrayDesc,
                         AioSaveSettings const& settings):
-        _inputArrayDesc(inputArrayDesc),
+        _attrs(inputArrayDesc.getAttributes(true)),
+        _nDims(inputArrayDesc.getDimensions().size()),
         _attsOnly(settings.isAttsOnly()),
         _arrowSchema(attributes2ArrowSchema(inputArrayDesc, _attsOnly))
     {
-        Attributes const &attrs = inputArrayDesc.getAttributes(true);
-        Dimensions const &dims = inputArrayDesc.getDimensions();
-
-        const size_t nAttrs = attrs.size();
-        const size_t nDims = dims.size();
+        const size_t nAttrs = _attrs.size();
 
         _inputTypes.resize(nAttrs);
         _inputSizes.resize(nAttrs);
-        _arrowBuilders.resize(nAttrs + (_attsOnly ? 0 : nDims));
-        _arrowArrays.resize(nAttrs + (_attsOnly ? 0 : nDims));
+        _arrowBuilders.resize(nAttrs + (_attsOnly ? 0 : _nDims));
+        _arrowArrays.resize(nAttrs + (_attsOnly ? 0 : _nDims));
 
         // Create Arrow Builders
         for(size_t i = 0; i < nAttrs; ++i)
         {
-            _inputTypes[i] = typeId2TypeEnum(attrs[i].getType(), true);
-            _inputSizes[i] = attrs[i].getSize() +
-                (attrs[i].isNullable() ? 1 : 0);
+            _inputTypes[i] = typeId2TypeEnum(_attrs[i].getType(), true);
+            _inputSizes[i] = _attrs[i].getSize() +
+                (_attrs[i].isNullable() ? 1 : 0);
 
             THROW_NOT_OK(
                 arrow::MakeBuilder(
@@ -592,7 +591,7 @@ public:
         }
         if (!_attsOnly)
         {
-            for(size_t i = nAttrs; i < nAttrs + nDims; ++i)
+            for(size_t i = nAttrs; i < nAttrs + _nDims; ++i)
             {
                 THROW_NOT_OK(
                     arrow::MakeBuilder(
@@ -602,7 +601,7 @@ public:
             }
 
             // Setup coordinates buffers
-            _dimsValues = std::vector<std::vector<int64_t>>(nDims);
+            _dimsValues = std::vector<std::vector<int64_t>>(_nDims);
         }
     }
 
@@ -615,8 +614,7 @@ public:
                        int16_t const cellsPerChunk)
     {
         // Basic setup
-        const size_t nAttrs = _inputTypes.size();
-        const size_t nDims = _inputArrayDesc.getDimensions().size();
+        const size_t nAttrs = _attrs.size();
 
         // Append to Arrow Builders
         int64_t nCells = 0;
@@ -633,7 +631,7 @@ public:
                 // Reset coordinate buffers (skip first time)
                 if (!_attsOnly && i == 0 && nCells > 0)
                 {
-                    for (size_t i = 0; i < nDims; ++i)
+                    for (size_t i = 0; i < _nDims; ++i)
                     {
                         _dimsValues[i].clear();
                     }
@@ -667,7 +665,7 @@ public:
                         if (!_attsOnly && i == 0 )
                         {
                             Coordinates const &coords = citer->getPosition();
-                            for (size_t j = 0; j < nDims; ++j)
+                            for (size_t j = 0; j < _nDims; ++j)
                             {
                                 _dimsValues[j].push_back(coords[j]);
                                 bytesCount += 8;
@@ -704,7 +702,7 @@ public:
                         if (!_attsOnly && i == 0 )
                         {
                             Coordinates const &coords = citer->getPosition();
-                            for (size_t j = 0; j < nDims; ++j)
+                            for (size_t j = 0; j < _nDims; ++j)
                             {
                                 _dimsValues[j].push_back(coords[j]);
                                 bytesCount += 8;
@@ -741,7 +739,7 @@ public:
                         if (!_attsOnly && i == 0 )
                         {
                             Coordinates const &coords = citer->getPosition();
-                            for (size_t j = 0; j < nDims; ++j)
+                            for (size_t j = 0; j < _nDims; ++j)
                             {
                                 _dimsValues[j].push_back(coords[j]);
                                 bytesCount += 8;
@@ -757,7 +755,6 @@ public:
                     populateCell<bool,
                                  arrow::BooleanBuilder>(citer,
                                                         &Value::getBool,
-                                                        nDims,
                                                         i,
                                                         bytesCount);
                     break;
@@ -767,7 +764,6 @@ public:
                     populateCell<int64_t,
                                  arrow::Date64Builder>(citer,
                                                        &Value::getDateTime,
-                                                       nDims,
                                                        i,
                                                        bytesCount);
                     break;
@@ -777,7 +773,6 @@ public:
                     populateCell<double,
                                  arrow::DoubleBuilder>(citer,
                                                        &Value::getDouble,
-                                                       nDims,
                                                        i,
                                                        bytesCount);
                     break;
@@ -787,7 +782,6 @@ public:
                     populateCell<float,
                                  arrow::FloatBuilder>(citer,
                                                       &Value::getFloat,
-                                                      nDims,
                                                       i,
                                                       bytesCount);
                     break;
@@ -797,7 +791,6 @@ public:
                     populateCell<int8_t,
                                  arrow::Int8Builder>(citer,
                                                      &Value::getInt8,
-                                                     nDims,
                                                      i,
                                                      bytesCount);
                     break;
@@ -807,7 +800,6 @@ public:
                     populateCell<int16_t,
                                  arrow::Int16Builder>(citer,
                                                       &Value::getInt16,
-                                                      nDims,
                                                       i,
                                                       bytesCount);
                     break;
@@ -817,7 +809,6 @@ public:
                     populateCell<int32_t,
                                  arrow::Int32Builder>(citer,
                                                       &Value::getInt32,
-                                                      nDims,
                                                       i,
                                                       bytesCount);
                     break;
@@ -827,7 +818,6 @@ public:
                     populateCell<int64_t,
                                  arrow::Int64Builder>(citer,
                                                       &Value::getInt64,
-                                                      nDims,
                                                       i,
                                                       bytesCount);
                     break;
@@ -837,7 +827,6 @@ public:
                     populateCell<uint8_t,
                                  arrow::UInt8Builder>(citer,
                                                       &Value::getUint8,
-                                                      nDims,
                                                       i,
                                                       bytesCount);
                     break;
@@ -847,7 +836,6 @@ public:
                     populateCell<uint16_t,
                                  arrow::UInt16Builder>(citer,
                                                        &Value::getUint16,
-                                                       nDims,
                                                        i,
                                                        bytesCount);
                     break;
@@ -857,7 +845,6 @@ public:
                     populateCell<uint32_t,
                                  arrow::UInt32Builder>(citer,
                                                        &Value::getUint32,
-                                                       nDims,
                                                        i,
                                                        bytesCount);
                     break;
@@ -867,7 +854,6 @@ public:
                     populateCell<uint64_t,
                                  arrow::UInt64Builder>(citer,
                                                        &Value::getUint64,
-                                                       nDims,
                                                        i,
                                                        bytesCount);
                     break;
@@ -876,7 +862,7 @@ public:
                 {
                     ostringstream error;
                     error << "Type "
-                          << _inputArrayDesc.getAttributes(true)[i].getType()
+                          << _attrs[i].getType()
                           << " not supported in arrow format";
                     throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION) << error.str();
                 }
@@ -889,7 +875,7 @@ public:
                     // Store coordinates in Arrow arrays
                     if (!_attsOnly)
                     {
-                        for (size_t j = 0; j < nDims; ++j)
+                        for (size_t j = 0; j < _nDims; ++j)
                         {
                             THROW_NOT_OK(
                                 static_cast<arrow::Int64Builder*>(
@@ -903,7 +889,7 @@ public:
         }
 
         // Finalize Arrow Builders and populate Arrow Arrays (resets builders)
-        for (size_t i = 0; i < nAttrs + (_attsOnly ? 0 : nDims); ++i)
+        for (size_t i = 0; i < nAttrs + (_attsOnly ? 0 : _nDims); ++i)
         {
             THROW_NOT_OK(
                 _arrowBuilders[i]->Finish(&_arrowArrays[i])); // Resets builder
@@ -940,7 +926,6 @@ private:
               typename ValueFunc> inline
     void populateCell(shared_ptr<ConstChunkIterator> citer,
                       ValueFunc valueGetter,
-                      const size_t nDims,
                       const size_t i,
                       size_t &bytesCount)
     {
@@ -966,7 +951,7 @@ private:
             if (!_attsOnly && i == 0 )
             {
                 Coordinates const &coords = citer->getPosition();
-                for (size_t j = 0; j < nDims; ++j)
+                for (size_t j = 0; j < _nDims; ++j)
                 {
                     _dimsValues[j].push_back(coords[j]);
                     bytesCount += 8;
