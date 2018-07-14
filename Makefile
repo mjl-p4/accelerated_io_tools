@@ -5,6 +5,7 @@ all:
 test:
 	./tests/test.sh
 	./tests/test_arrow.sh
+	./tests/test_binary.sh
 
 clean:
 	$(MAKE) -C src clean
