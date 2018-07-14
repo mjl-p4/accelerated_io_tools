@@ -554,3 +554,4 @@ Error description: Error during query execution. Attributes mismatch.
 UserException in file: src/smgr/io/TemplateParser.cpp function: parse
 Error id: scidb::SCIDB_SE_EXECUTION::SCIDB_LE_ATTRIBUTES_MISMATCH
 Error description: Error during query execution. Attributes mismatch.
+{chunk_no,dest_instance_id,source_instance_id} val

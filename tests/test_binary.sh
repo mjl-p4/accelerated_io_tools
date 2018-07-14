@@ -86,8 +86,8 @@ iq "input(<x:int64, i:int64 not null>[j], '$F', 0, '(int64 null,int64)')"
 echo -e "\nII. Exceptions"
 echo "1. Incomplete format (missing)"
 $IQ "aio_save(build(<x:int64 not null>[i=0:0], i), '$F', 'atts_only=0', 'format=(int64)')" 2>&1 \
-    |  sed --expression='s/ line: [0-9]\+//g'                                                         \
-    |  grep --invert-match "Failed query id:" >> $TEST_OUT                                            \
+    |  sed --expression='s/ line: [0-9]\+//g'                                                   \
+    |  grep --invert-match "Failed query id:" >> $TEST_OUT                                      \
     || echo "expected exception"
 
 
@@ -98,11 +98,11 @@ $IQ "aio_save(build(<x:int64 not null>[i=0:0], i), '$F', 'atts_only=0', 'format=
     || echo "expected exception"
 
 
-# echo "3. Incomplete format (wrong)"
-# $IQ "aio_save(build(<x:int64 not null>[i=0:0], i), '$F', 'atts_only=0', 'format=(int64,double)')" 2>&1 \
-#     |  sed --expression='s/ line: [0-9]\+//g'                                                         \
-#     |  grep --invert-match "Failed query id:" >> $TEST_OUT                                            \
-#     || echo "expected exception"
+echo "3. Incomplete format (wrong)"
+$IQ "aio_save(build(<x:int64 not null>[i=0:0], i), '$F', 'atts_only=0', 'format=(int64,double)')" 2>&1  \
+    |  sed --expression='s/ line: [0-9]\+//g'                                                           \
+    |  grep --invert-match "Failed query id:" >> $TEST_OUT                                              \
+    || echo "expected exception"
 
 
 diff $TEST_OUT $DIR/test_binary.expected
