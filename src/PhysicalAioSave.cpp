@@ -573,7 +573,7 @@ public:
                 }
                 else
                 {
-                    if (_attsOnly)
+                    if (!_attsOnly)
                     {
                         builder.addData((char*)(&coords[c - _nAttrs]), 8);
                     }
