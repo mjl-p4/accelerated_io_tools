@@ -417,6 +417,7 @@ By default, the file is saved to a path on the query coordinator instance. You c
 * `cells_per_chunk=C`: the maximum number of array cells to place in each chunk before saving to disk. By default, binary accounting is used but this can be enabled to force an exact number of cells. See notes on saving data in order below.
 * `buffer_size=B`: the amount of data to pack into a single buffer before transferring and saving to disk. Default is 8 MB. This setting is not honored if `cells_per_chunk` is specified.
 * `precision=P`: the maximum number of significant figures to use when writing float or double values as text. Defaults to the SciDB 'precision' config. Applies when format is set to `tdv`.
+* `atts_only=1`: specify whether the output should only include attribute values or include attribute as well as dimension values. Possible values are `0` and `1` (default). If `atts_only=0` is specified the dimension values are appended for each cell after the attribute values. The type used for the dimension values is `int64`. This setting is only applicable when the binary or the `arrow` formats are used. For the binary format, the `format=(...)` specification has to include an `int64` type specifications (appended at the end) for each of the input array dimensions.
 
 ## Returned array:
 The schema is always `<val:string null> [chunk_no=0:*,1,0, source_instance_id=0:*,1,0]`. The returned array is always empty as the operator's objective is to export the data.
