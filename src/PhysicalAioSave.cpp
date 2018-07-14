@@ -474,7 +474,7 @@ public:
         _cnvValues(_nAttrs),
         _padBuffer(sizeof(uint64_t) + 1, '\0')
     {
-        for (size_t c = 0, i = 0; c < _nColumns; ++c)
+        for (size_t c = 0, i = 0; c < _nAttrs; ++c)
         {
           ExchangeTemplate::Column const& column = _templ.columns[c];
           if (column.skip)
