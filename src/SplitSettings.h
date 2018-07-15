@@ -130,7 +130,7 @@ public:
                 stringstream ss(paramContent); // Turn the string into a stream.
                 string tok;
                 _multiplepath = true;
-                while(getline(ss, tok, delimiter)) 
+                while(getline(ss, tok, delimiter))
                 {
                     _inputPaths.push_back(tok);
                 }
@@ -147,7 +147,7 @@ public:
                 vector<string> internal;
                 stringstream ss(paramContent); // Turn the string into a stream.
                 string tok;
-                while(getline(ss, tok, delimiter)) 
+                while(getline(ss, tok, delimiter))
                 {
                    try
                    {
@@ -167,7 +167,7 @@ public:
                 }
                 string paramContent = parameterString.substr(headerHeader.size());
                 boost::algorithm::trim(paramContent);
-                try 
+                try
                 {
                     _header = lexical_cast<int64_t>(paramContent);
                 }
@@ -279,7 +279,7 @@ public:
                 throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Number of paths do not equal the number of instances.";
             }
             std::set<string>uniqueInstances;
-            std::set<int64_t> s(_inputInstances.begin(), _inputInstances.end()); 
+            std::set<int64_t> s(_inputInstances.begin(), _inputInstances.end());
             if(s.size() !=  _inputPaths.size())
             {
                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Input instances were not unique.";
@@ -292,7 +292,7 @@ public:
             if((_inputInstances.size()==1) && (itrel != _inputInstances.end()))
             {
                  string relinputpath  = _inputPaths[0];
-                 _inputFilePath  = relinputpath;  
+                 _inputFilePath  = relinputpath;
                  _instanceParse  = myInstanceId;
             }
             else
