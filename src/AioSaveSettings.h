@@ -26,7 +26,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <query/Operator.h>
-#include <log4cxx/logger.h>
+#include <util/PathUtils.h>
 
 #ifndef AIO_SAVE_SETTINGS
 #define AIO_SAVE_SETTINGS
@@ -305,7 +305,7 @@ public:
                 }
                 string paramContent = parameterString.substr(filePathHeader.size());
                 trim(paramContent);
-                filePaths.push_back(paramContent);
+                filePaths.push_back(path::expandForSave(paramContent, *query));
             }
             else if (starts_with (parameterString, filePathsHeader))
             {
@@ -321,7 +321,7 @@ public:
                 {
                     if(tok.size() != 0)
                     {
-                        filePaths.push_back(tok);
+                        filePaths.push_back(path::expandForSave(tok, *query));
                     }
                 }
             }
@@ -458,7 +458,7 @@ public:
                   errorMsg << "unrecognized parameter: "<< parameterString;
                   throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << errorMsg.str().c_str();
                 }
-                filePaths.push_back(path);
+                filePaths.push_back(path::expandForSave(path, *query));
             }
         }
         if(filePaths.size() == 0)

@@ -29,6 +29,7 @@
 #include <boost/filesystem.hpp>
 #include <array/SinglePassArray.h>
 #include <query/Operator.h>
+#include <util/PathUtils.h>
 
 #ifndef SPLIT_SETTINGS
 #define SPLIT_SETTINGS
@@ -114,7 +115,7 @@ public:
                 string paramContent = parameterString.substr(inputFilePathHeader.size());
                 boost::algorithm::trim(paramContent);
                 _singlepath = true;
-                _inputFilePath = paramContent;
+                _inputFilePath = path::expandForRead(paramContent, *query);
                 _instanceParse = 0;
             }
             else if  (starts_with(parameterString, inputPathsHeader))
@@ -132,7 +133,7 @@ public:
                 _multiplepath = true;
                 while(getline(ss, tok, delimiter))
                 {
-                    _inputPaths.push_back(tok);
+                    _inputPaths.push_back(path::expandForRead(tok, *query));
                 }
             }
             else if  (starts_with(parameterString, inputInstancesHeader))
@@ -267,7 +268,7 @@ public:
                 string path = parameterString;
                 boost::algorithm::trim(path);
                 _singlepath     = true;
-                _inputFilePath  = path;
+                _inputFilePath  = path::expandForRead(path, *query);
                 _instanceParse  = 0;
             }
         }

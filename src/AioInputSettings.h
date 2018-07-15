@@ -28,6 +28,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/filesystem.hpp>
 #include <query/Operator.h>
+#include <util/PathUtils.h>
 
 #ifndef AIO_INPUT_SETTINGS
 #define AIO_INPUT_SETTINGS
@@ -128,7 +129,7 @@ public:
                 string paramContent = parameterString.substr(inputFilePathHeader.size());
                 trim(paramContent);
                 _singlepath = true;
-                _inputFilePath = paramContent;
+                _inputFilePath = path::expandForRead(paramContent, *query);
                 _thisInstanceReadsData = query->isCoordinator();
             }
             else if  (starts_with(parameterString, inputPathsHeader))
@@ -146,7 +147,7 @@ public:
                 _multiplepath = true;
                 while(getline(ss, tok, delimiter))
                 {
-                    _inputPaths.push_back(tok);
+                    _inputPaths.push_back(path::expandForRead(tok, *query));
                 }
             }
             else if  (starts_with(parameterString, inputInstancesHeader))
@@ -375,7 +376,7 @@ public:
                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << errorMsg.str().c_str();
                 }
                 _singlepath     = true;
-                _inputFilePath  = path;
+                _inputFilePath  = path::expandForRead(path, *query);
                 _thisInstanceReadsData = query->isCoordinator();
             }
         }
