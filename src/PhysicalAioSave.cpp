@@ -668,12 +668,12 @@ public:
             {
                 shared_ptr<ConstChunkIterator> citer = cursor.getChunkIter(i);
 
-                // Reset coordinate buffers (skip first time)
-                if (!_attsOnly && i == 0 && nCells > 0)
+                // Reset coordinate buffers
+                if (!_attsOnly && i == 0)
                 {
-                    for (size_t i = 0; i < _nDims; ++i)
+                    for (size_t j = 0; j < _nDims; ++j)
                     {
-                        _dimsValues[i].clear();
+                        _dimsValues[j].clear();
                     }
                 }
 
@@ -919,7 +919,8 @@ public:
                         {
                             THROW_NOT_OK(
                                 static_cast<arrow::Int64Builder*>(
-                                    _arrowBuilders[nAttrs + j].get())->Append(_dimsValues[j]));
+                                    _arrowBuilders[nAttrs + j].get()
+                                    )->Append(_dimsValues[j]));
                         }
                     }
                 }
@@ -937,7 +938,8 @@ public:
 
         // Create Arrow Record Batch
         std::shared_ptr<arrow::RecordBatch> arrowBatch;
-        arrowBatch = arrow::RecordBatch::Make(_arrowSchema, nCells, _arrowArrays);
+        arrowBatch = arrow::RecordBatch::Make(
+            _arrowSchema, nCells, _arrowArrays);
 
         // Stream Arrow Record Batch to Arrow Pool Buffer using Arrow Record
         // Batch Writer and Arrow Buffer Output Stream

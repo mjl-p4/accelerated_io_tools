@@ -283,4 +283,10 @@ iq "aio_save(apply(build(<x:uint32 not null>[i=1:20:0:4], i), y, iif(i%2=0, uint
 python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
     >> $TEST_OUT
 
+echo "11. Buffer size"
+iq "aio_save(filter(build(<x:int64>[i=1:100:0:50], i), x % 2 = 0), '$F', 'format=arrow', 'atts_only=0', 'buffer_size=256')"
+python -c "import pyarrow; print(pyarrow.open_stream('$F').read_all().to_pandas().sort_values('x').to_string(index=False))" \
+    >> $TEST_OUT
+
+
 diff $TEST_OUT $DIR/test_arrow.expected
