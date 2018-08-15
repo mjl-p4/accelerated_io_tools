@@ -28,14 +28,14 @@
 #include <sstream>
 
 #include <boost/unordered_map.hpp>
-#include <query/Operator.h>
+#include <query/PhysicalOperator.h>
 #include <util/Platform.h>
 #include <array/Tile.h>
 #include <array/TileIteratorAdaptors.h>
 #include <array/SinglePassArray.h>
 #include <array/PinBuffer.h>
 #include <system/Sysinfo.h>
-#include <util/Network.h>
+#include <network/Network.h>
 
 #include <boost/algorithm/string.hpp>
 
@@ -135,7 +135,7 @@ public:
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "File splitter cannot allocate memory";
         }
-        _bufPointer = (char*) _chunk.getData();
+        _bufPointer = (char*) _chunk.getWriteData();
         ConstRLEPayload::Header* hdr = (ConstRLEPayload::Header*) _bufPointer;
         hdr->_magic = RLE_PAYLOAD_MAGIC;
         hdr->_nSegs = 1;
@@ -399,7 +399,7 @@ public:
         dimensions[2] = DimensionDesc("src_instance_id",    0, 0, nInstances-1, nInstances-1, 1, 0);
         vector<AttributeDesc> attributes;
         attributes.push_back(AttributeDesc((AttributeID)0, "value",  TID_BINARY, 0, CompressorType::NONE));
-        return ArrayDesc("aio_input", attributes, dimensions, defaultPartitioning(), query->getDefaultArrayResidency());
+        return ArrayDesc("aio_input", attributes, dimensions, createDistribution(defaultPartitioning()), query->getDefaultArrayResidency());
     }
 
     PhysicalAioInput(std::string const& logicalName,
@@ -523,7 +523,7 @@ public:
                                                createDistribution(psByCol),
                                                ArrayResPtr(),
                                                query,
-                                               getShared());
+                                               shared_from_this());
         size_t const nInstances = query->getInstancesCount();
         vector<Coordinate> lastBlocks(nInstances, -1);
         shared_ptr<Array> supplement = makeSupplement(splitData, query, settings, lastBlocks);
@@ -532,7 +532,7 @@ public:
                                                 createDistribution(psByCol),
                                                 ArrayResPtr(),
                                                 query,
-                                                getShared());
+                                                shared_from_this());
         shared_ptr<ConstArrayIterator> inputIterator = splitData->getConstIterator(0);
         shared_ptr<ConstArrayIterator> supplementIter = supplement->getConstIterator(0);
         size_t const outputChunkSize = _schema.getDimensions()[0].getChunkInterval();

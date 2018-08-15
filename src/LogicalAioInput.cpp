@@ -23,10 +23,10 @@
 * END_COPYRIGHT
 */
 
-#include <query/Operator.h>
+#include <query/LogicalOperator.h>
+#include <array/Metadata.h>  // for addEmptyTagAttribute
 
 #include "AioInputSettings.h"
-
 namespace scidb
 {
 

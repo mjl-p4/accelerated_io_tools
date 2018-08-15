@@ -25,7 +25,9 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
-#include <query/Operator.h>
+#include <query/LogicalOperator.h>
+#include <query/Query.h>
+#include <query/Expression.h>
 #include <util/PathUtils.h>
 
 #ifndef AIO_SAVE_SETTINGS

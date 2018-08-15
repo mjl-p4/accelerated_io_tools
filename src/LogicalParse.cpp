@@ -23,7 +23,7 @@
 * END_COPYRIGHT
 */
 
-#include <query/Operator.h>
+#include <query/LogicalOperator.h>
 #include "ParseSettings.h"
 
 namespace scidb

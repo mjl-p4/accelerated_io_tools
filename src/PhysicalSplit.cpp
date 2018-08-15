@@ -28,7 +28,7 @@
 #include <sstream>
 
 #include <boost/unordered_map.hpp>
-#include <query/Operator.h>
+#include <query/PhysicalOperator.h>
 #include <util/Platform.h>
 #include <array/Tile.h>
 #include <array/TileIteratorAdaptors.h>
@@ -341,7 +341,7 @@ public:
                                             createDistribution(psHashPartitioned),
                                             ArrayResPtr(),
                                             query,
-                                            getShared());
+                                            shared_from_this());
         return result;
     }
 };

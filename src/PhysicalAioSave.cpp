@@ -50,15 +50,15 @@
 #include <query/TypeSystem.h>
 #include <query/FunctionDescription.h>
 #include <query/FunctionLibrary.h>
-#include <query/Operator.h>
+#include <query/PhysicalOperator.h>
 #include <query/TypeSystem.h>
 #include <query/FunctionLibrary.h>
-#include <query/Operator.h>
+#include <query/PhysicalOperator.h>
 //#include <array/DBArray.h>
 #include <array/Tile.h>
 #include <array/TileIteratorAdaptors.h>
 #include <util/Platform.h>
-#include <util/Network.h>
+#include <network/Network.h>
 #include <array/SinglePassArray.h>
 #include <array/SynchableArray.h>
 #include <array/PinBuffer.h>
@@ -262,7 +262,7 @@ public:
         _allocSize(s_startingSize)
     {
         _chunk.allocate(_allocSize);
-        _chunkStartPointer = (char*) _chunk.getData();
+        _chunkStartPointer = (char*) _chunk.getWriteData();
         ConstRLEPayload::Header* hdr = (ConstRLEPayload::Header*) _chunkStartPointer;
         hdr->_magic = RLE_PAYLOAD_MAGIC;
         hdr->_nSegs = 1;
@@ -302,9 +302,9 @@ public:
                 _allocSize = _allocSize * 2;
             }
             vector<char> buf(_allocSize);
-            memcpy(&(buf[0]), _chunk.getData(), mySize);
+            memcpy(&(buf[0]), _chunk.getWriteData(), mySize);
             _chunk.allocate(_allocSize);
-            _chunkStartPointer = (char*) _chunk.getData();
+            _chunkStartPointer = (char*) _chunk.getWriteData();
             memcpy(_chunkStartPointer, &(buf[0]), mySize);
             _dataStartPointer = _chunkStartPointer + AioSaveSettings::chunkDataOffset();
             _sizePointer = (uint32_t*) (_chunkStartPointer + AioSaveSettings::chunkSizeOffset());
@@ -920,7 +920,7 @@ public:
                             THROW_NOT_OK(
                                 static_cast<arrow::Int64Builder*>(
                                     _arrowBuilders[nAttrs + j].get()
-                                    )->Append(_dimsValues[j]));
+                                    )->AppendValues(_dimsValues[j]));
                         }
                     }
                 }
@@ -1571,7 +1571,7 @@ public:
     {
         std::shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, sizeof(bool)));
         InstanceID myId = query->getInstanceID();
-        *((bool*) buf->getData()) = value;
+        *((bool*) buf->getWriteData()) = value;
         for(InstanceID i=0; i<query->getInstancesCount(); i++)
         {
             if(i != myId)
@@ -1638,7 +1638,7 @@ public:
                                           createDistribution(psByCol),
                                           ArrayResPtr(),
                                           query,
-                                          getShared());
+                                          shared_from_this());
         bool const wasConverted = (outArrayRedist != outArray) ;
         if (thisInstanceSavesData)
         {

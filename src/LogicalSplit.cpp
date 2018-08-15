@@ -23,7 +23,8 @@
 * END_COPYRIGHT
 */
 
-#include <query/Operator.h>
+#include <query/LogicalOperator.h>
+#include <query/OperatorParam.h>
 #include "SplitSettings.h"
 
 namespace scidb
@@ -58,7 +59,7 @@ public:
 
         dimensions[0] = DimensionDesc("source_instance_id", 0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
         dimensions[1] = DimensionDesc("chunk_no",    0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
-        return ArrayDesc("split", attributes, dimensions, defaultPartitioning(), query->getDefaultArrayResidency());
+        return ArrayDesc("split", attributes, dimensions, createDistribution(defaultPartitioning()), query->getDefaultArrayResidency());
     }
 
 };
