@@ -21,9 +21,9 @@ then
     # wget --output-document /etc/yum.repos.d/bintray-rvernica-rpm.repo \
     #      https://bintray.com/rvernica/rpm/rpm
 
-    yum install --assumeyes          \
-        arrow-devel-$ARROW_VER-1.el6 \
-        libpqxx-devel                \
+    yum install --assumeyes    \
+        arrow-devel-$ARROW_VER \
+        libpqxx-devel          \
         python27
 
     source /opt/rh/python27/enable
@@ -50,7 +50,6 @@ else
     apt-get install                              \
             --assume-yes --no-install-recommends \
             libarrow-dev=$ARROW_VER-1            \
-            libarrow0=$ARROW_VER-1               \
             libpqxx-dev
 fi
 
