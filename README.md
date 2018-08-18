@@ -520,7 +520,7 @@ The following libraries are required to build the plugin:
 ### Install the plugin
 
 After that, follow
-[`dev-tools` installation](https://github.com/paradigm4/dev_tools#installationinstructions)
+[`dev-tools` installation](https://github.com/paradigm4/dev_tools#installation)
 instructions to get `dev_tools` first. Then:
 ```bash
 > iquery -aq "install_github('paradigm4/accelerated_io_tools')"
