@@ -444,84 +444,110 @@ aio_save(
 
 # Installation
 
-## Install prerequisites
+There are multiple ways to install the `accelerated_io_tools` package:
 
-The following libraries are required to build the plugin:
+* Install `extra-scidb-libs`
+* Install using `dev_tools`
+* Install from source
 
-* SciDB development libraries
-* Protocol Buffers development library
-* PostgreSQL development library
-* Apache Arrow development library
+Once installed, the plugin can be loaded with:
 
-Due to a version conflict with the Protocol Buffers library included
-with the official Apache Arrow packages, we use Apache Arrow packages
-custom built for SciDB.
-
-### CentOS
 ```bash
-> sudo yum install scidb-18.1-dev scidb-18.1-libboost-devel \
-    log4cxx-devel protobuf-devel libpqxx-devel
-```
-
-Install Apache Arrow:
-
-#### CentOS 6
-```bash
-> sudo yum install \
-    https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm
-
-> sudo wget --output-document /etc/yum.repos.d/bintray-rvernica-rpm.repo \
-    https://bintray.com/rvernica/rpm/rpm
-> sudo yum install arrow-devel
-```
-
-#### CentOS 7
-```bash
-> sudo yum install \
-     https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
-
-> sudo wget --output-document /etc/yum.repos.d/bintray-rvernica-rpm.repo \
-    https://bintray.com/rvernica/rpm/rpm
-> sudo yum install arrow-devel
-```
-
-### Ubuntu
-```bash
-> sudo apt-get install scidb-18.1-dev libprotobuf-dev libpqxx-dev
-```
-
-Install Apache Arrow:
-```bash
-> cat <<APT_LINE | tee /etc/apt/sources.list.d/bintray-rvernica.list
-deb https://dl.bintray.com/rvernica/deb trusty universe
-APT_LINE
-
-> apt-key adv --keyserver hkp://keyserver.ubuntu.com --recv 46BD98A354BA5235
-> apt-get update
-> apt-get install libarrow-dev libarrow0
-```
-
-## Install plug-in
-
-After that, follow instructions https://github.com/paradigm4/dev_tools to get dev_tools first. Then:
-```bash
-> iquery -aq "install_github('paradigm4/accelerated_io_tools')"
 > iquery -aq "load_library('accelerated_io_tools')"
 ```
-
-Warning: if you were previously using `prototype_load_tools` you will need to unload that library and restart the cluster:
- * `iquery -aq "unload_library('prototype_load_tools')"`
- * restart the cluster
- * `iquery -aq "load_library('accelerated_io_tools')"`
 
 If you are using Shim together with SciDB, note that you can configure
 shim to use `aio_save` after it is installed to speed up data exports.
 See Shim [Help](http://paradigm4.github.io/shim/help.html#aio-plugin)
 page for instructions.
 
+## Install extra-scidb-libs
+
+The easiest way to install `accelerated_io_tools` is to install
+[`extra-scidb-libs`](https://paradigm4.github.io/extra-scidb-libs/)
+
+## Install using dev_tools
+
+### Install prerequisites
+
+The following libraries are required to build the plugin:
+
+* SciDB development libraries
+* Protocol Buffers development library
+* PostgreSQL development library
+* Apache Arrow development library version `0.9.0`
+
+#### CentOS 6 & 7
+
+1. Install the Extra Packages for Enterprise Linux (EPEL) repository
+   (see [instructions](https://fedoraproject.org/wiki/EPEL)), if not
+   already installed.
+1. Add the SciDB Extra Libs repository:
+   ```bash
+   > cat <<EOF | sudo tee /etc/yum.repos.d/scidb-extra.repo
+   [scidb-extra]
+   name=SciDB extra libs repository
+   baseurl=https://downloads.paradigm4.com/extra/$SCIDB_VER/centos6.3
+   gpgcheck=0
+   enabled=1
+   EOF
+   ```
+1. Install dependencies:
+   ```bash
+   > sudo yum install scidb-18.1-dev scidb-18.1-libboost-devel \
+       log4cxx-devel protobuf-devel libpqxx-devel arrow-devel-0.9.0
+   ```
+
+#### Ubuntu Trusty
+
+1. Install the `apt-transport-https` package (if not already installed):
+   ```bash
+   > sudo apt-get install apt-transport-https
+   ```
+1. Add the SciDB Extra Libs repository:
+   ```bash
+   > cat <<APT_LINE | sudo tee /etc/apt/sources.list.d/scidb-extra.list
+   deb https://downloads.paradigm4.com/ extra/$SCIDB_VER/ubuntu14.04/
+   APT_LINE
+   > sudo apt-get update
+   ```
+1. Install the dependencies:
+   ```bash
+   > sudo apt-get install scidb-18.1-dev libprotobuf-dev libpqxx-dev \
+       libarrow-dev=0.9.0-1
+   ```
+
+### Install the plugin
+
+After that, follow instructions https://github.com/paradigm4/dev_tools
+to get dev_tools first. Then:
+```bash
+> iquery -aq "install_github('paradigm4/accelerated_io_tools')"
+```
+
+## Install from source
+
+Follow the [Install Prerequisites](#install-prerequisites)
+above. Download the sourcecode from GitHub and run `make` in the top
+directory. Copy the resultin `.so` file to your SciDB plugins
+directory as instructed by the `make` output.
+
+## Note: unload prototype_load_tools if loaded
+
+Warning: if you were previously using `prototype_load_tools` you will
+need to unload that library and restart the cluster:
+
+* `iquery -aq "unload_library('prototype_load_tools')"`
+* restart the cluster
+* `iquery -aq "load_library('accelerated_io_tools')"`
+
 ## Note: use the right branch for your version
-The git branches of accelerated_io_tools follow different versions of SciDB - with the master branch used for the most recent version. Note also changes in behavior are possible between versions.
 
-# Old split() and parse() operators
+The git branches of accelerated_io_tools follow different versions of
+SciDB - with the master branch used for the most recent version. Note
+also changes in behavior are possible between versions.
 
-Are included in this .so as well and work the same way as before. They are, however, deprecated. Operator `aio_input` should be used instead.
+## Note: Old split() and parse() operators
+
+Are included in this .so as well and work the same way as before. They
+are, however, deprecated. Operator `aio_input` should be used instead.
