@@ -1,7 +1,7 @@
 accelerated_io_tools
 ==========
 
-[![Build Status](https://travis-ci.org/Paradigm4/accelerated_io_tools.svg)](https://travis-ci.org/Paradigm4/accelerated_io_tools)
+[![Build Status](https://travis-ci.org/Paradigm4/accelerated_io_tools.svg)](https://travis-ci.org/Paradigm4/accelerated_io_tools) ![arrow 0.9.0](https://img.shields.io/badge/arrow-0.9.0-blue.svg)
 
 A prototype library for the accelerated import and export of data out of SciDB. The work started previously as the `prototype_load_tools` package and continued to get optimized and expanded. Currently contains two SciDB operators and several functions:
  * `aio_input`: an operator that reads token-separated text from 1 or more filesystem objects and returns the data as a SciDB array
