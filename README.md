@@ -519,26 +519,6 @@ shim to use `aio_save` after it is installed to speed up data exports.
 See Shim [Help](http://paradigm4.github.io/shim/help.html#aio-plugin)
 page for instructions.
 
-## Update Shim and SciDB-Py
-
-In order to take advantage of the Apache Arrow format in `aio_save`,
-[Shim](https://github.com/Paradigm4/shim) and
-[SciDB-Py](https://github.com/Paradigm4/SciDB-Py) need to be updated
-to the latest development versions.
-
-### Shim
-
-Download the Shim source code from GitHub and follow the *Manual
-Building* instructions from the Shim
-[README](https://github.com/Paradigm4/shim#manual-building) page.
-
-### SciDB-Py
-
-Install SciDB-Py version `18.1.2` or newer:
-```bash
-> pip install "scidb-py>=18.1.2"
-```
-
 ## Note: use the right branch for your version
 The git branches of accelerated_io_tools follow different versions of SciDB - with the master branch used for the most recent version. Note also changes in behavior are possible between versions.
 
