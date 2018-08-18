@@ -446,9 +446,9 @@ aio_save(
 
 There are multiple ways to install the `accelerated_io_tools` package:
 
-* Install `extra-scidb-libs`
-* Install using `dev_tools`
-* Install from source
+* [Install `extra-scidb-libs`](#install-extra-scidb-libs)
+* [Install using `dev_tools`](#install-using-dev_tools)
+* [Install from source](#install-from-source)
 
 Once installed, the plugin can be loaded with:
 
@@ -519,8 +519,9 @@ The following libraries are required to build the plugin:
 
 ### Install the plugin
 
-After that, follow instructions https://github.com/paradigm4/dev_tools
-to get dev_tools first. Then:
+After that, follow
+[`dev-tools` installation](https://github.com/paradigm4/dev_tools#installationinstructions)
+instructions to get `dev_tools` first. Then:
 ```bash
 > iquery -aq "install_github('paradigm4/accelerated_io_tools')"
 ```
