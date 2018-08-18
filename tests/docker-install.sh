@@ -21,9 +21,9 @@ then
     # wget --output-document /etc/yum.repos.d/bintray-rvernica-rpm.repo \
     #      https://bintray.com/rvernica/rpm/rpm
 
-    yum install --assumeyes        \
-        arrow-devel-$ARROW_VER.el6 \
-        libpqxx-devel              \
+    yum install --assumeyes          \
+        arrow-devel-$ARROW_VER-1.el6 \
+        libpqxx-devel                \
         python27
 
     source /opt/rh/python27/enable
@@ -49,15 +49,15 @@ else
     apt-get update
     apt-get install                              \
             --assume-yes --no-install-recommends \
-            libarrow-dev=$ARROW_VER              \
-            libarrow0=$ARROW_VER                 \
+            libarrow-dev=$ARROW_VER-1            \
+            libarrow0=$ARROW_VER-1               \
             libpqxx-dev
 fi
 
 
 wget --no-verbose https://bootstrap.pypa.io/get-pip.py
 python get-pip.py
-pip install pandas pyarrow scidb-py
+pip install pandas pyarrow==$ARROW_VER scidb-py
 
 
 # Reset SciDB instance count to 4

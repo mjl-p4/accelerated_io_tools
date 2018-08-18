@@ -6,7 +6,7 @@ python:
   - "3.6"
 
 env:
-  global: SCIDB_VER=18.1 ARROW_VER=0.9.0-1
+  global: SCIDB_VER=18.1 ARROW_VER=0.9.0
   matrix:
     - SCIDB_IMG=18.1
     - SCIDB_IMG=18.1-trusty
