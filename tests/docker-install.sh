@@ -21,6 +21,9 @@ then
     # wget --output-document /etc/yum.repos.d/bintray-rvernica-rpm.repo \
     #      https://bintray.com/rvernica/rpm/rpm
 
+    yum install --assumeyes \
+        centos-release-scl
+
     yum install --assumeyes    \
         arrow-devel-$ARROW_VER \
         libpqxx-devel          \
