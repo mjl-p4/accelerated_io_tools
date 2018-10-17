@@ -23,7 +23,7 @@
 * END_COPYRIGHT
 */
 
-#include <limits>
+#define LEGACY_API
 #include <limits>
 #include <sstream>
 
@@ -397,7 +397,7 @@ public:
         dimensions[0] = DimensionDesc("chunk_no",           0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
         dimensions[1] = DimensionDesc("dst_instance_id",    0, 0, nInstances-1, nInstances-1, 1, 0);
         dimensions[2] = DimensionDesc("src_instance_id",    0, 0, nInstances-1, nInstances-1, 1, 0);
-        vector<AttributeDesc> attributes;
+        Attributes attributes;
         attributes.push_back(AttributeDesc((AttributeID)0, "value",  TID_BINARY, 0, CompressorType::NONE));
         return ArrayDesc("aio_input", attributes, dimensions, createDistribution(defaultPartitioning()), query->getDefaultArrayResidency());
     }
@@ -420,6 +420,15 @@ public:
     {
         RedistributeContext distro(_schema.getDistribution(), _schema.getResidency());
         return distro;
+    }
+
+    /// @see OperatorDist
+    DistType inferSynthesizedDistType(std::vector<DistType> const& /*inDist*/, size_t /*depth*/) const override
+    {
+        std::vector<RedistributeContext> emptyRC;
+        std::vector<ArrayDesc> emptyAD;
+        auto context = getOutputDistribution(emptyRC, emptyAD); // avoiding duplication of logic
+        return context.getArrayDistribution()->getPartitioningSchema();
     }
 
     shared_ptr<Array> makeSupplement(shared_ptr<Array>& afterSplit, shared_ptr<Query>& query, shared_ptr<AioInputSettings>& settings, vector<Coordinate>& lastBlocks)
@@ -520,7 +529,7 @@ public:
         }
 
         splitData = redistributeToRandomAccess(splitData,
-                                               createDistribution(psByCol),
+                                               createDistribution(psHashPartitioned),
                                                ArrayResPtr(),
                                                query,
                                                shared_from_this());
@@ -529,7 +538,7 @@ public:
         shared_ptr<Array> supplement = makeSupplement(splitData, query, settings, lastBlocks);
         exchangeLastBlocks(lastBlocks, query);
         supplement = redistributeToRandomAccess(supplement,
-                                                createDistribution(psByCol),
+                                                createDistribution(psHashPartitioned),
                                                 ArrayResPtr(),
                                                 query,
                                                 shared_from_this());

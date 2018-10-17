@@ -23,6 +23,7 @@
 * END_COPYRIGHT
 */
 
+#define LEGACY_API
 #include <limits>
 #include <sstream>
 #include <memory>
@@ -34,26 +35,12 @@
 #include <system/SystemCatalog.h>
 #include <system/Sysinfo.h>
 
-#include <arrow/buffer.h>
-#include <arrow/builder.h>
-#include <arrow/io/file.h>
-#include <arrow/io/interfaces.h>
-#include <arrow/io/memory.h>
-#include <arrow/ipc/reader.h>
-#include <arrow/ipc/writer.h>
-#include <arrow/memory_pool.h>
-#include <arrow/record_batch.h>
-#include <arrow/status.h>
-#include <arrow/type.h>
-#include <arrow/util/io-util.h>
-
 #include <query/TypeSystem.h>
 #include <query/FunctionDescription.h>
 #include <query/FunctionLibrary.h>
 #include <query/PhysicalOperator.h>
 #include <query/TypeSystem.h>
 #include <query/FunctionLibrary.h>
-#include <query/PhysicalOperator.h>
 //#include <array/DBArray.h>
 #include <array/Tile.h>
 #include <array/TileIteratorAdaptors.h>
@@ -70,28 +57,8 @@
 
 #include "AioSaveSettings.h"
 
-
-#define THROW_NOT_OK(s)                                            \
-    {                                                              \
-        arrow::Status _s = (s);                                    \
-        if (!_s.ok())                                              \
-        {                                                          \
-            throw USER_EXCEPTION(                                  \
-                SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION) \
-                    << _s.ToString().c_str();                      \
-        }                                                          \
-    }
-
-#define THROW_NOT_OK_FILE(s)                                      \
-    {                                                             \
-        arrow::Status _s = (s);                                   \
-        if (!_s.ok())                                             \
-        {                                                         \
-            throw USER_EXCEPTION(                                 \
-                SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR) \
-                    << _s.ToString().c_str() << (int)_s.code();   \
-        }                                                         \
-    }
+using std::make_shared;
+using boost::algorithm::is_from_range;
 
 namespace scidb
 {
@@ -106,142 +73,6 @@ static void EXCEPTION_ASSERT(bool cond)
     {
         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Internal inconsistency";
     }
-}
-
-std::shared_ptr<arrow::Schema> attributes2ArrowSchema(ArrayDesc const &arrayDesc,
-                                                      bool attsOnly)
-{
-    Attributes const &attrs = arrayDesc.getAttributes(true);
-    Dimensions const &dims = arrayDesc.getDimensions();
-
-    size_t nAttrs = attrs.size();
-    size_t nDims = dims.size();
-
-    std::vector<std::shared_ptr<arrow::Field>> arrowFields(
-        nAttrs + (attsOnly ? 0 : nDims));
-    for (size_t i = 0; i < nAttrs; ++i)
-    {
-        auto type = attrs[i].getType();
-        auto typeEnum = typeId2TypeEnum(type, true);
-        std::shared_ptr<arrow::DataType> arrowType;
-
-        switch (typeEnum)
-        {
-        case TE_BINARY:
-        {
-            arrowType = arrow::binary();
-            break;
-        }
-        case TE_BOOL:
-        {
-            arrowType = arrow::boolean();
-            break;
-        }
-        case TE_CHAR:
-        {
-            arrowType = arrow::utf8();
-            break;
-        }
-        case TE_DATETIME:
-        {
-            arrowType = arrow::timestamp(arrow::TimeUnit::SECOND);
-            break;
-        }
-        case TE_DOUBLE:
-        {
-            arrowType = arrow::float64();
-            break;
-        }
-        case TE_FLOAT:
-        {
-            arrowType = arrow::float32();
-            break;
-        }
-        case TE_INT8:
-        {
-            arrowType = arrow::int8();
-            break;
-        }
-        case TE_INT16:
-        {
-            arrowType = arrow::int16();
-            break;
-        }
-        case TE_INT32:
-        {
-            arrowType = arrow::int32();
-            break;
-        }
-        case TE_INT64:
-        {
-            arrowType = arrow::int64();
-            break;
-        }
-        case TE_UINT8:
-        {
-            arrowType = arrow::uint8();
-            break;
-        }
-        case TE_UINT16:
-        {
-            arrowType = arrow::uint16();
-            break;
-        }
-        case TE_UINT32:
-        {
-            arrowType = arrow::uint32();
-            break;
-        }
-        case TE_UINT64:
-        {
-            arrowType = arrow::uint64();
-            break;
-        }
-        case TE_STRING:
-        {
-            arrowType = arrow::utf8();
-            break;
-        }
-        default:
-        {
-            ostringstream error;
-            error << "Type " << type << " not supported in arrow format";
-            throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION) << error.str();
-        }
-        }
-
-        arrowFields[i] = arrow::field(attrs[i].getName(), arrowType);
-    }
-    if (!attsOnly)
-    {
-        for (size_t i = 0; i < nDims; ++i)
-        {
-            arrowFields[nAttrs + i] = arrow::field(dims[i].getBaseName(), arrow::int64());
-        }
-    }
-
-    return arrow::schema(arrowFields);
-}
-
-ArrayDesc const addDimensionsToArrayDesc(ArrayDesc const& arrayDesc,
-                                         bool attsOnly,
-                                         size_t nAttrs)
-{
-    ArrayDesc arrayDescWithDim(arrayDesc);
-
-    Dimensions const &dims = arrayDesc.getDimensions();
-    const size_t nDims = dims.size();
-
-    for (size_t i = 0; i < nDims; ++i)
-    {
-        arrayDescWithDim.addAttribute(
-            AttributeDesc((AttributeID)(nAttrs + i),
-                          dims[i].getBaseName() + "val",
-                          TID_INT64,
-                          0,
-                          CompressorType::NONE));
-    }
-    return arrayDescWithDim;
 }
 
 class MemChunkBuilder
@@ -372,29 +203,29 @@ public:
         return _nAttrs;
     }
 
-    void advanceChunkIters()
+    void advance()
     {
-        if (_end)
+        if(_end)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Internal error: iterating past end of cursor";
         }
-        if (_inputChunkIters[0] == 0) // 1st time!
+        if (_inputChunkIters[0] == 0) //1st time!
         {
-            for(size_t i = 0; i < _nAttrs; ++i)
+            for(size_t i =0; i<_nAttrs; ++i)
             {
                 _inputChunkIters[i] = _inputArrayIters[i]->getChunk().getConstIterator(ConstChunkIterator::IGNORE_OVERLAPS | ConstChunkIterator::IGNORE_EMPTY_CELLS);
             }
         }
-        else if (!_inputChunkIters[0]->end()) // not the first time!
+        else if (!_inputChunkIters[0]->end()) //not first time!
         {
-            for(size_t i = 0; i < _nAttrs; ++i)
+            for(size_t i =0; i<_nAttrs; ++i)
             {
                 ++(*_inputChunkIters[i]);
             }
         }
         while(_inputChunkIters[0]->end())
         {
-            for(size_t i =0; i < _nAttrs; ++i)
+            for(size_t i =0; i<_nAttrs; ++i)
             {
                 ++(*_inputArrayIters[i]);
             }
@@ -403,25 +234,12 @@ public:
                 _end = true;
                 return;
             }
-            for(size_t i =0; i < _nAttrs; ++i)
+            for(size_t i =0; i<_nAttrs; ++i)
             {
                 _inputChunkIters[i] = _inputArrayIters[i]->getChunk().getConstIterator(ConstChunkIterator::IGNORE_OVERLAPS | ConstChunkIterator::IGNORE_EMPTY_CELLS);
             }
         }
-    }
-
-    void advance()
-    {
-        if (_end)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "Internal error: iterating past end of cursor";
-        }
-        advanceChunkIters();
-        if (_end)
-        {
-            return;
-        }
-        for(size_t i = 0; i < _nAttrs; ++i)
+        for(size_t i =0; i<_nAttrs; ++i)
         {
             _currentCell[i] = &(_inputChunkIters[i]->getItem());
         }
@@ -432,24 +250,18 @@ public:
         return _currentCell;
     }
 
-    shared_ptr<ConstChunkIterator> getChunkIter(size_t i)
-    {
-        return _inputChunkIters[i];
-    }
-
     Coordinates const& getPosition()
     {
         return _inputChunkIters[0]->getPosition();
     }
 };
 
+
 class BinaryChunkPopulator
 {
 private:
-    bool             _attsOnly;
-    size_t const     _nAttrs;
-    size_t const     _nDims;
     ExchangeTemplate _templ;
+    size_t const     _nAttrs;
     size_t const     _nColumns;
     vector< Value >  _cnvValues;
     vector< char >   _padBuffer;
@@ -463,18 +275,13 @@ private:
 public:
     BinaryChunkPopulator(ArrayDesc const& inputArrayDesc,
                          AioSaveSettings const& settings):
-        _attsOnly(settings.isAttsOnly()),
+        _templ(TemplateParser::parse(inputArrayDesc, settings.getBinaryFormatString(), false)),
         _nAttrs(inputArrayDesc.getAttributes(true).size()),
-        _nDims(inputArrayDesc.getDimensions().size()),
-        _templ(TemplateParser::parse(
-                   _attsOnly ? inputArrayDesc : addDimensionsToArrayDesc(inputArrayDesc, _attsOnly, _nAttrs),
-                   settings.getBinaryFormatString(),
-                   false)),
         _nColumns(_templ.columns.size()),
         _cnvValues(_nAttrs),
         _padBuffer(sizeof(uint64_t) + 1, '\0')
     {
-        for (size_t c = 0, i = 0; c < _nAttrs; ++c)
+        for (size_t c = 0, i = 0; c < _nColumns; ++c)
         {
           ExchangeTemplate::Column const& column = _templ.columns[c];
           if (column.skip)
@@ -506,506 +313,70 @@ public:
         while( !cursor.end() && ((cellsPerChunk<=0 && builder.getTotalSize() < bytesPerChunk) || (cellsPerChunk > 0 && nCells < cellsPerChunk)))
         {
             vector <Value const *> const& cell = cursor.getCell();
-            Coordinates const &coords = cursor.getPosition();
-
             for (size_t c = 0, i = 0; c < _nColumns; ++c)
             {
-                if (c < _nAttrs)
+                ExchangeTemplate::Column const& column = _templ.columns[c];
+                if (column.skip)
                 {
-                    ExchangeTemplate::Column const& column = _templ.columns[c];
-                    if (column.skip)
-                    {
-                        size_t pad = skip_bytes(column);
-                        builder.addData(&(_padBuffer[0]), _padBuffer.size());
-                    }
-                    else
-                    {
-                        Value const* v = cell[i];
-                        if (column.nullable)
-                        {
-                            int8_t missingReason = (int8_t)v->getMissingReason();
-                            builder.addData( (char*) (&missingReason), sizeof(missingReason));
-                        }
-                        if (v->isNull())
-                        {
-                            if (!column.nullable)
-                            {
-                                throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ASSIGNING_NULL_TO_NON_NULLABLE);
-                            }
-                            // for varying size type write 4-bytes counter
-                            size_t size = column.fixedSize ? column.fixedSize : sizeof(uint32_t);
-                            builder.addData( &(_padBuffer[0]), size);
-                        }
-                        else
-                        {
-                            if (column.converter)
-                            {
-                                column.converter(&v, &_cnvValues[i], NULL);
-                                v = &_cnvValues[i];
-                            }
-                            if (v->size() > numeric_limits<uint32_t>::max())
-                            {
-                                throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_TRUNCATION) << v->size() << numeric_limits<uint32_t>::max();
-                            }
-                            uint32_t size = (uint32_t)v->size();
-                            if (column.fixedSize == 0)
-                            { // varying size type
-                                builder.addData( (char*) (&size), sizeof(size));
-                                builder.addData( (char*) v->data(), size);
-                            }
-                            else
-                            {
-                                if (size > column.fixedSize)
-                                {
-                                    throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_TRUNCATION) << size << column.fixedSize;
-                                }
-                                builder.addData( (char*) v->data(), size);
-                                if (size < column.fixedSize)
-                                {
-                                    size_t padSize = column.fixedSize - size;
-                                    assert(padSize <= _padBuffer.size());
-                                    builder.addData(&(_padBuffer[0]), padSize);
-                                }
-                            }
-                        }
-                        ++i;
-                    }
+                    size_t pad = skip_bytes(column);
+                    builder.addData(&(_padBuffer[0]), _padBuffer.size());
                 }
                 else
                 {
-                    if (!_attsOnly)
+                    Value const* v = cell[i];
+                    if (column.nullable)
                     {
-                        builder.addData((char*)(&coords[c - _nAttrs]), 8);
+                        int8_t missingReason = (int8_t)v->getMissingReason();
+                        builder.addData( (char*) (&missingReason), sizeof(missingReason));
                     }
+                    if (v->isNull())
+                    {
+                        if (!column.nullable)
+                        {
+                            throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ASSIGNING_NULL_TO_NON_NULLABLE);
+                        }
+                        // for varying size type write 4-bytes counter
+                        size_t size = column.fixedSize ? column.fixedSize : sizeof(uint32_t);
+                        builder.addData( &(_padBuffer[0]), size);
+                    }
+                    else
+                    {
+                        if (column.converter)
+                        {
+                            column.converter(&v, &_cnvValues[i], NULL);
+                            v = &_cnvValues[i];
+                        }
+                        if (v->size() > numeric_limits<uint32_t>::max())
+                        {
+                            throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_TRUNCATION) << v->size() << numeric_limits<uint32_t>::max();
+                        }
+                        uint32_t size = (uint32_t)v->size();
+                        if (column.fixedSize == 0)
+                        { // varying size type
+                            builder.addData( (char*) (&size), sizeof(size));
+                            builder.addData( (char*) v->data(), size);
+                        }
+                        else
+                        {
+                            if (size > column.fixedSize)
+                            {
+                                throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_TRUNCATION) << size << column.fixedSize;
+                            }
+                            builder.addData( (char*) v->data(), size);
+                            if (size < column.fixedSize)
+                            {
+                                size_t padSize = column.fixedSize - size;
+                                assert(padSize <= _padBuffer.size());
+                                builder.addData(&(_padBuffer[0]), padSize);
+                            }
+                        }
+                    }
+                    ++i;
                 }
             }
             cursor.advance();
             ++nCells;
         }
-    }
-};
-
-class ArrowChunkPopulator
-{
-
-private:
-    const Attributes&                                 _attrs;
-    const size_t                                      _nDims;
-    const bool                                        _attsOnly;
-    const std::shared_ptr<arrow::Schema>              _arrowSchema;
-
-    std::vector<TypeEnum>                             _inputTypes;
-    std::vector<size_t>                               _inputSizes;
-    std::vector<std::unique_ptr<arrow::ArrayBuilder>> _arrowBuilders;
-    std::vector<std::shared_ptr<arrow::Array>>        _arrowArrays;
-    arrow::MemoryPool*                                _arrowPool = arrow::default_memory_pool();
-    std::vector<std::vector<int64_t>>                 _dimsValues;
-
-public:
-    ArrowChunkPopulator(ArrayDesc const& inputArrayDesc,
-                        AioSaveSettings const& settings):
-        _attrs(inputArrayDesc.getAttributes(true)),
-        _nDims(inputArrayDesc.getDimensions().size()),
-        _attsOnly(settings.isAttsOnly()),
-        _arrowSchema(attributes2ArrowSchema(inputArrayDesc, _attsOnly))
-    {
-        const size_t nAttrs = _attrs.size();
-
-        _inputTypes.resize(nAttrs);
-        _inputSizes.resize(nAttrs);
-        _arrowBuilders.resize(nAttrs + (_attsOnly ? 0 : _nDims));
-        _arrowArrays.resize(nAttrs + (_attsOnly ? 0 : _nDims));
-
-        // Create Arrow Builders
-        for(size_t i = 0; i < nAttrs; ++i)
-        {
-            _inputTypes[i] = typeId2TypeEnum(_attrs[i].getType(), true);
-            _inputSizes[i] = _attrs[i].getSize() +
-                (_attrs[i].isNullable() ? 1 : 0);
-
-            THROW_NOT_OK(
-                arrow::MakeBuilder(
-                    _arrowPool,
-                    _arrowSchema->field(i)->type(),
-                    &_arrowBuilders[i]));
-        }
-        if (!_attsOnly)
-        {
-            for(size_t i = nAttrs; i < nAttrs + _nDims; ++i)
-            {
-                THROW_NOT_OK(
-                    arrow::MakeBuilder(
-                        _arrowPool,
-                        _arrowSchema->field(i)->type(),
-                        &_arrowBuilders[i]));
-            }
-
-            // Setup coordinates buffers
-            _dimsValues = std::vector<std::vector<int64_t>>(_nDims);
-        }
-    }
-
-    ~ArrowChunkPopulator()
-    {}
-
-    void populateChunk(MemChunkBuilder& builder,
-                       ArrayCursor& cursor,
-                       size_t const bytesPerChunk,
-                       int16_t const cellsPerChunk)
-    {
-        // Basic setup
-        const size_t nAttrs = _attrs.size();
-
-        // Append to Arrow Builders
-        int64_t nCells = 0;
-        size_t bytesCount = 0;
-
-        while (!cursor.end() &&
-               ((cellsPerChunk <= 0 && bytesCount < bytesPerChunk) ||
-                (cellsPerChunk > 0 && nCells < cellsPerChunk)))
-        {
-            for (size_t i = 0; i < nAttrs; ++i)
-            {
-                shared_ptr<ConstChunkIterator> citer = cursor.getChunkIter(i);
-
-                // Reset coordinate buffers
-                if (!_attsOnly && i == 0)
-                {
-                    for (size_t j = 0; j < _nDims; ++j)
-                    {
-                        _dimsValues[j].clear();
-                    }
-                }
-
-                switch (_inputTypes[i])
-                {
-                case TE_BINARY:
-                {
-                    while (!citer->end())
-                    {
-                        Value const& value = citer->getItem();
-                        if(value.isNull())
-                        {
-                            THROW_NOT_OK(
-                                static_cast<arrow::BinaryBuilder*>(
-                                    _arrowBuilders[i].get())->AppendNull());
-                        }
-                        else
-                        {
-                            THROW_NOT_OK(
-                                static_cast<arrow::BinaryBuilder*>(
-                                    _arrowBuilders[i].get())->Append(
-                                        reinterpret_cast<const char*>(
-                                            value.data()),
-                                        value.size()));
-                        }
-                        bytesCount += _inputSizes[i] + value.size();
-
-                        // Store coordinates in the buffer
-                        if (!_attsOnly && i == 0 )
-                        {
-                            Coordinates const &coords = citer->getPosition();
-                            for (size_t j = 0; j < _nDims; ++j)
-                            {
-                                _dimsValues[j].push_back(coords[j]);
-                                bytesCount += 8;
-                            }
-                        }
-
-                        ++(*citer);
-                    }
-                    break;
-                }
-                case TE_STRING:
-                {
-                    // TODO Use Append(vector<... when 0.10.0 is
-                    // released due to ARROW-2351 and ARROW-2388
-                    while (!citer->end())
-                    {
-                        Value const& value = citer->getItem();
-                        if(value.isNull())
-                        {
-                            THROW_NOT_OK(
-                                static_cast<arrow::StringBuilder*>(
-                                    _arrowBuilders[i].get())->AppendNull());
-                        }
-                        else
-                        {
-                            THROW_NOT_OK(
-                                static_cast<arrow::StringBuilder*>(
-                                    _arrowBuilders[i].get())->Append(
-                                        value.getString()));
-                        }
-                        bytesCount += _inputSizes[i] + value.size();
-
-                        // Store coordinates in the buffer
-                        if (!_attsOnly && i == 0 )
-                        {
-                            Coordinates const &coords = citer->getPosition();
-                            for (size_t j = 0; j < _nDims; ++j)
-                            {
-                                _dimsValues[j].push_back(coords[j]);
-                                bytesCount += 8;
-                            }
-                        }
-
-                        ++(*citer);
-                    }
-                    break;
-                }
-                case TE_CHAR:
-                {
-                    // TODO Use Append(vector<... when 0.10.0 is
-                    // released due to ARROW-2351 and ARROW-2388
-                    while (!citer->end())
-                    {
-                        Value const& value = citer->getItem();
-                        if(value.isNull())
-                        {
-                            THROW_NOT_OK(
-                                static_cast<arrow::StringBuilder*>(
-                                    _arrowBuilders[i].get())->AppendNull());
-                        }
-                        else
-                        {
-                            THROW_NOT_OK(
-                                static_cast<arrow::StringBuilder*>(
-                                    _arrowBuilders[i].get())->Append(
-                                        string(1, value.getChar())));
-                        }
-                        bytesCount += _inputSizes[i] + value.size();
-
-                        // Store coordinates in the buffer
-                        if (!_attsOnly && i == 0 )
-                        {
-                            Coordinates const &coords = citer->getPosition();
-                            for (size_t j = 0; j < _nDims; ++j)
-                            {
-                                _dimsValues[j].push_back(coords[j]);
-                                bytesCount += 8;
-                            }
-                        }
-
-                        ++(*citer);
-                    }
-                    break;
-                }
-                case TE_BOOL:
-                {
-                    populateCell<bool,
-                                 arrow::BooleanBuilder>(citer,
-                                                        &Value::getBool,
-                                                        i,
-                                                        bytesCount);
-                    break;
-                }
-                case TE_DATETIME:
-                {
-                    populateCell<int64_t,
-                                 arrow::Date64Builder>(citer,
-                                                       &Value::getDateTime,
-                                                       i,
-                                                       bytesCount);
-                    break;
-                }
-                case TE_DOUBLE:
-                {
-                    populateCell<double,
-                                 arrow::DoubleBuilder>(citer,
-                                                       &Value::getDouble,
-                                                       i,
-                                                       bytesCount);
-                    break;
-                }
-                case TE_FLOAT:
-                {
-                    populateCell<float,
-                                 arrow::FloatBuilder>(citer,
-                                                      &Value::getFloat,
-                                                      i,
-                                                      bytesCount);
-                    break;
-                }
-                case TE_INT8:
-                {
-                    populateCell<int8_t,
-                                 arrow::Int8Builder>(citer,
-                                                     &Value::getInt8,
-                                                     i,
-                                                     bytesCount);
-                    break;
-                }
-                case TE_INT16:
-                {
-                    populateCell<int16_t,
-                                 arrow::Int16Builder>(citer,
-                                                      &Value::getInt16,
-                                                      i,
-                                                      bytesCount);
-                    break;
-                }
-                case TE_INT32:
-                {
-                    populateCell<int32_t,
-                                 arrow::Int32Builder>(citer,
-                                                      &Value::getInt32,
-                                                      i,
-                                                      bytesCount);
-                    break;
-                }
-                case TE_INT64:
-                {
-                    populateCell<int64_t,
-                                 arrow::Int64Builder>(citer,
-                                                      &Value::getInt64,
-                                                      i,
-                                                      bytesCount);
-                    break;
-                }
-                case TE_UINT8:
-                {
-                    populateCell<uint8_t,
-                                 arrow::UInt8Builder>(citer,
-                                                      &Value::getUint8,
-                                                      i,
-                                                      bytesCount);
-                    break;
-                }
-                case TE_UINT16:
-                {
-                    populateCell<uint16_t,
-                                 arrow::UInt16Builder>(citer,
-                                                       &Value::getUint16,
-                                                       i,
-                                                       bytesCount);
-                    break;
-                }
-                case TE_UINT32:
-                {
-                    populateCell<uint32_t,
-                                 arrow::UInt32Builder>(citer,
-                                                       &Value::getUint32,
-                                                       i,
-                                                       bytesCount);
-                    break;
-                }
-                case TE_UINT64:
-                {
-                    populateCell<uint64_t,
-                                 arrow::UInt64Builder>(citer,
-                                                       &Value::getUint64,
-                                                       i,
-                                                       bytesCount);
-                    break;
-                }
-                default:
-                {
-                    ostringstream error;
-                    error << "Type "
-                          << _attrs[i].getType()
-                          << " not supported in arrow format";
-                    throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION) << error.str();
-                }
-                }
-
-                if (i == 0)
-                {
-                    ++nCells;
-
-                    // Store coordinates in Arrow arrays
-                    if (!_attsOnly)
-                    {
-                        for (size_t j = 0; j < _nDims; ++j)
-                        {
-                            THROW_NOT_OK(
-                                static_cast<arrow::Int64Builder*>(
-                                    _arrowBuilders[nAttrs + j].get()
-                                    )->AppendValues(_dimsValues[j]));
-                        }
-                    }
-                }
-            }
-
-            cursor.advanceChunkIters();
-        }
-
-        // Finalize Arrow Builders and populate Arrow Arrays (resets builders)
-        for (size_t i = 0; i < nAttrs + (_attsOnly ? 0 : _nDims); ++i)
-        {
-            THROW_NOT_OK(
-                _arrowBuilders[i]->Finish(&_arrowArrays[i])); // Resets builder
-        }
-
-        // Create Arrow Record Batch
-        std::shared_ptr<arrow::RecordBatch> arrowBatch;
-        arrowBatch = arrow::RecordBatch::Make(
-            _arrowSchema, nCells, _arrowArrays);
-
-        // Stream Arrow Record Batch to Arrow Pool Buffer using Arrow Record
-        // Batch Writer and Arrow Buffer Output Stream
-        std::shared_ptr<arrow::PoolBuffer> arrowBuffer(
-            new arrow::PoolBuffer(_arrowPool));
-        // std::shared_ptr<arrow::PoolBuffer> arrowBuffer =
-        //   make_shared<arrow::PoolBuffer>(_arrowPool);
-        arrow::io::BufferOutputStream arrowStream(arrowBuffer);
-        std::shared_ptr<arrow::ipc::RecordBatchWriter> arrowWriter;
-        THROW_NOT_OK(
-            arrow::ipc::RecordBatchStreamWriter::Open(
-                &arrowStream, _arrowSchema, &arrowWriter));
-        THROW_NOT_OK(
-            arrowWriter->WriteRecordBatch(*arrowBatch));
-        THROW_NOT_OK(arrowWriter->Close());
-        THROW_NOT_OK(arrowStream.Close());
-
-        // Copy data to Mem Chunk Builder
-        builder.addData(reinterpret_cast<const char*>(arrowBuffer->data()),
-                        arrowBuffer->size());
-    }
-
-private:
-    template <typename SciDBType,
-              typename ArrowBuilder,
-              typename ValueFunc> inline
-    void populateCell(shared_ptr<ConstChunkIterator> citer,
-                      ValueFunc valueGetter,
-                      const size_t i,
-                      size_t &bytesCount)
-    {
-        vector<SciDBType> values;
-        vector<bool> is_valid;
-
-        while (!citer->end())
-        {
-            Value const& value = citer->getItem();
-            if(value.isNull())
-            {
-                values.push_back(0);
-                is_valid.push_back(false);
-            }
-            else
-            {
-                values.push_back((value.*valueGetter)());
-                is_valid.push_back(true);
-            }
-            bytesCount += _inputSizes[i];
-
-            // Store coordinates in the buffer
-            if (!_attsOnly && i == 0 )
-            {
-                Coordinates const &coords = citer->getPosition();
-                for (size_t j = 0; j < _nDims; ++j)
-                {
-                    _dimsValues[j].push_back(coords[j]);
-                    bytesCount += 8;
-                }
-            }
-
-            ++(*citer);
-        }
-
-        THROW_NOT_OK(
-            static_cast<ArrowBuilder*>(
-                _arrowBuilders[i].get())->Append(values, is_valid));
     }
 };
 
@@ -1295,7 +666,6 @@ public:
 };
 
 typedef ConversionArray <BinaryChunkPopulator> BinaryConvertedArray;
-typedef ConversionArray <ArrowChunkPopulator>  ArrowConvertedArray;
 typedef ConversionArray <TextChunkPopulator>   TextConvertedArray;
 
 struct AwIoError
@@ -1420,127 +790,14 @@ uint64_t saveToDisk(shared_ptr<Array> const& array,
     return 0;
 }
 
-uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
-                         string fileName,
-                         std::shared_ptr<Query> const& query,
-                         bool const append,
-                         AioSaveSettings const& settings,
-                         ArrayDesc const& inputSchema)
-{
-    EXCEPTION_ASSERT(array->getArrayDesc().getAttributes(true).size()==1);
-
-    LOG4CXX_DEBUG(logger, "ALT_SAVE>> opening file");
-    std::shared_ptr<arrow::io::OutputStream> arrowStream;
-    if (fileName == "console" || fileName == "stdout")
-    {
-        arrowStream.reset(new arrow::io::StdoutStream());
-    }
-    else if (fileName == "stderr")
-    {
-        arrowStream.reset(new arrow::io::StderrStream());
-    }
-    else
-    {
-        std::shared_ptr<arrow::io::FileOutputStream> arrowFile;
-        auto arrowStatus = arrow::io::FileOutputStream::Open(
-            fileName, append, &arrowFile);
-        if (!arrowStatus.ok())
-        {
-            auto str = arrowStatus.ToString().c_str();
-            int code = (int)arrowStatus.code();
-            LOG4CXX_DEBUG(logger, "Attempted to open output file '" << fileName << "' failed: " << str << " (" << code << ")");
-            throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_CANT_OPEN_FILE)
-                 << fileName << str << code;
-        }
-        arrowStream = arrowFile;
-        // TODO: is file lock necessary?
-    }
-
-    LOG4CXX_DEBUG(logger, "ALT_SAVE>> starting write");
-    std::shared_ptr<arrow::ipc::RecordBatchWriter> arrowWriter;
-    std::shared_ptr<arrow::RecordBatch> arrowBatch;
-    std::shared_ptr<arrow::RecordBatchReader> arrowReader;
-    size_t bytesWritten = 0;
-    try
-    {
-        std::shared_ptr<arrow::Schema> arrowSchema = attributes2ArrowSchema(
-            inputSchema, settings.isAttsOnly());
-        THROW_NOT_OK_FILE(
-            arrow::ipc::RecordBatchStreamWriter::Open(
-                arrowStream.get(), arrowSchema, &arrowWriter));
-
-        shared_ptr<ConstArrayIterator> arrayIter = array->getConstIterator(0);
-        for (size_t n = 0; !arrayIter->end(); n++)
-        {
-            ConstChunk const& ch = arrayIter->getChunk();
-            PinBuffer scope(ch);
-            uint32_t* sizePointer = (uint32_t*) (((char*)ch.getConstData()) +
-                                                 AioSaveSettings::chunkSizeOffset());
-            uint32_t size = *sizePointer;
-            bytesWritten += size;
-            char* data = ((char*)ch.getConstData() + AioSaveSettings::chunkDataOffset());
-
-            arrow::io::BufferReader arrowBufferReader(
-                reinterpret_cast<const uint8_t*>(data), size); // zero copy
-
-            // Read Record Batch
-            // THROW_NOT_OK(
-            //     arrow::ipc::ReadRecordBatch(
-            //         arrowSchema, &arrowBufferReader, &arrowBatch));
-
-            // Read Record Batch using Stream Reader
-            THROW_NOT_OK(
-                arrow::ipc::RecordBatchStreamReader::Open(
-                    &arrowBufferReader, &arrowReader));
-            THROW_NOT_OK(arrowReader->ReadNext(&arrowBatch));
-
-            // Write Record Batch to stream
-            THROW_NOT_OK_FILE(
-                arrowWriter->WriteRecordBatch(*arrowBatch));
-
-            ++(*arrayIter);
-        }
-    }
-    catch (AwIoError& e)
-    {
-        if (arrowWriter != nullptr)
-        {
-            arrowWriter->Close();
-        }
-        if (fileName == "console" || fileName == "stdout" || fileName == "stderr")
-        {
-            arrowStream->Flush();
-        }
-        else
-        {
-            arrowStream->Close();
-        }
-        throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR)
-            << ::strerror(e.error) << e.error;
-    }
-
-    LOG4CXX_DEBUG(logger, "ALT_SAVE>> wrote "<< bytesWritten<< " bytes, closing");
-    THROW_NOT_OK_FILE(arrowWriter->Close());
-    if (fileName == "console" || fileName == "stdout" || fileName == "stderr")
-    {
-        THROW_NOT_OK_FILE(arrowStream->Flush());
-    }
-    else
-    {
-        THROW_NOT_OK_FILE(arrowStream->Close());
-    }
-    LOG4CXX_DEBUG(logger, "ALT_SAVE>> closed")
-    return 0;
-}
-
 
 class PhysicalAioSave : public PhysicalOperator
 {
 public:
     PhysicalAioSave(std::string const& logicalName,
-                    std::string const& physicalName,
-                    Parameters const& parameters,
-                    ArrayDesc const& schema):
+                  std::string const& physicalName,
+                  Parameters const& parameters,
+                   ArrayDesc const& schema):
         PhysicalOperator(logicalName, physicalName, parameters, schema)
     {}
 
@@ -1602,10 +859,6 @@ public:
         {
             outArray.reset(new BinaryConvertedArray(_schema, input, query, settings));
         }
-        else if(settings.isArrowFormat())
-        {
-            outArray.reset(new ArrowConvertedArray(_schema, input, query, settings));
-        }
         else
         {
             outArray.reset(new TextConvertedArray(_schema, input, query, settings));
@@ -1619,16 +872,7 @@ public:
             if(thisInstanceSavesData)
             {
                 string const& path = iter->second;
-                if (settings.isArrowFormat())
-                {
-                    saveToDiskArrow(
-                        outArray, path, query, false, settings, inputSchema);
-                }
-                else
-                {
-                    saveToDisk(
-                        outArray, path, query, false, settings, inputSchema);
-                }
+                saveToDisk(outArray, path, query, false, settings, inputSchema);
             }
             return shared_ptr<Array>(new MemArray(_schema, query));
         }
@@ -1643,16 +887,7 @@ public:
         if (thisInstanceSavesData)
         {
             string const& path = iter->second;
-            if (settings.isArrowFormat())
-            {
-                saveToDiskArrow(
-                    outArrayRedist, path, query, false, settings, inputSchema);
-            }
-            else
-            {
-                saveToDisk(
-                    outArrayRedist, path, query, false, settings, inputSchema);
-            }
+            saveToDisk(outArrayRedist, path, query, false, settings, inputSchema);
         }
         if (wasConverted)
         {
@@ -1664,5 +899,6 @@ public:
 };
 
 REGISTER_PHYSICAL_OPERATOR_FACTORY(PhysicalAioSave, "aio_save", "PhysicalAioSave");
+
 
 } // end namespace scidb

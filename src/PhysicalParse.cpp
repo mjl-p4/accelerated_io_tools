@@ -23,7 +23,7 @@
 * END_COPYRIGHT
 */
 
-#include <limits>
+#define LEGACY_API
 #include <limits>
 #include <sstream>
 
@@ -215,6 +215,15 @@ public:
     virtual bool changesDistribution(std::vector<ArrayDesc> const&) const
     {
         return true;
+    }
+
+    /// @see OperatorDist
+    DistType inferSynthesizedDistType(std::vector<DistType> const& /*inDist*/, size_t /*depth*/) const override
+    {
+        std::vector<RedistributeContext> emptyRC;
+        std::vector<ArrayDesc> emptyAD;
+        auto context = getOutputDistribution(emptyRC, emptyAD); // avoiding duplication of logic
+        return context.getArrayDistribution()->getPartitioningSchema();
     }
 
     virtual RedistributeContext getOutputDistribution(

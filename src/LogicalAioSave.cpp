@@ -36,21 +36,21 @@ public:
     LogicalAioSave(const std::string& logicalName, const std::string& alias):
         LogicalOperator(logicalName, alias)
     {
-        ADD_PARAM_INPUT();
-        ADD_PARAM_VARIES();
     }
 
-    //unparse(array,'format=tsv','lines_per_chunk=10')
-    //returns <val:string> [iid=0:*,1,0 chunk=0:*,1,0]
-    std::vector<shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    static PlistSpec const* makePlistSpec()
     {
-        std::vector<shared_ptr<OperatorParamPlaceholder> > res;
-        res.push_back(END_OF_VARIES_PARAMS());
-        if (_parameters.size() < AioSaveSettings::MAX_PARAMETERS)
-        {
-            res.push_back(PARAM_CONSTANT("string"));
-        }
-        return res;
+        static PlistSpec argSpec {
+            { "", // positionals
+              RE(RE::LIST, {
+                 RE(PP(PLACEHOLDER_INPUT)),
+                 RE(RE::STAR, {
+                    RE(PP(PLACEHOLDER_CONSTANT, TID_STRING))
+                 })
+              })
+            }
+        };
+        return &argSpec;
     }
 
     ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, shared_ptr< Query> query)
@@ -62,7 +62,7 @@ public:
         dimensions[0] = DimensionDesc("chunk_no",    0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
         dimensions[1] = DimensionDesc("dest_instance_id",   0, 0, nInstances-1, nInstances-1, 1, 0);
         dimensions[2] = DimensionDesc("source_instance_id", 0, 0, nInstances-1, nInstances-1, 1, 0);
-        vector<AttributeDesc> attributes;
+        Attributes attributes;
         attributes.push_back(AttributeDesc((AttributeID)0, "val", TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
         return ArrayDesc("aio_save", attributes, dimensions, createDistribution(defaultPartitioning()), query->getDefaultArrayResidency());
     }
