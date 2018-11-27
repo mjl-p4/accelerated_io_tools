@@ -1380,6 +1380,12 @@ uint64_t saveToDisk(shared_ptr<Array> const& array,
             uint32_t* sizePointer = (uint32_t*) (((char*)ch.getConstData()) + AioSaveSettings::chunkSizeOffset());
             uint32_t size = *sizePointer;
             bytesWritten += size;
+            if (bytesWritten >= settings.getFileSzLimit())
+            {
+                int err = errno ? errno : EIO;
+                LOG4CXX_INFO(logger, "Attempting to write " << bytesWritten << " bytes to " << file << "  when limit is " << settings.getFileSzLimit());
+                throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR) << "Exceeding specified file size limit of" << settings.getFileSzLimit();
+            }
             char* data = ((char*)ch.getConstData() + AioSaveSettings::chunkDataOffset());
             if (::fwrite(data, 1, size, f) != size)
             {
@@ -1478,6 +1484,11 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
                                                  AioSaveSettings::chunkSizeOffset());
             uint32_t size = *sizePointer;
             bytesWritten += size;
+            if (bytesWritten >= settings.getFileSzLimit())
+            {
+                LOG4CXX_INFO(logger, "Attempted to write " << bytesWritten << " bytes to '" << fileName << "' which is over specified limit.");
+                throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR) << "Exceeding specified file size limit of" << settings.getFileSzLimit();
+            }
             char* data = ((char*)ch.getConstData() + AioSaveSettings::chunkDataOffset());
 
             arrow::io::BufferReader arrowBufferReader(
