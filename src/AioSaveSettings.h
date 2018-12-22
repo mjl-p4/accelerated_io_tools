@@ -123,7 +123,7 @@ public:
         bool  lineDelimiterSet      = false;
         bool  formatSet             = false;
         bool  nullPatternSet        = false;
-        bool  fileSzLimitSet     = false;
+        bool  fileSzLimitSet        = false;
         bool  usingCsvPlus          = false;
         if(_precision <= 0)
         {//correct for an unfortunate configuration problem that may arise
@@ -446,7 +446,7 @@ public:
             {
                 if (fileSzLimitSet)
                 {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set tmp_sz_limit multiple times";
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set file_limit multiple times";
                 }
                 string paramContent = parameterString.substr(fileSzLimitHeader.size());
                 trim(paramContent);
@@ -455,12 +455,12 @@ public:
                     _fileSzLimit = lexical_cast<int64_t>(paramContent);
                     if(_fileSzLimit < 0)
                     {
-                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "tmp_sz_limit must be positive";
+                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "file_limit must be positive";
                     }
                 }
                 catch (bad_lexical_cast const& exn)
                 {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse tmp_sz_limit";
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse file_limit";
                 }
                 fileSzLimitSet = true;
             }
