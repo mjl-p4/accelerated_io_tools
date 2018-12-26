@@ -78,7 +78,7 @@ private:
     bool                        _writeHeader;
     int32_t                     _precision;
     bool                        _attsOnly;
-    int64_t                     _fileSzLimit;
+    int64_t                     _resultSizeLimit;
 
 public:
     static const size_t MAX_PARAMETERS = 6;
@@ -101,7 +101,7 @@ public:
                 _writeHeader(false),
                 _precision(std::numeric_limits<double>::digits10),
                 _attsOnly(true),
-                _fileSzLimit(-1)
+                _resultSizeLimit(-1)
     {
         string const bufferSizeHeader              = "buffer_size=";
         string const cellsPerChunkHeader           = "cells_per_chunk=";
@@ -115,7 +115,7 @@ public:
         string const nullPatternHeader             = "null_pattern=";
         string const precisionHeader               = "precision=";
         string const attsOnlyHeader                = "atts_only=";
-        string const fileSzLimitHeader             = "file_limit=";
+        string const resultSizeLimitHeader         = "result_size_limit=";
         size_t const nParams = operatorParameters.size();
         bool  cellsPerChunkSet      = false;
         bool  bufferSizeSet         = false;
@@ -123,7 +123,7 @@ public:
         bool  lineDelimiterSet      = false;
         bool  formatSet             = false;
         bool  nullPatternSet        = false;
-        bool  fileSzLimitSet        = false;
+        bool  resultSizeLimitSet    = false;
         bool  usingCsvPlus          = false;
         if(_precision <= 0)
         {//correct for an unfortunate configuration problem that may arise
@@ -442,18 +442,18 @@ public:
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse atts_only";
                 }
                 attsOnlySet = true;
-            } else if (starts_with(parameterString, fileSzLimitHeader))
+            } else if (starts_with(parameterString, resultSizeLimitHeader))
             {
-                if (fileSzLimitSet)
+                if (resultSizeLimitSet)
                 {
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set file_limit multiple times";
                 }
-                string paramContent = parameterString.substr(fileSzLimitHeader.size());
+                string paramContent = parameterString.substr(resultSizeLimitHeader.size());
                 trim(paramContent);
                 try
                 {
-                    _fileSzLimit = lexical_cast<int64_t>(paramContent);
-                    if(_fileSzLimit < 0)
+                    _resultSizeLimit = lexical_cast<int64_t>(paramContent);
+                    if(_resultSizeLimit < 0)
                     {
                         throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "file_limit must be positive";
                     }
@@ -462,7 +462,7 @@ public:
                 {
                     throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse file_limit";
                 }
-                fileSzLimitSet = true;
+                resultSizeLimitSet = true;
             }
             else
             {
@@ -612,10 +612,10 @@ public:
         return _precision;
     }
 
-    int64_t getFileSzLimit() const
+    int64_t getResultSizeLimit() const
     {
-        int64_t retVal = _fileSzLimit;
-        if (_fileSzLimit > -1) {
+        int64_t retVal = _resultSizeLimit;
+        if (_resultSizeLimit > -1) {
             retVal = retVal * 1024 * 1024;
         }
         return retVal;
