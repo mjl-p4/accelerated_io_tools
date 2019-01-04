@@ -615,9 +615,9 @@ public:
         return _precision;
     }
 
-    int64_t getFileSzLimit() const
+    size_t getFileSzLimit() const
     {
-        int64_t retVal = _fileSzLimit;
+        size_t retVal = _fileSzLimit;
         if (_fileSzLimit > -1) {
             retVal = retVal * 1024 * 1024;
         }

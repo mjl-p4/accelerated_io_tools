@@ -57,8 +57,8 @@ public:
         ArrayDesc const& inputSchema = schemas[0];
         Attributes inputAttributes = inputSchema.getAttributes(true);
         if (inputAttributes.size() != 1 ||
-            inputAttributes[0].getType() != TID_STRING ||
-            inputAttributes[0].getFlags() != 0)
+            inputAttributes.firstDataAttribute().getType() != TID_STRING ||
+            inputAttributes.firstDataAttribute().getFlags() != 0)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "input to parse must have a single, non-nullable string attribute";
         }
@@ -83,7 +83,7 @@ public:
         if (settings.getSplitOnDimension())
         {   //add 1 for the error column
             dimensions.push_back(DimensionDesc("attribute_no", 0, 0, numRequestedAttributes, numRequestedAttributes, numRequestedAttributes+1, 0));
-            attributes.push_back(AttributeDesc(0, "a", TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
+            attributes.push_back(AttributeDesc("a", TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
         }
         else
         {
@@ -92,9 +92,9 @@ public:
                 ostringstream attname;
                 attname<<"a";
                 attname<<i;
-                attributes.push_back(AttributeDesc((AttributeID)i, attname.str(),  TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
+                attributes.push_back(AttributeDesc(attname.str(),  TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
             }
-            attributes.push_back(AttributeDesc((AttributeID)numRequestedAttributes, "error", TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
+            attributes.push_back(AttributeDesc("error", TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
         }
         attributes.addEmptyTagAttribute();
 

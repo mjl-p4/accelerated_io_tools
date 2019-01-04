@@ -179,9 +179,11 @@ public:
         _inputArrayIters(_nAttrs, 0),
         _inputChunkIters(_nAttrs, 0)
     {
-        for(size_t i =0; i<_nAttrs; ++i)
+        const auto& inputSchemaAttrs = input->getArrayDesc().getAttributes(true);
+//        for(size_t i =0; i<_nAttrs; ++i)
+        for (const auto& attr : inputSchemaAttrs)
         {
-            _inputArrayIters[i] = _input->getConstIterator(i);
+            _inputArrayIters[attr.getId()] = _input->getConstIterator(attr);
         }
         if (_inputArrayIters[0]->end())
         {
@@ -418,36 +420,37 @@ public:
        _nanRepresentation("nan")
     {
         Attributes const& inputAttrs = inputArrayDesc.getAttributes(true);
-        for (size_t i = 0; i < inputAttrs.size(); ++i)
+        for (const auto& attr : inputAttrs)
+//        for (size_t i = 0; i < inputAttrs.size(); ++i)
         {
-            if(inputAttrs[i].getType() == TID_STRING)
+            if(attr.getType() == TID_STRING)
             {
-                _attTypes[i] = STRING;
+                _attTypes[attr.getId()] = STRING;
             }
-            else if(inputAttrs[i].getType() == TID_BOOL)
+            else if(attr.getType() == TID_BOOL)
             {
-                _attTypes[i] = BOOL;
+                _attTypes[attr.getId()] = BOOL;
             }
-            else if(inputAttrs[i].getType() == TID_DOUBLE)
+            else if(attr.getType() == TID_DOUBLE)
             {
-                _attTypes[i] = DOUBLE;
+                _attTypes[attr.getId()] = DOUBLE;
             }
-            else if(inputAttrs[i].getType() == TID_FLOAT)
+            else if(attr.getType() == TID_FLOAT)
             {
-                _attTypes[i] = FLOAT;
+                _attTypes[attr.getId()] = FLOAT;
             }
-            else if(inputAttrs[i].getType() == TID_UINT8)
+            else if(attr.getType() == TID_UINT8)
             {
-                _attTypes[i] = UINT8;
+                _attTypes[attr.getId()] = UINT8;
             }
-            else if(inputAttrs[i].getType() == TID_INT8)
+            else if(attr.getType() == TID_INT8)
             {
-                _attTypes[i] = INT8;
+                _attTypes[attr.getId()] = INT8;
             }
             else
             {
-                _converters[i] = FunctionLibrary::getInstance()->findConverter(
-                    inputAttrs[i].getType(),
+                _converters[attr.getId()] = FunctionLibrary::getInstance()->findConverter(
+                    attr.getType(),
                     TID_STRING,
                     false);
             }
@@ -731,18 +734,20 @@ uint64_t saveToDisk(shared_ptr<Array> const& array,
                     header<<inputSchema.getDimensions()[i].getBaseName();
                 }
             }
-            for(size_t i =0; i<inputSchema.getAttributes(true).size(); ++i)
+            size_t i = 0;
+            for (const auto& attr : inputSchema.getAttributes(true))
             {
                 if(i || settings.printCoordinates())
                 {
                     header<<settings.getAttributeDelimiter();
                 }
-                header<<inputSchema.getAttributes(true)[i].getName();
+                header<<attr.getName();
+                i++;
             }
             header<<settings.getLineDelimiter();
             ::fprintf(f, "%s", header.str().c_str());
         }
-        shared_ptr<ConstArrayIterator> arrayIter = array->getConstIterator(0);
+        shared_ptr<ConstArrayIterator> arrayIter = array->getConstIterator(inputSchema.getAttributes(true).firstDataAttribute());
         for (size_t n = 0; !arrayIter->end(); n++)
         {
             ConstChunk const& ch = arrayIter->getChunk();
@@ -820,9 +825,9 @@ public:
         return true;
     }
 
-    bool haveChunk(shared_ptr<Array>& input)
+    bool haveChunk(shared_ptr<Array>& input, ArrayDesc const& schema)
     {
-        shared_ptr<ConstArrayIterator> iter = input->getConstIterator(0);
+        shared_ptr<ConstArrayIterator> iter = input->getConstIterator(schema.getAttributes(true).firstDataAttribute());
         return !(iter->end());
     }
 
@@ -872,7 +877,7 @@ public:
         InstanceID const myInstanceID = query->getInstanceID();
         map<InstanceID, string>::const_iterator iter = settings.getInstanceMap().find(myInstanceID);
         bool thisInstanceSavesData = (iter != settings.getInstanceMap().end());
-        if(singleChunk && agreeOnBoolean((thisInstanceSavesData == haveChunk(input)), query))
+        if(singleChunk && agreeOnBoolean((thisInstanceSavesData == haveChunk(input, inputSchema)), query))
         {
             LOG4CXX_DEBUG(logger, "ALT_SAVE>> single-chunk path")
             if(thisInstanceSavesData)

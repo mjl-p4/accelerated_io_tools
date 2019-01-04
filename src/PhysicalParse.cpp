@@ -76,9 +76,10 @@ public:
         _attributeDelimiter(attDelimiter)
     {
 
-        for(AttributeID i =0; i<_numLiveAttributes; ++i)
+//        for(AttributeID i =0; i<_numLiveAttributes; ++i)
+        for (const auto& attr : schema.getAttributes(/*excludeEbm:*/true))
         {
-            _outputArrayIterators[i] = _output->getIterator(i);
+            _outputArrayIterators[attr.getId()] = _output->getIterator(attr);
         }
     }
 
@@ -239,11 +240,15 @@ public:
         ParseSettings settings (_parameters, false, query);
         OutputWriter writer(_schema, query, settings.getSplitOnDimension(), settings.getAttributeDelimiter());
         shared_ptr<Array>& input = inputArrays[0];
-        shared_ptr<ConstArrayIterator> inputIterator = input->getConstIterator(0);
+//        shared_ptr<ConstArrayIterator> inputIterator = input->getConstIterator(0);
         size_t const outputChunkSize = _schema.getDimensions()[2].getChunkInterval();
         char const attDelim = settings.getAttributeDelimiter();
         char const lineDelim = settings.getLineDelimiter();
+        const auto& inputSchemaAttrs = _schema.getAttributes();
+        shared_ptr<ConstArrayIterator> inputIterator = input->getConstIterator(inputSchemaAttrs.firstDataAttribute());
+
         while(!inputIterator-> end())
+//        for (const auto& attr : inputSchemaAttrs)
         {
             Coordinates const& pos = inputIterator->getPosition();
             shared_ptr<ConstChunkIterator> inputChunkIterator = inputIterator->getChunk().getConstIterator();

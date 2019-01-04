@@ -64,7 +64,7 @@ public:
         if (settings.getSplitOnDimension())
         {   //add 1 for the error column
             dimensions.push_back(DimensionDesc("attribute_no", 0, 0, numRequestedAttributes, numRequestedAttributes, numRequestedAttributes+1, 0));
-            attributes.push_back(AttributeDesc(0, "a", TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
+            attributes.push_back(AttributeDesc("a", TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
         }
         else
         {
@@ -73,9 +73,9 @@ public:
                 ostringstream attname;
                 attname<<"a";
                 attname<<i;
-                attributes.push_back(AttributeDesc((AttributeID)i, attname.str(),  TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
+                attributes.push_back(AttributeDesc(attname.str(),  TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
             }
-            attributes.push_back(AttributeDesc((AttributeID)numRequestedAttributes, "error", TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
+            attributes.push_back(AttributeDesc("error", TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
         }
         attributes.addEmptyTagAttribute();
         return ArrayDesc("aio_input", attributes, dimensions, createDistribution(psUndefined), query->getDefaultArrayResidency());

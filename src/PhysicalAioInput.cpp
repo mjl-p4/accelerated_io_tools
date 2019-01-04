@@ -257,9 +257,13 @@ public:
         _attributeDelimiter(attDelimiter),
         _buf(_outputLineSize-1)
     {
-        for(AttributeID i =0; i<_numLiveAttributes; ++i)
+/*        for(AttributeID i =0; i<_numLiveAttributes; ++i)
         {
             _outputArrayIterators[i] = _output->getIterator(i);
+            }*/
+        for (const auto& attr : schema.getAttributes(/*excludeEbm:*/true))
+        {
+            _outputArrayIterators[attr.getId()] = _output->getIterator(attr);
         }
     }
 
@@ -398,7 +402,7 @@ public:
         dimensions[1] = DimensionDesc("dst_instance_id",    0, 0, nInstances-1, nInstances-1, 1, 0);
         dimensions[2] = DimensionDesc("src_instance_id",    0, 0, nInstances-1, nInstances-1, 1, 0);
         Attributes attributes;
-        attributes.push_back(AttributeDesc((AttributeID)0, "value",  TID_BINARY, 0, CompressorType::NONE));
+        attributes.push_back(AttributeDesc("value",  TID_BINARY, 0, CompressorType::NONE));
         return ArrayDesc("aio_input", attributes, dimensions, createDistribution(defaultPartitioning()), query->getDefaultArrayResidency());
     }
 
@@ -435,8 +439,8 @@ public:
     {
         char const lineDelim = settings->getLineDelimiter();
         shared_ptr<Array> supplement(new MemArray(getSplitSchema(query), query));
-        shared_ptr<ConstArrayIterator> srcArrayIter = afterSplit->getConstIterator(0);
-        shared_ptr<ArrayIterator> dstArrayIter = supplement->getIterator(0);
+        shared_ptr<ConstArrayIterator> srcArrayIter = afterSplit->getConstIterator(getSplitSchema(query).getAttributes(true).firstDataAttribute());
+        shared_ptr<ArrayIterator> dstArrayIter = supplement->getIterator(getSplitSchema(query).getAttributes(true).firstDataAttribute());
         shared_ptr<ChunkIterator> dstChunkIter;
         size_t const nInstances = query->getInstancesCount();
         while(!srcArrayIter->end())
@@ -542,8 +546,8 @@ public:
                                                 ArrayResPtr(),
                                                 query,
                                                 shared_from_this());
-        shared_ptr<ConstArrayIterator> inputIterator = splitData->getConstIterator(0);
-        shared_ptr<ConstArrayIterator> supplementIter = supplement->getConstIterator(0);
+        shared_ptr<ConstArrayIterator> inputIterator = splitData->getConstIterator(getSplitSchema(query).getAttributes(true).firstDataAttribute());
+        shared_ptr<ConstArrayIterator> supplementIter = supplement->getConstIterator(getSplitSchema(query).getAttributes(true).firstDataAttribute());
         size_t const outputChunkSize = _schema.getDimensions()[0].getChunkInterval();
         char const attDelim = settings->getAttributeDelimiter();
         char const lineDelim = settings->getLineDelimiter();
