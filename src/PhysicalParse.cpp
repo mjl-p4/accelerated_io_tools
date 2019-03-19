@@ -224,7 +224,7 @@ public:
         std::vector<RedistributeContext> emptyRC;
         std::vector<ArrayDesc> emptyAD;
         auto context = getOutputDistribution(emptyRC, emptyAD); // avoiding duplication of logic
-        return context.getArrayDistribution()->getPartitioningSchema();
+        return context.getArrayDistribution()->getDistType();
     }
 
     virtual RedistributeContext getOutputDistribution(

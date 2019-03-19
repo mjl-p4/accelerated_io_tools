@@ -403,7 +403,7 @@ public:
         dimensions[2] = DimensionDesc("src_instance_id",    0, 0, nInstances-1, nInstances-1, 1, 0);
         Attributes attributes;
         attributes.push_back(AttributeDesc("value",  TID_BINARY, 0, CompressorType::NONE));
-        return ArrayDesc("aio_input", attributes, dimensions, createDistribution(defaultPartitioning()), query->getDefaultArrayResidency());
+        return ArrayDesc("aio_input", attributes, dimensions, createDistribution(defaultDistType()), query->getDefaultArrayResidency());
     }
 
     PhysicalAioInput(std::string const& logicalName,
@@ -432,7 +432,7 @@ public:
         std::vector<RedistributeContext> emptyRC;
         std::vector<ArrayDesc> emptyAD;
         auto context = getOutputDistribution(emptyRC, emptyAD); // avoiding duplication of logic
-        return context.getArrayDistribution()->getPartitioningSchema();
+        return context.getArrayDistribution()->getDistType();
     }
 
     shared_ptr<Array> makeSupplement(shared_ptr<Array>& afterSplit, shared_ptr<Query>& query, shared_ptr<AioInputSettings>& settings, vector<Coordinate>& lastBlocks)
@@ -533,7 +533,7 @@ public:
         }
 
         splitData = redistributeToRandomAccess(splitData,
-                                               createDistribution(psHashPartitioned),
+                                               createDistribution(dtHashPartitioned),
                                                ArrayResPtr(),
                                                query,
                                                shared_from_this());
@@ -542,7 +542,7 @@ public:
         shared_ptr<Array> supplement = makeSupplement(splitData, query, settings, lastBlocks);
         exchangeLastBlocks(lastBlocks, query);
         supplement = redistributeToRandomAccess(supplement,
-                                                createDistribution(psHashPartitioned),
+                                                createDistribution(dtHashPartitioned),
                                                 ArrayResPtr(),
                                                 query,
                                                 shared_from_this());

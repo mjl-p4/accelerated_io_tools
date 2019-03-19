@@ -64,7 +64,7 @@ public:
         dimensions[2] = DimensionDesc("source_instance_id", 0, 0, nInstances-1, nInstances-1, 1, 0);
         Attributes attributes;
         attributes.push_back(AttributeDesc("val", TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
-        return ArrayDesc("aio_save", attributes, dimensions, createDistribution(defaultPartitioning()), query->getDefaultArrayResidency());
+        return ArrayDesc("aio_save", attributes, dimensions, createDistribution(defaultDistType()), query->getDefaultArrayResidency());
     }
 };
 

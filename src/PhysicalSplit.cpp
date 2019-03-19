@@ -338,7 +338,7 @@ public:
             result = std::shared_ptr<EmptySinglePass>(new EmptySinglePass(_schema));
         }
         result = redistributeToRandomAccess(result,
-                                            createDistribution(psHashPartitioned),
+                                            createDistribution(dtHashPartitioned),
                                             ArrayResPtr(),
                                             query,
                                             shared_from_this());

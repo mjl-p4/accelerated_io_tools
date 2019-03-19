@@ -78,7 +78,7 @@ public:
             attributes.push_back(AttributeDesc("error", TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
         }
         attributes.addEmptyTagAttribute();
-        return ArrayDesc("aio_input", attributes, dimensions, createDistribution(psUndefined), query->getDefaultArrayResidency());
+        return ArrayDesc("aio_input", attributes, dimensions, createDistribution(dtUndefined), query->getDefaultArrayResidency());
     }
 };
 

@@ -98,7 +98,7 @@ public:
         }
         attributes.addEmptyTagAttribute();
 
-        return ArrayDesc("parse", attributes, dimensions, createDistribution(psUndefined), query->getDefaultArrayResidency());
+        return ArrayDesc("parse", attributes, dimensions, createDistribution(dtUndefined), query->getDefaultArrayResidency());
     }
 };
 

@@ -890,7 +890,7 @@ public:
         shared_ptr<Array> outArrayRedist;
         LOG4CXX_DEBUG(logger, "ALT_SAVE>> Starting SG")
         outArrayRedist = pullRedistribute(outArray,
-                                          createDistribution(psByCol),
+                                          createDistribution(dtByCol),
                                           ArrayResPtr(),
                                           query,
                                           shared_from_this());
