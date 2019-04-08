@@ -237,46 +237,46 @@ iquery -aq "op_count(bar)" >> $TEST_OUT
 
 echo "test aio_input 1"
 echo "test aio_input 1" >> $TEST_OUT
-time iquery -aq "aio_input('/tmp/load_tools_test/file1', 'num_attributes=3')" >> $TEST_OUT
+time iquery -aq "aio_input('/tmp/load_tools_test/file1', num_attributes:3)" >> $TEST_OUT
 
 echo "test aio_input 2"
 echo "test aio_input 2" >> $TEST_OUT
-time iquery -aq "sort(aio_input('/tmp/load_tools_test/file1', 'num_attributes=3', 'buffer_size=40'), a0)" >> $TEST_OUT
+time iquery -aq "sort(aio_input('/tmp/load_tools_test/file1', num_attributes:3, buffer_size:40), a0)" >> $TEST_OUT
 
 echo "test aio_input 3"
 echo "test aio_input 3" >> $TEST_OUT
 time iquery -aq "sort(aio_input(
-            'paths=/tmp/load_tools_test/file1;/tmp/load_tools_test/symlink1',
-            'instances=1;2',
-            'header=1',
-            'num_attributes=2',
-            'buffer_size=31'
+            paths:('/tmp/load_tools_test/file1', '/tmp/load_tools_test/symlink1'),
+            instances:(1,2),
+            header:1,
+            num_attributes:2,
+            buffer_size:31
             ),a0)" >> $TEST_OUT
 
 echo "test aio_input 4"
 echo "test aio_input 4" >> $TEST_OUT
 cat /tmp/load_tools_test/file2 > /tmp/load_tools_test/fifo1 &
 time iquery -aq "aio_input(
-            'paths=/tmp/load_tools_test/file1;/tmp/load_tools_test/symlink1;/tmp/load_tools_test/fifo1',
-            'instances=1;2;0',
-            'header=1',
-            'num_attributes=1'
+            paths:('/tmp/load_tools_test/file1','/tmp/load_tools_test/symlink1','/tmp/load_tools_test/fifo1'),
+            instances:(1,2,0),
+            header:1,
+            num_attributes:1
             )" >> $TEST_OUT
 
 echo "test aio_input 5"
 echo "test aio_input 5" >> $TEST_OUT
 time iquery -aq "sort(aio_input(
-            'paths=/tmp/load_tools_test/file1;/tmp/load_tools_test/file2;/tmp/load_tools_test/directory',
-            'instances=1;2;0',
-            'buffer_size=41',
-            'attribute_delimiter=,',
-            'num_attributes=3'
+            paths:('/tmp/load_tools_test/file1','/tmp/load_tools_test/file2','/tmp/load_tools_test/directory'),
+            instances:(1,2,0),
+            buffer_size:41,
+            attribute_delimiter:',',
+            num_attributes:3
             ), a0)" >> $TEST_OUT
 
 echo "test aio_input 6"
 echo "test aio_input 6" >> $TEST_OUT
 iquery -anq "remove(bar)" > /dev/null 2>&1
-time iquery -anq "store(project(filter(apply(aio_input('paths=foo.tsv', 'instances=-1', 'num_attributes=1'), v, dcast(a0, double(null))), v is not null), v), bar)" > /dev/null
+time iquery -anq "store(project(filter(apply(aio_input(paths:'foo.tsv', instances:-1, num_attributes:1), v, dcast(a0, double(null))), v is not null), v), bar)" > /dev/null
 iquery -aq "op_count(bar)" >> $TEST_OUT
 
 echo "test aio_save 1"

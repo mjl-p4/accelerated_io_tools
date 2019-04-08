@@ -45,14 +45,41 @@ public:
               RE(RE::STAR, {
                  RE(PP(PLACEHOLDER_CONSTANT, TID_STRING))
               })
-            }
+            },
+            { KW_PATHS, RE(RE::OR, {
+                           RE(PP(PLACEHOLDER_EXPRESSION, TID_STRING)),
+                           RE(RE::GROUP, {
+                              RE(PP(PLACEHOLDER_EXPRESSION, TID_STRING)),
+                              RE(RE::PLUS, {
+                                 RE(PP(PLACEHOLDER_EXPRESSION, TID_STRING))
+                              })
+                           })
+                        })
+            },
+            { KW_INSTANCES, RE(RE::OR, {
+                            RE(PP(PLACEHOLDER_EXPRESSION, TID_INT64)),
+                            RE(RE::GROUP, {
+                                   RE(PP(PLACEHOLDER_EXPRESSION, TID_INT64)),
+                                   RE(RE::PLUS, {
+                                      RE(PP(PLACEHOLDER_EXPRESSION, TID_INT64))
+                                   })
+                              })
+                           })
+            },
+            { KW_BUF_SZ, RE(PP(PLACEHOLDER_CONSTANT, TID_INT64)) },
+            { KW_HEADER, RE(PP(PLACEHOLDER_CONSTANT, TID_INT64)) },
+            { KW_LINE_DELIM, RE(PP(PLACEHOLDER_CONSTANT, TID_STRING)) },
+            { KW_ATTR_DELIM, RE(PP(PLACEHOLDER_CONSTANT, TID_STRING)) },
+            { KW_NUM_ATTR, RE(PP(PLACEHOLDER_CONSTANT, TID_INT64)) },
+            { KW_CHUNK_SZ, RE(PP(PLACEHOLDER_CONSTANT, TID_INT64)) },
+            { KW_SPLIT_ON_DIM, RE(PP(PLACEHOLDER_CONSTANT, TID_BOOL)) }
         };
         return &argSpec;
     }
 
     ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, shared_ptr< Query> query)
     {
-        AioInputSettings settings (_parameters, true, query);
+        AioInputSettings settings (_parameters, _kwParameters, true, query);
         size_t numRequestedAttributes = settings.getNumAttributes();
         size_t requestedChunkSize = settings.getChunkSize();
         size_t const nInstances = query->getInstancesCount();

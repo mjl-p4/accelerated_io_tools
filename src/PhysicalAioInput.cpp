@@ -521,7 +521,7 @@ public:
 
     shared_ptr< Array> execute(std::vector< shared_ptr< Array> >& inputArrays, shared_ptr<Query> query)
     {
-        shared_ptr<AioInputSettings> settings (new AioInputSettings(_parameters, false, query));
+        shared_ptr<AioInputSettings> settings (new AioInputSettings(_parameters, _kwParameters, false, query));
         shared_ptr<Array> splitData;
         if(settings->thisInstanceReadsData())
         {
