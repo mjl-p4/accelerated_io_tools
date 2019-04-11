@@ -283,7 +283,7 @@ echo "test aio_save 1"
 echo "test aio_save 1" >> $TEST_OUT
 iquery -naq "remove(foo)" > /dev/null 2>&1
 iquery -naq "store(apply(build(<v1:float null>[i=1:50,10,0], iif(i%2=0,null,i)), v2, double(i/10.4), v3, 'abcdef'), foo)" > /dev/null
-iquery -anq "aio_save(sort(foo,v1,v2,v3,25), 'paths=/tmp/load_tools_test/foo;/tmp/load_tools_test/foo2', 'instances=2;0', 'format=tdv', 'buffer_size=150')" >> $TEST_OUT
+iquery -anq "aio_save(sort(foo,v1,v2,v3,25), paths:('/tmp/load_tools_test/foo','/tmp/load_tools_test/foo2'), instances:(2,0), format:'tdv', buffer_size:150)" >> $TEST_OUT
 
 echo "create files /tmp/.../{foo,foo2}"
 echo "create files /tmp/.../{foo,foo2}" >> $TEST_OUT
@@ -294,7 +294,7 @@ echo "test aio_save 1A"
 echo "test aio_save 1A" >> $TEST_OUT
 iquery -naq "remove(foo)" > /dev/null 2>&1
 iquery -naq "store(apply(build(<v1:float null>[i=1:50,10,0], iif(i%2=0,null,i)), v2, double(i/10.4), v3, 'abcdef'), foo)" > /dev/null
-iquery -anq "aio_save(sort(foo,v1,v2,v3,25), 'paths=/tmp/load_tools_test/foo;/tmp/load_tools_test/foo2', 'instances=2;0', 'format=tdv', 'cells_per_chunk=3')" >> $TEST_OUT
+iquery -anq "aio_save(sort(foo,v1,v2,v3,25), paths:('/tmp/load_tools_test/foo','/tmp/load_tools_test/foo2'), instances:(2,0), format:'tdv', cells_per_chunk:3)" >> $TEST_OUT
 
 echo "create files /tmp/.../{foo,foo2}"
 echo "create files /tmp/.../{foo,foo2}" >> $TEST_OUT
@@ -304,38 +304,38 @@ iquery -aq "sort(input(foo, '/tmp/load_tools_test/foo2', 0, 'tsv'), v2)" >> $TES
 
 echo "test aio_save 2"
 echo "test aio_save 2" >> $TEST_OUT
-iquery -anq "aio_save(foo, '/tmp/load_tools_test/foo', 'format=(float null, double, string)', 'buffer_size=512')" >> $TEST_OUT
+iquery -anq "aio_save(foo, '/tmp/load_tools_test/foo', format:'(float null, double, string)', buffer_size:512)" >> $TEST_OUT
 #cat /tmp/load_tools_test/foo >> $TEST_OUT
 
 echo "test aio_save 3"
 echo "test aio_save 3" >> $TEST_OUT
 iquery -aq "sort(input(foo, '/tmp/load_tools_test/foo', 0, '(float null, double, string)'), v2)" >> $TEST_OUT
-iquery -anq "aio_save(between(sort(foo,v1,v2,v3), 0,9), 'paths=/tmp/load_tools_test/foo', 'instances=0', 'format=tdv', 'null_pattern=?%')" >> $TEST_OUT
+iquery -anq "aio_save(between(sort(foo,v1,v2,v3), 0,9), paths:'/tmp/load_tools_test/foo', instances:0, format:'tdv', null_pattern:'?%')" >> $TEST_OUT
 cat /tmp/load_tools_test/foo >> $TEST_OUT
 
 echo "test aio_save 4"
 echo "test aio_save 4" >> $TEST_OUT
-iquery -anq "aio_save(between(sort(foo,v1,v2,v3), 0,9), 'paths=/tmp/load_tools_test/foo', 'instances=0', 'format=tdv', 'null_pattern=NULL CODE %, BRUH')" >> $TEST_OUT
+iquery -anq "aio_save(between(sort(foo,v1,v2,v3), 0,9), paths:'/tmp/load_tools_test/foo', instances:0, format:'tdv', null_pattern:'NULL CODE %, BRUH')" >> $TEST_OUT
 cat /tmp/load_tools_test/foo >> $TEST_OUT
 
 echo "test aio_save 5"
 echo "test aio_save 5" >> $TEST_OUT
-iquery -anq "aio_save(between(sort(foo,v1,v2,v3), 0,9), 'paths=/tmp/load_tools_test/foo', 'instances=0', 'format=tdv', 'null_pattern=%, BRUH')" >> $TEST_OUT
+iquery -anq "aio_save(between(sort(foo,v1,v2,v3), 0,9), paths:'/tmp/load_tools_test/foo', instances:0, format:'tdv', null_pattern:'%, BRUH')" >> $TEST_OUT
 cat /tmp/load_tools_test/foo >> $TEST_OUT
 
 echo "test aio_save 6"
 echo "test aio_save 6" >> $TEST_OUT
-iquery -anq "aio_save(apply(show(foo), b, bool(true)),  'paths=/tmp/load_tools_test/foo', 'instances=0', 'format=tdv')" >> $TEST_OUT
+iquery -anq "aio_save(apply(show(foo), b, bool(true)),  paths:'/tmp/load_tools_test/foo', instances:0, format:'tdv')" >> $TEST_OUT
 cat /tmp/load_tools_test/foo >> $TEST_OUT
 
 echo "test aio_save 7"
 echo "test aio_save 7" >> $TEST_OUT
-iquery -anq "aio_save(apply(show(foo), b, bool(true)),  'paths=/tmp/load_tools_test/foo', 'instances=1', 'format=tdv')" >> $TEST_OUT
+iquery -anq "aio_save(apply(show(foo), b, bool(true)),  paths:'/tmp/load_tools_test/foo', instances:1, format:'tdv')" >> $TEST_OUT
 cat /tmp/load_tools_test/foo >> $TEST_OUT
 
 echo "test aio_save 8"
 echo "test aio_save 8" >> $TEST_OUT
-iquery -anq "aio_save(apply(show('filter(foo, \'abc\' = \'def\' )', 'afl'), b, bool(true)),  'path=/tmp/load_tools_test/foo', 'instances=1', 'format=csv+')" >> $TEST_OUT
+iquery -anq "aio_save(apply(show('filter(foo, \'abc\' = \'def\' )', 'afl'), b, bool(true)),  paths:'/tmp/load_tools_test/foo', instances:1, format:'csv+')" >> $TEST_OUT
 cat /tmp/load_tools_test/foo >> $TEST_OUT
 
 echo "test aio_save 9"

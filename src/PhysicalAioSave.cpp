@@ -861,7 +861,7 @@ public:
 
     std::shared_ptr< Array> execute(std::vector< std::shared_ptr< Array> >& inputArrays, std::shared_ptr<Query> query)
     {
-        AioSaveSettings settings (_parameters, false, query);
+        AioSaveSettings settings (_parameters, _kwParameters, false, query);
         shared_ptr<Array>& input = inputArrays[0];
         ArrayDesc const& inputSchema = input->getArrayDesc();
         bool singleChunk = isSingleChunk(inputSchema);
