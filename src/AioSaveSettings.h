@@ -55,7 +55,7 @@ static const char* const KW_FORMAT			= "format";
 static const char* const KW_NULL_PATTERN	= "null_pattern";
 static const char* const KW_PRECISION		= "precision";
 static const char* const KW_ATTS_ONLY		= "atts_only";
-static const char* const KW_FILE_LIMIT		= "file_limit";
+static const char* const KW_RESULT_LIMIT	= "result_size_limit";
 
 typedef std::shared_ptr<OperatorParamLogicalExpression> ParamType_t ;
 
@@ -97,7 +97,7 @@ private:
     bool                        _writeHeader;
     int32_t                     _precision;
     bool                        _attsOnly;
-    int64_t                     _fileSzLimit;
+    int64_t                     _resultSizeLimit;
     bool  						_usingCsvPlus;
     vector<string>			    _filePaths;
     vector<InstanceID>			_instanceIds;
@@ -184,10 +184,10 @@ private:
         }
     }
 
-    void setParamFileSizeLimit(vector<int64_t> file_size_lim)
+    void setParamResultSizeLimit(vector<int64_t> result_size_lim)
     {
-        _fileSzLimit = file_size_lim[0];
-        if(_fileSzLimit < 0)
+        _resultSizeLimit = result_size_lim[0];
+        if(_resultSizeLimit < 0)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "tmp_sz_limit must be positive";
         }
@@ -427,7 +427,7 @@ public:
                 _writeHeader(false),
                 _precision(std::numeric_limits<double>::digits10),
                 _attsOnly(true),
-                _fileSzLimit(-1),
+                _resultSizeLimit(-1),
                 _usingCsvPlus(false)
     {
         string const instanceHeader                = "instance=";
@@ -439,7 +439,7 @@ public:
         bool  lineDelimiterSet      = false;
         bool  formatSet             = false;
         bool  nullPatternSet        = false;
-        bool  fileSzLimitSet        = false;
+        bool  resultSizeLimitSet        = false;
         if(_precision <= 0)
         {//correct for an unfortunate configuration problem that may arise
             _precision = 6;
@@ -454,7 +454,7 @@ public:
         setKeywordParamString(kwParams, KW_FORMAT, formatSet, &AioSaveSettings::setParamFormat);
         setKeywordParamString(kwParams, KW_NULL_PATTERN, nullPatternSet, &AioSaveSettings::setParamNullPattern);
         setKeywordParamInt64(kwParams, KW_PRECISION, precisionSet, &AioSaveSettings::setParamPrecision);
-        setKeywordParamInt64(kwParams, KW_FILE_LIMIT, fileSzLimitSet, &AioSaveSettings::setParamFileSizeLimit);
+        setKeywordParamInt64(kwParams, KW_RESULT_LIMIT, resultSizeLimitSet, &AioSaveSettings::setParamResultSizeLimit);
         setKeywordParamBool(kwParams, KW_ATTS_ONLY, _attsOnly);
         setKeywordParamString(kwParams, KW_PATHS, &AioSaveSettings::setParamPaths);
         setKeywordParamInt64(kwParams, KW_INSTANCES, &AioSaveSettings::setParamInstances);
@@ -613,10 +613,10 @@ public:
         return _precision;
     }
 
-    size_t getFileSzLimit() const
+    size_t getResultSizeLimit() const
     {
-        size_t retVal = _fileSzLimit;
-        if (_fileSzLimit > -1) {
+        size_t retVal = _resultSizeLimit;
+        if (_resultSizeLimit > -1) {
             retVal = retVal * 1024 * 1024;
         }
         return retVal;
