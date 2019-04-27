@@ -2,6 +2,12 @@
 
 set -o errexit
 
+if [ `lsb_release --id | cut --fields=2` != "CentOS" ]
+then
+    sed --in-place                                                  \
+        "\#deb http://deb.debian.org/debian jessie-updates main#d"  \
+        /etc/apt/sources.list
+fi
 
 wget -O- https://paradigm4.github.io/extra-scidb-libs/install.sh \
 |  sh -s -- --only-prereq
@@ -48,10 +54,6 @@ else
     # deb https://dl.bintray.com/rvernica/deb trusty universe
     # APT_LINE
     # apt-key adv --keyserver hkp://keyserver.ubuntu.com --recv 46BD98A354BA5235
-
-    sed --in-place                                                  \
-        "\#deb http://deb.debian.org/debian jessie-updates main#d"  \
-        /etc/apt/sources.list
 
     apt-get update
     apt-get install                              \
