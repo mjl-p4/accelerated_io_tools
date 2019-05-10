@@ -38,7 +38,7 @@ $ cat /tmp/foo.tsv
 
 Ingest the file into an array called temp:
 ```
-$ iquery -anq "store(aio_input('/tmp/foo.tsv', 'num_attributes=2'), temp)"
+$ iquery -anq "store(aio_input('/tmp/foo.tsv', num_attributes:2), temp)"
 Query was executed successfully
 
 $ iquery -aq "scan(temp)"
@@ -103,7 +103,7 @@ $ cat /tmp/foo.tsv
 4   dave    extra stuff here
 5error_no_tab
 
-$ iquery -aq "aio_input('/tmp/foo.tsv', 'num_attributes=2')"
+$ iquery -aq "aio_input('/tmp/foo.tsv', num_attributes:2)"
 {tuple_no,dst_instance_id,src_instance_id} a0,a1,error
 {0,0,0} '1','alex',null
 {1,0,0} '2','bob',null
@@ -117,45 +117,45 @@ Example CSV ingest and store from multiple files:
 ```
 $ iquery -anq "store(
  aio_input(
-  'paths=/tmp/foo.tsv;/tmp/foo2.tsv',
-  'instances=1;2',
-  'num_attributes=4',
-  'attribute_delimiter=,',
-  'split_on_dimension=1',
-  'header=1'
+  paths:('/tmp/foo.tsv','/tmp/foo2.tsv'),
+  instances:(1,2),
+  num_attributes:4,
+  attribute_delimiter:',',
+  split_on_dimension:true,
+  header:1
  ),
  temp
 )"
 ```
 
 ## Formally:
-All parameters are supplied as `key=value` strings. The `num_attributes` and either `path` or `paths` must always be specified:
+All parameters are supplied as key:value syntax. The `num_attributes` and `path` must always be specified:
 ```
-aio_input('parameter=value', 'parameter2=value2;value3',...)
+aio_input(parameter:value, parameter2(value2,value3),...)
 ```
 
 ### Load from one or multiple files:
-* `path=/path/to/file`: the absolute path to load from. Assumed to be on the coordinator instance. If the operator encounters a string without '=' it uses that as path.
-* `paths=/path/to/file1;/path/to/file2`: semicolon-seprated list of paths for loading from multiple fs devices.
+* `paths:'/path/to/file'`: the absolute path to load from. Assumed to be on the coordinator instance. If the operator encounters a string without a keyword specified, it uses that as path.
+* `paths:('/path/to/file1','/path/to/file2')`: a comma separated list of paths for loading from multiple fs devices.
 
-If `paths` is used, then `instances` must be used to specify the loading instance identifiers:
-* `instances=0;1;...`: semicolon-separated list of instance ids, in the same order as `paths`. Must match the number of `paths` and contain unique ids.
+If more than one path is specified, then `instances` must be used to specify the loading instance identifiers:
+* `instances:(0,1);...`: a comma separated list of instance ids, in the same order as `paths`. Must match the number of `paths` and contain unique ids.
 
 ### File format settings:
-* `num_attributes=N`: number of columns in the file (at least on the majority of the lines). Required.
-* `header=H`: an integer number of lines to skip from the file;  if "paths" is used, applies to all files. Default is 0.
-* `line_delimiter=L`: a character that separates the lines (cells) of the file; values of `\t` `\r` `\n` and ` ` are also supported. Default is `\n`.
-* `attribute_delimiter=A`: a character that separates the columns (attributes) of the file; values of `\t` `\r` `\n` and ` ` are also supported. Default is `\t`.
+* `num_attributes:N`: number of columns in the file (at least on the majority of the lines). Required.
+* `header:H`: an integer number of lines to skip from the file;  if "paths" is used, applies to all files. Default is 0.
+* `line_delimiter:'L'`: a character that separates the lines (cells) of the file; values of `\t` `\r` `\n` and ` ` are also supported. Default is `\n`.
+* `attribute_delimiter:A`: a character that separates the columns (attributes) of the file; values of `\t` `\r` `\n` and ` ` are also supported. Default is `\t`.
 
 ### Splitting on dimension:
-* `split_on_dimension=<0/1>`: a flag that determines whether the file columns are placed in SciDB attributes, or cells along an extra dimension. Default is 0 (create attributes).
+* `split_on_dimension:<true/false>`: a flag that determines whether the file columns are placed in SciDB attributes, or cells along an extra dimension. Default is `false` (create attributes).
 
 ### Tuning settings:
-* `buffer_size=B`: the units into which the loaded file(s) are initially split when first redistributed across the cluster, specified in bytes; default is 8MB.
-* `chunk_size=C`: the chunk size along the third dimension of the result array. Should not be required often as the `buffer_size` actually controls how much data goes in each chunk. Default is 10,000,000. If `buffer_size` is set and `chunk_size` is not set, the `chunk_size` is automatically set to equal `buffer_size` as an over-estimate.
+* `buffer_size:B`: the units into which the loaded file(s) are initially split when first redistributed across the cluster, specified in bytes; default is 8MB.
+* `chunk_size:C`: the chunk size along the third dimension of the result array. Should not be required often as the `buffer_size` actually controls how much data goes in each chunk. Default is 10,000,000. If `buffer_size` is set and `chunk_size` is not set, the `chunk_size` is automatically set to equal `buffer_size` as an over-estimate.
 
 ### Returned array:
-If `split_on_dimension=0` (default), the schema of the returned array is as follows:
+If `split_on_dimension:false` (default), the schema of the returned array is as follows:
 ```
  <a0:string null, a1:string null, ... aN-1: string null, error:string null>
  [tuple_no        = 0: *,                 CS,   0,
@@ -164,7 +164,7 @@ If `split_on_dimension=0` (default), the schema of the returned array is as foll
 ```
 Where `N` is the specified `num_attributes` value, `CS` is the chunk size (10M default; see above) and `NUM_INSTANCES` is the number of SciDB instances in the cluster. The error attribute is null, unless the particular line in the file had a number of tokens not equal to `N`, in which case the error attribute is set to either 'short' or 'long ' followed by the leftover line. In the case of a short line, the absent attributes are set to null.
 
-If `split_on_dimension=1` the attributes are populated along a fourth dimension like so:
+If `split_on_dimension:true` the attributes are populated along a fourth dimension like so:
 ```
  <a:string null>
  [tuple_no        = 0: *,                 CS,   0,
@@ -172,9 +172,9 @@ If `split_on_dimension=1` the attributes are populated along a fourth dimension 
   src_instance_id = 0: NUM_INSTANCES-1,   1,    0,
   attribute_no    = 0: N,                 N+1,  0]
 ```
-The slice of the array at `attribute_no=N` shall contain the error attribute, populated as above.
+The slice of the array at `attribute_no:N` shall contain the error attribute, populated as above.
 
-Other than `attribute_no` (when `split_on_dimension=1`) the dimensions are not intended to be used in queries. The `src_instance_id` matches the instance(s) reading the data; the `dst_instance_id` is assigned in a round-robin fashion to successive blocks from the same source. The `tuple_no` starts at 0 for each `{dst_instance_id, src_instance_id}` pair and is populated densely within the block. However, each new block starts a new chunk.
+Other than `attribute_no` (when `split_on_dimension:true`) the dimensions are not intended to be used in queries. The `src_instance_id` matches the instance(s) reading the data; the `dst_instance_id` is assigned in a round-robin fashion to successive blocks from the same source. The `tuple_no` starts at 0 for each `{dst_instance_id, src_instance_id}` pair and is populated densely within the block. However, each new block starts a new chunk.
 
 # Scalar functions that may be useful in loading data
 
@@ -185,14 +185,14 @@ SciDB supports regular type casting but the behavior is to fail the entire query
 The SciDB typesystem and the type of the second value can be used to dispatch the right dcast return type.
 For example, this cast fails on the fifth row:
 ```
-$ iquery -aq "aio_input('/tmp/foo.tsv', 'num_attributes=2')"
+$ iquery -aq "aio_input('/tmp/foo.tsv', num_attributes:2)"
 {tuple_no,dst_instance_id,src_instance_id} a0,a1,error
 {0,0,0} '1','alex',null
 {1,0,0} '2','bob',null
 {2,0,0} '3','jack',null
 {3,0,0} '4','dave','long    extra stuff here'
 {4,0,0} '5error_no_tab',null,'short'
-$ iquery -aq "apply(aio_input('/tmp/foo.tsv', 'num_attributes=2'), d0, double(a0))"
+$ iquery -aq "apply(aio_input('/tmp/foo.tsv', num_attributes:2), d0, double(a0))"
 UserException in file: src/query/BuiltInFunctions.inc function: CONV_TID_DOUBLE_FROM_String line: 394
 Error id: scidb::SCIDB_SE_TYPESYSTEM::SCIDB_LE_FAILED_PARSE_STRING
 Error description: Typesystem error. Failed to parse string '5error_no_tab
@@ -200,7 +200,7 @@ Error description: Typesystem error. Failed to parse string '5error_no_tab
 
 And we can use dcast to return a null instead of failing the query:
 ```
-$ iquery -aq "apply(aio_input('/tmp/foo.tsv', 'num_attributes=2'), d0, dcast(a0, double(null)))"
+$ iquery -aq "apply(aio_input('/tmp/foo.tsv', num_attributes:2), d0, dcast(a0, double(null)))"
 {tuple_no,dst_instance_id,src_instance_id} a0,a1,error,d0
 {0,0,0} '1','alex',null,1
 {1,0,0} '2','bob',null,2
@@ -211,14 +211,14 @@ $ iquery -aq "apply(aio_input('/tmp/foo.tsv', 'num_attributes=2'), d0, dcast(a0,
 
 We can also use a missing code, or a special non-null value like `-1`:
 ```
-$ iquery -aq "apply(aio_input('/tmp/foo.tsv', 'num_attributes=2'), d0, dcast(a0, double(missing(1))))"
+$ iquery -aq "apply(aio_input('/tmp/foo.tsv', num_attributes:2), d0, dcast(a0, double(missing(1))))"
 {tuple_no,dst_instance_id,src_instance_id} a0,a1,error,d0
 {0,0,0} '1','alex',null,1
 {1,0,0} '2','bob',null,2
 {2,0,0} '3','jack',null,3
 {3,0,0} '4','dave','long    extra stuff here',4
 {4,0,0} '5error_no_tab',null,'short',?1
-$ iquery -aq "apply(aio_input('/tmp/foo.tsv', 'num_attributes=2'), d0, dcast(a0, double(-1)))"
+$ iquery -aq "apply(aio_input('/tmp/foo.tsv', num_attributes:2), d0, dcast(a0, double(-1)))"
 {tuple_no,dst_instance_id,src_instance_id} a0,a1,error,d0
 {0,0,0} '1','alex',null,1
 {1,0,0} '2','bob',null,2
@@ -379,46 +379,46 @@ For an example of using regular expressions, consult the regular expression subs
 This operator replaces the existing save functionality, for binary and tab-delimited formats.
 Example save to a binary file:
 ```
-iquery -anq "aio_save( bar, '/tmp/bar.out', 'format=(int64, double null, string null)')"
+iquery -anq "aio_save( bar, '/tmp/bar.out', format:'(int64, double null, string null)')"
 ```
 
 Example save to a binary file using Apache Arrow format:
 ```
-iquery -anq "aio_save( bar, '/tmp/bar.out', 'format=arrow')"
+iquery -anq "aio_save( bar, '/tmp/bar.out', format:'arrow')"
 ```
 
 Example save to two TSV files:
 ```
 iquery -anq "aio_save(
  filter(bar, a>3),
- 'paths=/tmp/bar1.tsv;/tmp/bar2.tsv',
- 'instances=0;16',
- 'format=tdv'
+ paths:('/tmp/bar1.tsv','/tmp/bar2.tsv'),
+ instances:0;16,
+ format:'tdv'
 )
 ```
 
 ## Formally:
 ```
-aio_save(array, 'parameter1=value1', 'parameter2=value2',...)
+aio_save(array, parameter1:value1, parameter2:value2,...)
 ```
-The `path` or `paths` must always be specified.
+The `paths` must always be specified.
 
 ## Save to one or more files:
 By default, the file is saved to a path on the query coordinator instance. You can distribute the IO and network load by simultaneously writing data to multiple FS devices from several different instances (one instance per path).
-* `path=/path/to/file`: the location to save the file; required. If the operator enocunters a string parameter without '=', it assumes that to be the path.
-* `paths=/path1;/path2;..`: multiple file paths for saving from different instances, separated by semicolon. Must be specified along with `instances` and have an equal number of terms. Either `path` or `paths` must be specified, but not both.
-* `instance=I`: the instance to save the file on. Default is the instance the query is submitted to.
-* `instances=0;1;..`: multiple instance ID's for saving from different instances, separated by semicolon. Must be specified along with `paths` and have an equal number of unique terms. Either `instance` or `instances` must be specified, but not both.
+* `paths:'/path/to/file'`: the location to save the file; required. If the operator enocunters a string parameter without a keyword specifier, it assumes that to be the path.
+* `paths:('/path1','/path2'..`: multiple file paths for saving from different instances, separated by semicolon. Must be specified along with `instances` and have an equal number of terms.
+* `instances:I`: the instance to save the file on. Default is the instance the query is submitted to.
+* `instances:(0,1);..`: multiple instance ID's for saving from different instances, separated by semicolon. Must be specified along with `paths` and have an equal number of unique terms. Either `instance` or `instances` must be specified, but not both.
 
 ## Other settings:
-* `format=F`: the format string, may be either `tdv` (token-delimited values), a scidb-style binary format spec like `(int64, double null,...)`, or `arrow` for the Apache Arrow format. Default is `tdv`.
-* `attributes_delimiter=A`: the character to write between array attributes. Default is a tab. Applies when format is set to `tdv`.
-* `line_delimiter=L`: the character to write between array cells. Default is a newline. Applies when format is set to `tdv`.
-* `cells_per_chunk=C`: the maximum number of array cells to place in each chunk before saving to disk. By default, binary accounting is used but this can be enabled to force an exact number of cells. See notes on saving data in order below.
-* `buffer_size=B`: the amount of data to pack into a single buffer before transferring and saving to disk. Default is 8 MB. This setting is not honored if `cells_per_chunk` is specified.
-* `precision=P`: the maximum number of significant figures to use when writing float or double values as text. Defaults to the SciDB 'precision' config. Applies when format is set to `tdv`.
-* `atts_only=1`: specify whether the output should only include attribute values or include attribute as well as dimension values. Possible values are `0` and `1` (default). If `atts_only=0` is specified the dimension values are appended for each cell after the attribute values. The type used for the dimension values is `int64`. This setting is only applicable when the binary or the `arrow` formats are used. For the binary format, the `format=(...)` specification has to include an `int64` type specifications (appended at the end) for each of the input array dimensions.
-* `result_size_limit=M`: absolute limit of the output file in Megabytes. By default it is set to 2^64-1.
+* `format:'F'`: the format string, may be either `tdv` (token-delimited values), a scidb-style binary format spec like `(int64, double null,...)`, or `arrow` for the Apache Arrow format. Default is `tdv`.
+* `attributes_delimiter:'A'`: the character to write between array attributes. Default is a tab. Applies when format is set to `tdv`.
+* `line_delimiter"'L'`: the character to write between array cells. Default is a newline. Applies when format is set to `tdv`.
+* `cells_per_chunk:'C'`: the maximum number of array cells to place in each chunk before saving to disk. By default, binary accounting is used but this can be enabled to force an exact number of cells. See notes on saving data in order below.
+* `buffer_size:'B'`: the amount of data to pack into a single buffer before transferring and saving to disk. Default is 8 MB. This setting is not honored if `cells_per_chunk` is specified.
+* `precision:'P'`: the maximum number of significant figures to use when writing float or double values as text. Defaults to the SciDB 'precision' config. Applies when format is set to `tdv`.
+* `atts_only:true`: specify whether the output should only include attribute values or include attribute as well as dimension values. Possible values are `false` and `true` (default). If `atts_only:false` is specified the dimension values are appended for each cell after the attribute values. The type used for the dimension values is `int64`. This setting is only applicable when the binary or the `arrow` formats are used. For the binary format, the `format:'(...)'` specification has to include an `int64` type specifications (appended at the end) for each of the input array dimensions.
+* `result_size_limit:M`: absolute limit of the output file in Megabytes. By default it is set to 2^64-1.
 
 ## Returned array:
 The schema is always `<val:string null> [chunk_no=0:*,1,0, src_instance_id=0:*,1,0]`. The returned array is always empty as the operator's objective is to export the data.
@@ -438,8 +438,8 @@ aio_save(
   1
  ),
  '/path/to/file',
- 'format=tdv',
- 'cells_per_chunk=100000'
+ format:'tdv',
+ cells_per_chunk:'100000'
 )
 ```
 

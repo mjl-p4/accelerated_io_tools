@@ -548,22 +548,22 @@
 {8} 2,2
 {9} 3,3
 {10} 4,4
-SystemException in file: AioSaveSettings.h function: AioSaveSettings
+SystemException in file: AioSaveSettings.h function: setParamFormat
 Error id: scidb::SCIDB_SE_INTERNAL::SCIDB_LE_ILLEGAL_OPERATION
 Error description: Internal SciDB error. Illegal operation: format must be either 'tdv', 'tsv', 'csv+', 'arrow', or a binary spec such as '(int64,double,string null)'.
-UserException in file: src/smgr/io/TemplateParser.cpp function: parse
+UserException in file: src/array/TemplateParser.cpp function: parse
 Error id: scidb::SCIDB_SE_EXECUTION::SCIDB_LE_TEMPLATE_PARSE_ERROR
 Error description: Error during query execution. Failed to parse template at position 2.
-SystemException in file: src/query/TypeSystem.cpp function: _getType
+SystemException in file: src/query/TypeSystem.cpp function: _getTypeUnlocked
 Error id: scidb::SCIDB_SE_TYPESYSTEM::SCIDB_LE_TYPE_NOT_REGISTERED
 Error description: Typesystem error. Type 'foo' is not registered.
-UserException in file: src/smgr/io/TemplateParser.cpp function: parse
+UserException in file: src/array/TemplateParser.cpp function: parse
 Error id: scidb::SCIDB_SE_EXECUTION::SCIDB_LE_ATTRIBUTES_MISMATCH
 Error description: Error during query execution. Attributes mismatch.
-UserException in file: src/smgr/io/TemplateParser.cpp function: parse
+UserException in file: src/array/TemplateParser.cpp function: parse
 Error id: scidb::SCIDB_SE_EXECUTION::SCIDB_LE_ATTRIBUTES_MISMATCH
 Error description: Error during query execution. Attributes mismatch.
-UserException in file: src/smgr/io/TemplateParser.cpp function: parse
+UserException in file: src/array/TemplateParser.cpp function: parse
 Error id: scidb::SCIDB_SE_EXECUTION::SCIDB_LE_ATTRIBUTES_MISMATCH
 Error description: Error during query execution. Attributes mismatch.
 {chunk_no,dest_instance_id,source_instance_id} val
