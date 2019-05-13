@@ -124,27 +124,27 @@
   99    NaN
  100  100.0
 {chunk_no,dest_instance_id,source_instance_id} val
-               x                y
- ['b', 'i', 'n']             None
- ['b', 'i', 'n']  ['b', 'i', 'n']
- ['b', 'i', 'n']             None
- ['b', 'i', 'n']  ['b', 'i', 'n']
- ['b', 'i', 'n']             None
- ['b', 'i', 'n']  ['b', 'i', 'n']
- ['b', 'i', 'n']             None
- ['b', 'i', 'n']  ['b', 'i', 'n']
- ['b', 'i', 'n']             None
- ['b', 'i', 'n']  ['b', 'i', 'n']
- ['b', 'i', 'n']             None
- ['b', 'i', 'n']  ['b', 'i', 'n']
- ['b', 'i', 'n']             None
- ['b', 'i', 'n']  ['b', 'i', 'n']
- ['b', 'i', 'n']             None
- ['b', 'i', 'n']  ['b', 'i', 'n']
- ['b', 'i', 'n']             None
- ['b', 'i', 'n']  ['b', 'i', 'n']
- ['b', 'i', 'n']             None
- ['b', 'i', 'n']  ['b', 'i', 'n']
+      x       y
+ b'bin'    None
+ b'bin'  b'bin'
+ b'bin'    None
+ b'bin'  b'bin'
+ b'bin'    None
+ b'bin'  b'bin'
+ b'bin'    None
+ b'bin'  b'bin'
+ b'bin'    None
+ b'bin'  b'bin'
+ b'bin'    None
+ b'bin'  b'bin'
+ b'bin'    None
+ b'bin'  b'bin'
+ b'bin'    None
+ b'bin'  b'bin'
+ b'bin'    None
+ b'bin'  b'bin'
+ b'bin'    None
+ b'bin'  b'bin'
 {chunk_no,dest_instance_id,source_instance_id} val
     x     y
  True  None
@@ -512,7 +512,6 @@ Query was executed successfully
 47 MB (49988452 B)
 3100000
 3100000
-3100000
 Query was executed successfully
 Query was executed successfully
 {inst,attid} att,count,bytes,chunks,min_count,avg_count,max_count,min_bytes,avg_bytes,max_bytes
@@ -523,7 +522,6 @@ Query was executed successfully
 50 MB (53268772 B)
 {chunk_no,dest_instance_id,source_instance_id} val
 47 MB (49557108 B)
-2700000
 2700000
 2700000
 Query was executed successfully
