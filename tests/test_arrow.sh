@@ -291,4 +291,4 @@ $PYTHON -c "import pyarrow; print(pyarrow.ipc.open_stream('$F').read_all().to_pa
     >> $TEST_OUT
 
 
-diff $TEST_OUT $DIR/test_arrow.expected.py$PYTHON_VERSION
+diff --ignore-all-space $TEST_OUT $DIR/test_arrow.expected.py$PYTHON_VERSION
