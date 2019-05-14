@@ -30,6 +30,7 @@ before_install:
     --detach
     --publish 8080:8080
     --volume `pwd`:/accelerated_io_tools
+    --volume /tmp:/tmp
     --env ARROW_VER=${ARROW_VER}
     rvernica/scidb:${SCIDB_IMG}
   - while ! curl http://localhost:8080/version; do sleep 5; done
@@ -38,10 +39,12 @@ install:
   - docker exec scidb /accelerated_io_tools/tests/docker-install.sh
   # - docker exec scidb make --directory=/accelerated_io_tools/shim-master service
   # - docker exec scidb bash -c "source /opt/rh/python27/enable; pip install --upgrade /accelerated_io_tools/SciDB-Py-master"
+  - pip install scidb-py
 
 script:
   - docker exec scidb /accelerated_io_tools/tests/test.sh
   - docker exec scidb /accelerated_io_tools/tests/test_arrow.sh
+  - ./tests/test_arrow.sh "docker exec scidb"
 
 after_failure:
   - docker exec scidb cat /accelerated_io_tools/tests/test.out
