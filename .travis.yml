@@ -43,8 +43,8 @@ install:
 
 script:
   - docker exec scidb /accelerated_io_tools/tests/test.sh
-  - docker exec scidb /accelerated_io_tools/tests/test_arrow.sh
   - ./tests/test_arrow.sh "docker exec scidb"
+  - docker exec scidb /accelerated_io_tools/tests/test_arrow.sh
 
 after_failure:
   - docker exec scidb cat /accelerated_io_tools/tests/test.out
