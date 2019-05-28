@@ -65,7 +65,7 @@ fi
 
 wget --no-verbose https://bootstrap.pypa.io/get-pip.py
 python get-pip.py
-pip install pandas pyarrow==$ARROW_VER scidb-py
+pip install pandas pyarrow==$ARROW_VER "scidb-py<19.3"
 
 
 # Reset SciDB instance count to 4
