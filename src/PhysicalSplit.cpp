@@ -28,7 +28,7 @@
 #include <sstream>
 
 #include <boost/unordered_map.hpp>
-#include <query/Operator.h>
+#include <query/PhysicalOperator.h>
 #include <util/Platform.h>
 #include <array/Tile.h>
 #include <array/TileIteratorAdaptors.h>
@@ -338,10 +338,10 @@ public:
             result = std::shared_ptr<EmptySinglePass>(new EmptySinglePass(_schema));
         }
         result = redistributeToRandomAccess(result,
-                                            createDistribution(psHashPartitioned),
+                                            createDistribution(dtHashPartitioned),
                                             ArrayResPtr(),
                                             query,
-                                            getShared());
+                                            shared_from_this());
         return result;
     }
 };

@@ -23,10 +23,10 @@
 * END_COPYRIGHT
 */
 
-#include <query/Operator.h>
+#include <query/LogicalOperator.h>
+#include <array/Metadata.h>  // for addEmptyTagAttribute
 
 #include "AioInputSettings.h"
-
 namespace scidb
 {
 
@@ -36,23 +36,50 @@ public:
     LogicalAioInput(const std::string& logicalName, const std::string& alias):
         LogicalOperator(logicalName, alias)
     {
-        ADD_PARAM_VARIES();
     }
 
-    std::vector<shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    static PlistSpec const* makePlistSpec()
     {
-        std::vector<shared_ptr<OperatorParamPlaceholder> > res;
-        res.push_back(END_OF_VARIES_PARAMS());
-        if (_parameters.size() < AioInputSettings::MAX_PARAMETERS)
-        {
-            res.push_back(PARAM_CONSTANT("string"));
-        }
-        return res;
+        static PlistSpec argSpec {
+            { "", // positionals
+              RE(RE::STAR, {
+                 RE(PP(PLACEHOLDER_CONSTANT, TID_STRING))
+              })
+            },
+            { KW_PATHS, RE(RE::OR, {
+                           RE(PP(PLACEHOLDER_EXPRESSION, TID_STRING)),
+                           RE(RE::GROUP, {
+                              RE(PP(PLACEHOLDER_EXPRESSION, TID_STRING)),
+                              RE(RE::PLUS, {
+                                 RE(PP(PLACEHOLDER_EXPRESSION, TID_STRING))
+                              })
+                           })
+                        })
+            },
+            { KW_INSTANCES, RE(RE::OR, {
+                            RE(PP(PLACEHOLDER_EXPRESSION, TID_INT64)),
+                            RE(RE::GROUP, {
+                                   RE(PP(PLACEHOLDER_EXPRESSION, TID_INT64)),
+                                   RE(RE::PLUS, {
+                                      RE(PP(PLACEHOLDER_EXPRESSION, TID_INT64))
+                                   })
+                              })
+                           })
+            },
+            { KW_BUF_SZ, RE(PP(PLACEHOLDER_CONSTANT, TID_INT64)) },
+            { KW_HEADER, RE(PP(PLACEHOLDER_CONSTANT, TID_INT64)) },
+            { KW_LINE_DELIM, RE(PP(PLACEHOLDER_CONSTANT, TID_STRING)) },
+            { KW_ATTR_DELIM, RE(PP(PLACEHOLDER_CONSTANT, TID_STRING)) },
+            { KW_NUM_ATTR, RE(PP(PLACEHOLDER_CONSTANT, TID_INT64)) },
+            { KW_CHUNK_SZ, RE(PP(PLACEHOLDER_CONSTANT, TID_INT64)) },
+            { KW_SPLIT_ON_DIM, RE(PP(PLACEHOLDER_CONSTANT, TID_BOOL)) }
+        };
+        return &argSpec;
     }
 
     ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, shared_ptr< Query> query)
     {
-        AioInputSettings settings (_parameters, true, query);
+        AioInputSettings settings (_parameters, _kwParameters, true, query);
         size_t numRequestedAttributes = settings.getNumAttributes();
         size_t requestedChunkSize = settings.getChunkSize();
         size_t const nInstances = query->getInstancesCount();
@@ -60,11 +87,11 @@ public:
         dimensions[0] = DimensionDesc("tuple_no",           0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), requestedChunkSize, 0);
         dimensions[1] = DimensionDesc("dst_instance_id",    0, 0, nInstances-1, nInstances-1, 1, 0);
         dimensions[2] = DimensionDesc("src_instance_id",    0, 0, nInstances-1, nInstances-1, 1, 0);
-        vector<AttributeDesc> attributes;
+        Attributes attributes;
         if (settings.getSplitOnDimension())
         {   //add 1 for the error column
             dimensions.push_back(DimensionDesc("attribute_no", 0, 0, numRequestedAttributes, numRequestedAttributes, numRequestedAttributes+1, 0));
-            attributes.push_back(AttributeDesc(0, "a", TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
+            attributes.push_back(AttributeDesc("a", TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
         }
         else
         {
@@ -73,12 +100,12 @@ public:
                 ostringstream attname;
                 attname<<"a";
                 attname<<i;
-                attributes.push_back(AttributeDesc((AttributeID)i, attname.str(),  TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
+                attributes.push_back(AttributeDesc(attname.str(),  TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
             }
-            attributes.push_back(AttributeDesc((AttributeID)numRequestedAttributes, "error", TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
+            attributes.push_back(AttributeDesc("error", TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
         }
-        attributes = addEmptyTagAttribute(attributes);
-        return ArrayDesc("aio_input", attributes, dimensions, createDistribution(psUndefined), query->getDefaultArrayResidency());
+        attributes.addEmptyTagAttribute();
+        return ArrayDesc("aio_input", attributes, dimensions, createDistribution(dtUndefined), query->getDefaultArrayResidency());
     }
 };
 

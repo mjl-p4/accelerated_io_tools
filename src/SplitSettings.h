@@ -28,7 +28,9 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/filesystem.hpp>
 #include <array/SinglePassArray.h>
-#include <query/Operator.h>
+#include <query/LogicalOperator.h>
+#include <query/Query.h>
+#include <query/Expression.h>
 #include <util/PathUtils.h>
 
 #ifndef SPLIT_SETTINGS

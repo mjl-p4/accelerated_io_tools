@@ -23,19 +23,19 @@
 * END_COPYRIGHT
 */
 
-#include <limits>
+#define LEGACY_API
 #include <limits>
 #include <sstream>
 
 #include <boost/unordered_map.hpp>
-#include <query/Operator.h>
+#include <query/PhysicalOperator.h>
 #include <util/Platform.h>
 #include <array/Tile.h>
 #include <array/TileIteratorAdaptors.h>
 #include <array/SinglePassArray.h>
 #include <array/PinBuffer.h>
 #include <system/Sysinfo.h>
-#include <util/Network.h>
+#include <network/Network.h>
 
 #include <boost/algorithm/string.hpp>
 
@@ -135,7 +135,7 @@ public:
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "File splitter cannot allocate memory";
         }
-        _bufPointer = (char*) _chunk.getData();
+        _bufPointer = (char*) _chunk.getWriteData();
         ConstRLEPayload::Header* hdr = (ConstRLEPayload::Header*) _bufPointer;
         hdr->_magic = RLE_PAYLOAD_MAGIC;
         hdr->_nSegs = 1;
@@ -257,9 +257,13 @@ public:
         _attributeDelimiter(attDelimiter),
         _buf(_outputLineSize-1)
     {
-        for(AttributeID i =0; i<_numLiveAttributes; ++i)
+/*        for(AttributeID i =0; i<_numLiveAttributes; ++i)
         {
             _outputArrayIterators[i] = _output->getIterator(i);
+            }*/
+        for (const auto& attr : schema.getAttributes(/*excludeEbm:*/true))
+        {
+            _outputArrayIterators[attr.getId()] = _output->getIterator(attr);
         }
     }
 
@@ -397,9 +401,9 @@ public:
         dimensions[0] = DimensionDesc("chunk_no",           0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
         dimensions[1] = DimensionDesc("dst_instance_id",    0, 0, nInstances-1, nInstances-1, 1, 0);
         dimensions[2] = DimensionDesc("src_instance_id",    0, 0, nInstances-1, nInstances-1, 1, 0);
-        vector<AttributeDesc> attributes;
-        attributes.push_back(AttributeDesc((AttributeID)0, "value",  TID_BINARY, 0, CompressorType::NONE));
-        return ArrayDesc("aio_input", attributes, dimensions, defaultPartitioning(), query->getDefaultArrayResidency());
+        Attributes attributes;
+        attributes.push_back(AttributeDesc("value",  TID_BINARY, 0, CompressorType::NONE));
+        return ArrayDesc("aio_input", attributes, dimensions, createDistribution(defaultDistType()), query->getDefaultArrayResidency());
     }
 
     PhysicalAioInput(std::string const& logicalName,
@@ -422,12 +426,21 @@ public:
         return distro;
     }
 
+    /// @see OperatorDist
+    DistType inferSynthesizedDistType(std::vector<DistType> const& /*inDist*/, size_t /*depth*/) const override
+    {
+        std::vector<RedistributeContext> emptyRC;
+        std::vector<ArrayDesc> emptyAD;
+        auto context = getOutputDistribution(emptyRC, emptyAD); // avoiding duplication of logic
+        return context.getArrayDistribution()->getDistType();
+    }
+
     shared_ptr<Array> makeSupplement(shared_ptr<Array>& afterSplit, shared_ptr<Query>& query, shared_ptr<AioInputSettings>& settings, vector<Coordinate>& lastBlocks)
     {
         char const lineDelim = settings->getLineDelimiter();
         shared_ptr<Array> supplement(new MemArray(getSplitSchema(query), query));
-        shared_ptr<ConstArrayIterator> srcArrayIter = afterSplit->getConstIterator(0);
-        shared_ptr<ArrayIterator> dstArrayIter = supplement->getIterator(0);
+        shared_ptr<ConstArrayIterator> srcArrayIter = afterSplit->getConstIterator(getSplitSchema(query).getAttributes(true).firstDataAttribute());
+        shared_ptr<ArrayIterator> dstArrayIter = supplement->getIterator(getSplitSchema(query).getAttributes(true).firstDataAttribute());
         shared_ptr<ChunkIterator> dstChunkIter;
         size_t const nInstances = query->getInstancesCount();
         while(!srcArrayIter->end())
@@ -508,7 +521,7 @@ public:
 
     shared_ptr< Array> execute(std::vector< shared_ptr< Array> >& inputArrays, shared_ptr<Query> query)
     {
-        shared_ptr<AioInputSettings> settings (new AioInputSettings(_parameters, false, query));
+        shared_ptr<AioInputSettings> settings (new AioInputSettings(_parameters, _kwParameters, false, query));
         shared_ptr<Array> splitData;
         if(settings->thisInstanceReadsData())
         {
@@ -520,21 +533,21 @@ public:
         }
 
         splitData = redistributeToRandomAccess(splitData,
-                                               createDistribution(psByCol),
+                                               createDistribution(dtHashPartitioned),
                                                ArrayResPtr(),
                                                query,
-                                               getShared());
+                                               shared_from_this());
         size_t const nInstances = query->getInstancesCount();
         vector<Coordinate> lastBlocks(nInstances, -1);
         shared_ptr<Array> supplement = makeSupplement(splitData, query, settings, lastBlocks);
         exchangeLastBlocks(lastBlocks, query);
         supplement = redistributeToRandomAccess(supplement,
-                                                createDistribution(psByCol),
+                                                createDistribution(dtHashPartitioned),
                                                 ArrayResPtr(),
                                                 query,
-                                                getShared());
-        shared_ptr<ConstArrayIterator> inputIterator = splitData->getConstIterator(0);
-        shared_ptr<ConstArrayIterator> supplementIter = supplement->getConstIterator(0);
+                                                shared_from_this());
+        shared_ptr<ConstArrayIterator> inputIterator = splitData->getConstIterator(getSplitSchema(query).getAttributes(true).firstDataAttribute());
+        shared_ptr<ConstArrayIterator> supplementIter = supplement->getConstIterator(getSplitSchema(query).getAttributes(true).firstDataAttribute());
         size_t const outputChunkSize = _schema.getDimensions()[0].getChunkInterval();
         char const attDelim = settings->getAttributeDelimiter();
         char const lineDelim = settings->getLineDelimiter();

@@ -25,7 +25,10 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
-#include <query/Operator.h>
+#include <array/Metadata.h> // For addEmptyTagAttribute
+#include <query/LogicalOperator.h>
+#include <query/Expression.h>
+#include <query/Query.h>
 
 #ifndef PARSE_SETTINGS
 #define PARSE_SETTINGS

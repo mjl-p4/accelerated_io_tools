@@ -23,7 +23,8 @@
 * END_COPYRIGHT
 */
 
-#include <query/Operator.h>
+#include <query/LogicalOperator.h>
+#include <query/OperatorParam.h>
 #include "SplitSettings.h"
 
 namespace scidb
@@ -35,30 +36,31 @@ public:
     LogicalSplit(const std::string& logicalName, const std::string& alias):
         LogicalOperator(logicalName, alias)
     {
-        ADD_PARAM_VARIES();
     }
 
-    std::vector<shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    static PlistSpec const* makePlistSpec()
     {
-        std::vector<shared_ptr<OperatorParamPlaceholder> > res;
-        res.push_back(END_OF_VARIES_PARAMS());
-        if (_parameters.size() < SplitSettings::MAX_PARAMETERS)
-        {
-            res.push_back(PARAM_CONSTANT("string"));
-        }
-        return res;
+        static PlistSpec argSpec {
+            { "", // positionals
+              RE(RE::STAR, {
+                 RE(PP(PLACEHOLDER_CONSTANT, TID_STRING))
+              })
+            }
+        };
+        return &argSpec;
     }
 
     ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, shared_ptr< Query> query)
     {
         SplitSettings settings (_parameters, true, query); //construct and check to ensure settings are legit
-        vector<AttributeDesc> attributes(1);
-        attributes[0] = AttributeDesc((AttributeID)0, "value",  TID_STRING, 0, CompressorType::NONE);
+        //vector<AttributeDesc> attributes(1);
+        Attributes attributes;
+        attributes.push_back(AttributeDesc("value",  TID_STRING, 0, CompressorType::NONE));
         vector<DimensionDesc> dimensions(2);
 
         dimensions[0] = DimensionDesc("source_instance_id", 0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
         dimensions[1] = DimensionDesc("chunk_no",    0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
-        return ArrayDesc("split", attributes, dimensions, defaultPartitioning(), query->getDefaultArrayResidency());
+        return ArrayDesc("split", attributes, dimensions, createDistribution(defaultDistType()), query->getDefaultArrayResidency());
     }
 
 };

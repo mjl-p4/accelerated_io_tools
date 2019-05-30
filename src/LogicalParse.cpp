@@ -23,7 +23,7 @@
 * END_COPYRIGHT
 */
 
-#include <query/Operator.h>
+#include <query/LogicalOperator.h>
 #include "ParseSettings.h"
 
 namespace scidb
@@ -35,19 +35,21 @@ public:
     LogicalParse(const std::string& logicalName, const std::string& alias):
         LogicalOperator(logicalName, alias)
     {
-        ADD_PARAM_INPUT();
-        ADD_PARAM_VARIES();
     }
 
-    std::vector<shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    static PlistSpec const* makePlistSpec()
     {
-        std::vector<shared_ptr<OperatorParamPlaceholder> > res;
-        res.push_back(END_OF_VARIES_PARAMS());
-        if (_parameters.size() < ParseSettings::MAX_PARAMETERS)
-        {
-            res.push_back(PARAM_CONSTANT("string"));
-        }
-        return res;
+        static PlistSpec argSpec {
+            { "", // positionals
+              RE(RE::LIST, {
+                 RE(PP(PLACEHOLDER_INPUT)),
+                 RE(RE::STAR, {
+                    RE(PP(PLACEHOLDER_CONSTANT, TID_STRING))
+                 })
+              })
+            }
+        };
+        return &argSpec;
     }
 
     ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, shared_ptr< Query> query)
@@ -55,8 +57,8 @@ public:
         ArrayDesc const& inputSchema = schemas[0];
         Attributes inputAttributes = inputSchema.getAttributes(true);
         if (inputAttributes.size() != 1 ||
-            inputAttributes[0].getType() != TID_STRING ||
-            inputAttributes[0].getFlags() != 0)
+            inputAttributes.firstDataAttribute().getType() != TID_STRING ||
+            inputAttributes.firstDataAttribute().getFlags() != 0)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "input to parse must have a single, non-nullable string attribute";
         }
@@ -75,13 +77,13 @@ public:
 
         dimensions[0] = DimensionDesc("source_instance_id", 0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
         dimensions[1] = DimensionDesc("chunk_no",    0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
-        dimensions[2] = DimensionDesc("line_no",     0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), requestedChunkSize, 0); 
+        dimensions[2] = DimensionDesc("line_no",     0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), requestedChunkSize, 0);
 
-        vector<AttributeDesc> attributes;
+        Attributes attributes;
         if (settings.getSplitOnDimension())
         {   //add 1 for the error column
             dimensions.push_back(DimensionDesc("attribute_no", 0, 0, numRequestedAttributes, numRequestedAttributes, numRequestedAttributes+1, 0));
-            attributes.push_back(AttributeDesc(0, "a", TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
+            attributes.push_back(AttributeDesc("a", TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
         }
         else
         {
@@ -90,13 +92,13 @@ public:
                 ostringstream attname;
                 attname<<"a";
                 attname<<i;
-                attributes.push_back(AttributeDesc((AttributeID)i, attname.str(),  TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
+                attributes.push_back(AttributeDesc(attname.str(),  TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
             }
-            attributes.push_back(AttributeDesc((AttributeID)numRequestedAttributes, "error", TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
+            attributes.push_back(AttributeDesc("error", TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
         }
-        attributes = addEmptyTagAttribute(attributes);
+        attributes.addEmptyTagAttribute();
 
-        return ArrayDesc("parse", attributes, dimensions, createDistribution(psUndefined), query->getDefaultArrayResidency());
+        return ArrayDesc("parse", attributes, dimensions, createDistribution(dtUndefined), query->getDefaultArrayResidency());
     }
 };
 

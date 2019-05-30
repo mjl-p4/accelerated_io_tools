@@ -23,7 +23,7 @@
 * END_COPYRIGHT
 */
 
-#include <query/Operator.h>
+#include <query/LogicalOperator.h>
 
 #include "AioSaveSettings.h"
 
@@ -36,35 +36,64 @@ public:
     LogicalAioSave(const std::string& logicalName, const std::string& alias):
         LogicalOperator(logicalName, alias)
     {
-        ADD_PARAM_INPUT();
-        ADD_PARAM_VARIES();
     }
 
-    //unparse(array,'format=tsv','lines_per_chunk=10')
-    //returns <val:string> [iid=0:*,1,0 chunk=0:*,1,0]
-    std::vector<shared_ptr<OperatorParamPlaceholder> > nextVaryParamPlaceholder(const std::vector< ArrayDesc> &schemas)
+    static PlistSpec const* makePlistSpec()
     {
-        std::vector<shared_ptr<OperatorParamPlaceholder> > res;
-        res.push_back(END_OF_VARIES_PARAMS());
-        if (_parameters.size() < AioSaveSettings::MAX_PARAMETERS)
-        {
-            res.push_back(PARAM_CONSTANT("string"));
-        }
-        return res;
+        static PlistSpec argSpec {
+            { "", // positionals
+              RE(RE::LIST, {
+                 RE(PP(PLACEHOLDER_INPUT)),
+                 RE(RE::STAR, {
+                    RE(PP(PLACEHOLDER_CONSTANT, TID_STRING))
+                 })
+              })
+            },
+            { KW_PATHS, RE(RE::OR, {
+                           RE(PP(PLACEHOLDER_EXPRESSION, TID_STRING)),
+                           RE(RE::GROUP, {
+                              RE(PP(PLACEHOLDER_EXPRESSION, TID_STRING)),
+                              RE(RE::PLUS, {
+                                 RE(PP(PLACEHOLDER_EXPRESSION, TID_STRING))
+                              })
+                           })
+                        })
+            },
+            { KW_INSTANCES, RE(RE::OR, {
+                            RE(PP(PLACEHOLDER_EXPRESSION, TID_INT64)),
+                            RE(RE::GROUP, {
+                                   RE(PP(PLACEHOLDER_EXPRESSION, TID_INT64)),
+                                   RE(RE::PLUS, {
+                                      RE(PP(PLACEHOLDER_EXPRESSION, TID_INT64))
+                                   })
+                              })
+                           })
+            },
+            { KW_BUF_SZ, RE(PP(PLACEHOLDER_CONSTANT, TID_INT64)) },
+            { KW_LINE_DELIM, RE(PP(PLACEHOLDER_CONSTANT, TID_STRING)) },
+            { KW_ATTR_DELIM, RE(PP(PLACEHOLDER_CONSTANT, TID_STRING)) },
+            { KW_CELLS_PER_CHUNK, RE(PP(PLACEHOLDER_CONSTANT, TID_INT64)) },
+            { KW_FORMAT, RE(PP(PLACEHOLDER_CONSTANT, TID_STRING)) },
+            { KW_NULL_PATTERN, RE(PP(PLACEHOLDER_CONSTANT, TID_STRING)) },
+            { KW_PRECISION, RE(PP(PLACEHOLDER_CONSTANT, TID_INT32)) },
+            { KW_ATTS_ONLY, RE(PP(PLACEHOLDER_CONSTANT, TID_BOOL)) },
+            { KW_RESULT_LIMIT, RE(PP(PLACEHOLDER_CONSTANT, TID_INT64)) }
+        };
+        return &argSpec;
     }
 
     ArrayDesc inferSchema(std::vector< ArrayDesc> schemas, shared_ptr< Query> query)
     {
         ArrayDesc const& inputSchema = schemas[0];
-        AioSaveSettings settings (_parameters, true, query);
+        AioSaveSettings settings (_parameters, _kwParameters, true, query);
         vector<DimensionDesc> dimensions(3);
         size_t const nInstances = query->getInstancesCount();
         dimensions[0] = DimensionDesc("chunk_no",    0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);
         dimensions[1] = DimensionDesc("dest_instance_id",   0, 0, nInstances-1, nInstances-1, 1, 0);
         dimensions[2] = DimensionDesc("source_instance_id", 0, 0, nInstances-1, nInstances-1, 1, 0);
-        vector<AttributeDesc> attributes;
-        attributes.push_back(AttributeDesc((AttributeID)0, "val", TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
-        return ArrayDesc("aio_save", attributes, dimensions, defaultPartitioning(), query->getDefaultArrayResidency());
+        Attributes attributes;
+        attributes.push_back(AttributeDesc("val", TID_STRING, AttributeDesc::IS_NULLABLE, CompressorType::NONE));
+        return ArrayDesc("aio_save", attributes, dimensions, createDistribution(defaultDistType()), query->getDefaultArrayResidency(), 0, false);
     }
 };
 

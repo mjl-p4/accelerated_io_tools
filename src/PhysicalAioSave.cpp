@@ -50,15 +50,14 @@
 #include <query/TypeSystem.h>
 #include <query/FunctionDescription.h>
 #include <query/FunctionLibrary.h>
-#include <query/Operator.h>
 #include <query/TypeSystem.h>
 #include <query/FunctionLibrary.h>
-#include <query/Operator.h>
+#include <query/PhysicalOperator.h>
 //#include <array/DBArray.h>
 #include <array/Tile.h>
 #include <array/TileIteratorAdaptors.h>
 #include <util/Platform.h>
-#include <util/Network.h>
+#include <network/Network.h>
 #include <array/SinglePassArray.h>
 #include <array/SynchableArray.h>
 #include <array/PinBuffer.h>
@@ -119,9 +118,10 @@ std::shared_ptr<arrow::Schema> attributes2ArrowSchema(ArrayDesc const &arrayDesc
 
     std::vector<std::shared_ptr<arrow::Field>> arrowFields(
         nAttrs + (attsOnly ? 0 : nDims));
-    for (size_t i = 0; i < nAttrs; ++i)
+    size_t i = 0;
+    for (const auto& attr : attrs)
     {
-        auto type = attrs[i].getType();
+        auto type = attr.getType();
         auto typeEnum = typeId2TypeEnum(type, true);
         std::shared_ptr<arrow::DataType> arrowType;
 
@@ -210,7 +210,8 @@ std::shared_ptr<arrow::Schema> attributes2ArrowSchema(ArrayDesc const &arrayDesc
         }
         }
 
-        arrowFields[i] = arrow::field(attrs[i].getName(), arrowType);
+        arrowFields[i] = arrow::field(attr.getName(), arrowType);
+        i++;
     }
     if (!attsOnly)
     {
@@ -235,8 +236,7 @@ ArrayDesc const addDimensionsToArrayDesc(ArrayDesc const& arrayDesc,
     for (size_t i = 0; i < nDims; ++i)
     {
         arrayDescWithDim.addAttribute(
-            AttributeDesc((AttributeID)(nAttrs + i),
-                          dims[i].getBaseName() + "val",
+            AttributeDesc(dims[i].getBaseName() + "val",
                           TID_INT64,
                           0,
                           CompressorType::NONE));
@@ -262,7 +262,7 @@ public:
         _allocSize(s_startingSize)
     {
         _chunk.allocate(_allocSize);
-        _chunkStartPointer = (char*) _chunk.getData();
+        _chunkStartPointer = (char*) _chunk.getWriteData();
         ConstRLEPayload::Header* hdr = (ConstRLEPayload::Header*) _chunkStartPointer;
         hdr->_magic = RLE_PAYLOAD_MAGIC;
         hdr->_nSegs = 1;
@@ -302,9 +302,9 @@ public:
                 _allocSize = _allocSize * 2;
             }
             vector<char> buf(_allocSize);
-            memcpy(&(buf[0]), _chunk.getData(), mySize);
+            memcpy(&(buf[0]), _chunk.getWriteData(), mySize);
             _chunk.allocate(_allocSize);
-            _chunkStartPointer = (char*) _chunk.getData();
+            _chunkStartPointer = (char*) _chunk.getWriteData();
             memcpy(_chunkStartPointer, &(buf[0]), mySize);
             _dataStartPointer = _chunkStartPointer + AioSaveSettings::chunkDataOffset();
             _sizePointer = (uint32_t*) (_chunkStartPointer + AioSaveSettings::chunkSizeOffset());
@@ -348,9 +348,10 @@ public:
         _inputArrayIters(_nAttrs, 0),
         _inputChunkIters(_nAttrs, 0)
     {
-        for(size_t i =0; i<_nAttrs; ++i)
+        const auto& inputSchemaAttrs = input->getArrayDesc().getAttributes(true);
+        for (const auto& attr : inputSchemaAttrs)
         {
-            _inputArrayIters[i] = _input->getConstIterator(i);
+            _inputArrayIters[attr.getId()] = _input->getConstIterator(attr);
         }
         if (_inputArrayIters[0]->end())
         {
@@ -617,17 +618,19 @@ public:
         _arrowArrays.resize(nAttrs + (_attsOnly ? 0 : _nDims));
 
         // Create Arrow Builders
-        for(size_t i = 0; i < nAttrs; ++i)
+        size_t i = 0;
+        for (const auto& attr : _attrs)
         {
-            _inputTypes[i] = typeId2TypeEnum(_attrs[i].getType(), true);
-            _inputSizes[i] = _attrs[i].getSize() +
-                (_attrs[i].isNullable() ? 1 : 0);
+            _inputTypes[i] = typeId2TypeEnum(attr.getType(), true);
+            _inputSizes[i] = attr.getSize() +
+                (attr.isNullable() ? 1 : 0);
 
             THROW_NOT_OK(
                 arrow::MakeBuilder(
                     _arrowPool,
                     _arrowSchema->field(i)->type(),
                     &_arrowBuilders[i]));
+            i++;
         }
         if (!_attsOnly)
         {
@@ -902,7 +905,7 @@ public:
                 {
                     ostringstream error;
                     error << "Type "
-                          << _attrs[i].getType()
+                          << _inputTypes[i]
                           << " not supported in arrow format";
                     throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION) << error.str();
                 }
@@ -1047,39 +1050,41 @@ public:
        _nanRepresentation("nan")
     {
         Attributes const& inputAttrs = inputArrayDesc.getAttributes(true);
-        for (size_t i = 0; i < inputAttrs.size(); ++i)
+        size_t i = 0;
+        for (const auto& attr : inputAttrs)
         {
-            if(inputAttrs[i].getType() == TID_STRING)
+            if (attr.getType() == TID_STRING)
             {
-                _attTypes[i] = STRING;
+                _attTypes[attr.getId()] = STRING;
             }
-            else if(inputAttrs[i].getType() == TID_BOOL)
+            else if(attr.getType() == TID_BOOL)
             {
-                _attTypes[i] = BOOL;
+                _attTypes[attr.getId()] = BOOL;
             }
-            else if(inputAttrs[i].getType() == TID_DOUBLE)
+            else if(attr.getType() == TID_DOUBLE)
             {
-                _attTypes[i] = DOUBLE;
+                _attTypes[attr.getId()] = DOUBLE;
             }
-            else if(inputAttrs[i].getType() == TID_FLOAT)
+            else if(attr.getType() == TID_FLOAT)
             {
-                _attTypes[i] = FLOAT;
+                _attTypes[attr.getId()] = FLOAT;
             }
-            else if(inputAttrs[i].getType() == TID_UINT8)
+            else if(attr.getType() == TID_UINT8)
             {
-                _attTypes[i] = UINT8;
+                _attTypes[attr.getId()] = UINT8;
             }
-            else if(inputAttrs[i].getType() == TID_INT8)
+            else if(attr.getType() == TID_INT8)
             {
-                _attTypes[i] = INT8;
+                _attTypes[attr.getId()] = INT8;
             }
             else
             {
                 _converters[i] = FunctionLibrary::getInstance()->findConverter(
-                    inputAttrs[i].getType(),
+                    attr.getType(),
                     TID_STRING,
                     false);
             }
+            i++;
         }
     }
 
@@ -1361,18 +1366,20 @@ uint64_t saveToDisk(shared_ptr<Array> const& array,
                     header<<inputSchema.getDimensions()[i].getBaseName();
                 }
             }
-            for(size_t i =0; i<inputSchema.getAttributes(true).size(); ++i)
+            size_t i = 0;
+            for (const auto& attr : inputSchema.getAttributes(true))
             {
                 if(i || settings.printCoordinates())
                 {
                     header<<settings.getAttributeDelimiter();
                 }
-                header<<inputSchema.getAttributes(true)[i].getName();
+                header<<attr.getName();
+                i++;
             }
             header<<settings.getLineDelimiter();
             ::fprintf(f, "%s", header.str().c_str());
         }
-        shared_ptr<ConstArrayIterator> arrayIter = array->getConstIterator(0);
+        shared_ptr<ConstArrayIterator> arrayIter = array->getConstIterator(inputSchema.getAttributes(true).firstDataAttribute());
         for (size_t n = 0; !arrayIter->end(); n++)
         {
             ConstChunk const& ch = arrayIter->getChunk();
@@ -1475,7 +1482,7 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
             arrow::ipc::RecordBatchStreamWriter::Open(
                 arrowStream.get(), arrowSchema, &arrowWriter));
 
-        shared_ptr<ConstArrayIterator> arrayIter = array->getConstIterator(0);
+        shared_ptr<ConstArrayIterator> arrayIter = array->getConstIterator(inputSchema.getAttributes(true).firstDataAttribute());
         for (size_t n = 0; !arrayIter->end(); n++)
         {
             ConstChunk const& ch = arrayIter->getChunk();
@@ -1568,9 +1575,9 @@ public:
         return true;
     }
 
-    bool haveChunk(shared_ptr<Array>& input)
+    bool haveChunk(shared_ptr<Array>& input, ArrayDesc const& schema)
     {
-        shared_ptr<ConstArrayIterator> iter = input->getConstIterator(0);
+        shared_ptr<ConstArrayIterator> iter = input->getConstIterator(schema.getAttributes(true).firstDataAttribute());
         return !(iter->end());
     }
 
@@ -1582,7 +1589,7 @@ public:
     {
         std::shared_ptr<SharedBuffer> buf(new MemoryBuffer(NULL, sizeof(bool)));
         InstanceID myId = query->getInstanceID();
-        *((bool*) buf->getData()) = value;
+        *((bool*) buf->getWriteData()) = value;
         for(InstanceID i=0; i<query->getInstancesCount(); i++)
         {
             if(i != myId)
@@ -1604,7 +1611,7 @@ public:
 
     std::shared_ptr< Array> execute(std::vector< std::shared_ptr< Array> >& inputArrays, std::shared_ptr<Query> query)
     {
-        AioSaveSettings settings (_parameters, false, query);
+        AioSaveSettings settings (_parameters, _kwParameters, false, query);
         shared_ptr<Array>& input = inputArrays[0];
         ArrayDesc const& inputSchema = input->getArrayDesc();
         bool singleChunk = isSingleChunk(inputSchema);
@@ -1624,7 +1631,7 @@ public:
         InstanceID const myInstanceID = query->getInstanceID();
         map<InstanceID, string>::const_iterator iter = settings.getInstanceMap().find(myInstanceID);
         bool thisInstanceSavesData = (iter != settings.getInstanceMap().end());
-        if(singleChunk && agreeOnBoolean((thisInstanceSavesData == haveChunk(input)), query))
+        if(singleChunk && agreeOnBoolean((thisInstanceSavesData == haveChunk(input, inputSchema)), query))
         {
             LOG4CXX_DEBUG(logger, "ALT_SAVE>> single-chunk path")
             if(thisInstanceSavesData)
@@ -1646,10 +1653,10 @@ public:
         shared_ptr<Array> outArrayRedist;
         LOG4CXX_DEBUG(logger, "ALT_SAVE>> Starting SG")
         outArrayRedist = pullRedistribute(outArray,
-                                          createDistribution(psByCol),
+                                          createDistribution(dtByCol),
                                           ArrayResPtr(),
                                           query,
-                                          getShared());
+                                          shared_from_this());
         bool const wasConverted = (outArrayRedist != outArray) ;
         if (thisInstanceSavesData)
         {

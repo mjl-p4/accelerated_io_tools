@@ -27,7 +27,9 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/filesystem.hpp>
-#include <query/Operator.h>
+#include <query/LogicalOperator.h>
+#include <query/Query.h>
+#include <query/Expression.h>
 #include <util/PathUtils.h>
 
 #ifndef AIO_INPUT_SETTINGS
@@ -41,8 +43,23 @@ using boost::algorithm::trim;
 using namespace boost::filesystem;
 using namespace std;
 
+// Logger for operator. static to prevent visibility of variable outside of file
+static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.operators.aio_input"));
+
 namespace scidb
 {
+static const char* const KW_PATHS 		 = "paths";
+static const char* const KW_INSTANCES	 = "instances";
+static const char* const KW_BUF_SZ 		 = "buffer_size";
+static const char* const KW_HEADER 		 = "header";
+static const char* const KW_LINE_DELIM 	 = "line_delimiter";
+static const char* const KW_ATTR_DELIM 	 = "attribute_delimiter";
+static const char* const KW_NUM_ATTR 	 = "num_attributes";
+static const char* const KW_CHUNK_SZ 	 = "chunk_size";
+static const char* const KW_SPLIT_ON_DIM = "split_on_dimension";
+
+typedef std::shared_ptr<OperatorParamLogicalExpression> ParamType_t ;
+
 class AioInputSettings
 {
 private:
@@ -67,10 +84,238 @@ private:
     bool             _splitOnDimension;
     bool             _splitOnDimensionSet;
 
+    void checkIfSet(bool alreadySet, const char* kw)
+    {
+        if (alreadySet)
+        {
+            ostringstream error;
+            error<<"illegal attempt to set "<<kw<<" multiple times";
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << error.str().c_str();
+        }
+    }
+
+    void setParamPaths(vector<string> paths)
+    {
+        for (size_t i = 0; i < paths.size(); ++i)
+        {
+            _inputPaths.push_back(paths[i]);
+        }
+        _multiplepath = true;
+    }
+
+    void setParamInstances(vector<int64_t> instances)
+    {
+        for (size_t i = 0; i < instances.size(); ++i) {
+           _inputInstances.push_back(instances[i]);
+        }
+    }
+
+    void setParamHeader(vector<int64_t> header)
+    {
+        if(header[0] < 0)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "header must be non negative";
+        }
+        _header = header[0];
+    }
+
+    void setParamBufferSize(vector<int64_t> buffer_size)
+    {
+        if(buffer_size[0] <=8 )
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "buffer_size must be greater than 8";
+        }
+        if(buffer_size[0] >= 1024*1024*1024)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "buffer_size must be under 1GB";
+        }
+        _bufferSize = buffer_size[0];
+    }
+
+    void setParamLineDelim(vector<string> l_delim)
+    {
+        _lineDelimiter = getParamDelim(l_delim);
+    }
+
+    void setParamAttrDelim(vector<string> a_delim)
+    {
+        _attributeDelimiter = getParamDelim(a_delim);
+    }
+
+    char getParamDelim(vector<string> a_delim)
+    {
+        string delim = a_delim[0];
+        char ret_delim;
+        if (delim == "\\t")
+        {
+            ret_delim = '\t';
+        }
+        else if (delim == "\\r")
+        {
+            ret_delim = '\r';
+        }
+        else if (delim == "\\n")
+        {
+            ret_delim = '\n';
+        }
+        else if (delim == "")
+        {
+            ret_delim = ' ';
+        }
+        else
+        {
+            try
+            {
+                ret_delim = lexical_cast<char>(delim);
+            }
+            catch (bad_lexical_cast const& exn)
+            {
+                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse delimiter";
+            }
+        }
+        return ret_delim;
+    }
+
+    void setParamNumAttr(vector<int64_t> atts)
+    {
+        if(atts[0] <= 0)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse num_attributes";
+        }
+        _numAttributes = atts[0];
+    }
+
+    void setParamChunkSize(vector<int64_t> chunk_size)
+    {
+        if(chunk_size[0] <= 0)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "chunk_size must be positive";
+        }
+        _chunkSize = chunk_size[0];
+    }
+
+    bool getParamContentBool(Parameter& param)
+    {
+        bool paramContent;
+
+        if(param->getParamType() == PARAM_LOGICAL_EXPRESSION) {
+            ParamType_t& paramExpr = reinterpret_cast<ParamType_t&>(param);
+            paramContent = evaluate(paramExpr->getExpression(), TID_BOOL).getBool();
+        } else {
+            OperatorParamPhysicalExpression* exp =
+                dynamic_cast<OperatorParamPhysicalExpression*>(param.get());
+            SCIDB_ASSERT(exp != nullptr);
+            paramContent = exp->getExpression()->evaluate().getBool();
+        }
+        return paramContent;
+    }
+
+    void setKeywordParamBool(KeywordParameters const& kwParams, const char* const kw, bool& value)
+    {
+        Parameter kwParam = getKeywordParam(kwParams, kw);
+        if (kwParam) {
+            bool paramContent = getParamContentBool(kwParam);
+            LOG4CXX_DEBUG(logger, "aio_input setting " << kw << " to " << paramContent);
+            value = paramContent;
+        } else {
+            LOG4CXX_DEBUG(logger, "aio_input findKeyword null: " << kw);
+        }
+    }
+
+    int64_t getParamContentInt64(Parameter& param)
+    {
+        size_t paramContent;
+
+        if(param->getParamType() == PARAM_LOGICAL_EXPRESSION) {
+            ParamType_t& paramExpr = reinterpret_cast<ParamType_t&>(param);
+            paramContent = evaluate(paramExpr->getExpression(), TID_INT64).getInt64();
+        } else {
+            OperatorParamPhysicalExpression* exp =
+                dynamic_cast<OperatorParamPhysicalExpression*>(param.get());
+            SCIDB_ASSERT(exp != nullptr);
+            paramContent = exp->getExpression()->evaluate().getInt64();
+            LOG4CXX_DEBUG(logger, "aio_input integer param is " << paramContent)
+
+        }
+        return paramContent;
+    }
+
+    void setKeywordParamInt64(KeywordParameters const& kwParams, const char* const kw, bool& alreadySet, void (AioInputSettings::* innersetter)(vector<int64_t>) )
+    {
+        checkIfSet(alreadySet, kw);
+
+        vector<int64_t> paramContent;
+        size_t numParams;
+
+        Parameter kwParam = getKeywordParam(kwParams, kw);
+        if (kwParam) {
+            if (kwParam->getParamType() == PARAM_NESTED) {
+                auto group = dynamic_cast<OperatorParamNested*>(kwParam.get());
+                Parameters& gParams = group->getParameters();
+                numParams = gParams.size();
+                for (size_t i = 0; i < numParams; ++i) {
+                    paramContent.push_back(getParamContentInt64(gParams[i]));
+                }
+            } else {
+                paramContent.push_back(getParamContentInt64(kwParam));
+            }
+            (this->*innersetter)(paramContent);
+            alreadySet = true;
+        } else {
+            LOG4CXX_DEBUG(logger, "aio_input findKeyword null: " << kw);
+        }
+    }
+
+    string getParamContentString(Parameter& param)
+    {
+        string paramContent;
+
+        if(param->getParamType() == PARAM_LOGICAL_EXPRESSION) {
+            ParamType_t& paramExpr = reinterpret_cast<ParamType_t&>(param);
+            paramContent = evaluate(paramExpr->getExpression(), TID_STRING).getString();
+        } else {
+            OperatorParamPhysicalExpression* exp =
+                dynamic_cast<OperatorParamPhysicalExpression*>(param.get());
+            SCIDB_ASSERT(exp != nullptr);
+            paramContent = exp->getExpression()->evaluate().getString();
+        }
+        return paramContent;
+    }
+
+    void setKeywordParamString(KeywordParameters const& kwParams, const char* const kw, bool& alreadySet, void (AioInputSettings::* innersetter)(vector<string>) )
+    {
+        checkIfSet(alreadySet, kw);
+        vector <string> paramContent;
+
+        Parameter kwParam = getKeywordParam(kwParams, kw);
+        if (kwParam) {
+            if (kwParam->getParamType() == PARAM_NESTED) {
+                auto group = dynamic_cast<OperatorParamNested*>(kwParam.get());
+                Parameters& gParams = group->getParameters();
+                for (size_t i = 0; i < gParams.size(); ++i) {
+                    paramContent.push_back(getParamContentString(gParams[i]));
+                }
+            } else {
+                paramContent.push_back(getParamContentString(kwParam));
+            }
+            (this->*innersetter)(paramContent);
+            alreadySet = true;
+        } else {
+            LOG4CXX_DEBUG(logger, "aio_input findKeyword null: " << kw);
+        }
+    }
+
+    Parameter getKeywordParam(KeywordParameters const& kwp, const std::string& kw) const
+    {
+        auto const& kwPair = kwp.find(kw);
+        return kwPair == kwp.end() ? Parameter() : kwPair->second;
+    }
+
 public:
-    static const size_t MAX_PARAMETERS = 9;
+    static const size_t MAX_PARAMETERS = 1;
 
     AioInputSettings(vector<shared_ptr<OperatorParam> > const& operatorParameters,
+                     KeywordParameters const& kwParams,
                      bool logical,
                      shared_ptr<Query>& query):
        _singlepath(false),
@@ -91,295 +336,70 @@ public:
        _splitOnDimension(false),
        _splitOnDimensionSet(false)
     {
-        string const inputFilePathHeader        = "path=";
-        string const inputPathsHeader           = "paths=";
-        string const inputInstancesHeader       = "instances=";
-        string const bufferSizeHeader           = "buffer_size=";
-        string const headerHeader               = "header=";
-        string const lineDelimiterHeader        = "line_delimiter=";
-        string const attributeDelimiterHeader   = "attribute_delimiter=";
-        string const numAttributesHeader        = "num_attributes=";
-        string const chunkSizeHeader            = "chunk_size=";
-        string const splitOnDimensionHeader     = "split_on_dimension=";
+        bool pathsSet = false;
+        bool instancesSet = false;
+        bool numAttrsSet = false;
         int64_t const myLogicalInstanceId = query->getInstanceID();
         InstanceID const myPhysicalInstanceId = query->getPhysicalInstanceID();
         size_t const nParams = operatorParameters.size();
+        string parameterString;
+
         if (nParams > MAX_PARAMETERS)
         {   //assert-like exception. Caller should have taken care of this!
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal number of parameters passed to SplitSettings";
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal number of parameters passed to AioInputSettings";
         }
-        for (size_t i= 0; i<nParams; ++i)
+        if (nParams > 0)
         {
-            shared_ptr<OperatorParam>const& param = operatorParameters[i];
-            string parameterString;
+            shared_ptr<OperatorParam>const& param = operatorParameters[0];
             if (logical)
             {
-                parameterString = evaluate(((shared_ptr<OperatorParamLogicalExpression>&) param)->getExpression(), TID_STRING).getString();
+                parameterString =
+                    evaluate(((shared_ptr<OperatorParamLogicalExpression>&) param)->getExpression(), TID_STRING).getString();
             }
             else
             {
-                parameterString = ((shared_ptr<OperatorParamPhysicalExpression>&) param)->getExpression()->evaluate().getString();
-            }
-            if      (starts_with(parameterString, inputFilePathHeader))
-            {
-                if (_inputFilePath != "")
-                {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set the path multiple times";
-                }
-                string paramContent = parameterString.substr(inputFilePathHeader.size());
-                trim(paramContent);
-                _singlepath = true;
-                _inputFilePath = path::expandForRead(paramContent, *query);
-                _thisInstanceReadsData = query->isCoordinator();
-            }
-            else if  (starts_with(parameterString, inputPathsHeader))
-            {
-                if (_inputPaths.size() > 0)
-                {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set the paths multiple times";
-                }
-                string paramContent = parameterString.substr(inputPathsHeader.size());
-                trim(paramContent);
-                char delimiter=';';
-                vector<string> internal;
-                stringstream ss(paramContent); // Turn the string into a stream.
-                string tok;
-                _multiplepath = true;
-                while(getline(ss, tok, delimiter))
-                {
-                    _inputPaths.push_back(path::expandForRead(tok, *query));
-                }
-            }
-            else if  (starts_with(parameterString, inputInstancesHeader))
-            {
-                if (_inputInstances.size() > 0)
-                {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set the input instances multiple times";
-                }
-                string paramContent = parameterString.substr(inputInstancesHeader.size());
-                trim(paramContent);
-                char delimiter=';';
-                vector<string> internal;
-                stringstream ss(paramContent); // Turn the string into a stream.
-                string tok;
-                while(getline(ss, tok, delimiter))
-                {
-                    try
-                    {
-                        _inputInstances.push_back(lexical_cast<int64_t>(tok));
-                    }
-                    catch (bad_lexical_cast const& exn)
-                    {
-                       throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse instances";
-                    }
-                }
-            }
-            else if (starts_with(parameterString, headerHeader))
-            {
-                if (_headerSet)
-                {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set the header multiple times";
-                }
-                string paramContent = parameterString.substr(headerHeader.size());
-                trim(paramContent);
-                try
-                {
-                   _header = lexical_cast<int64_t>(paramContent);
-                   if(_header<=0)
-                   {
-                       throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "header must be positive";
-                   }
-                   _headerSet = true;
-                }
-                catch (bad_lexical_cast const& exn)
-                {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse header";
-                }
-            }
-            else if (starts_with(parameterString, bufferSizeHeader))
-            {
-                if (_bufferSizeSet)
-                {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set buffer_size multiple times";
-                }
-                string paramContent = parameterString.substr(bufferSizeHeader.size());
-                trim(paramContent);
-                try
-                {
-                    _bufferSize = lexical_cast<int64_t>(paramContent);
-                    if(_bufferSize<=8)
-                    {
-                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "buffer_size must be greater than 8";
-                    }
-                    if(_bufferSize>= 1024*1024*1024)
-                    {
-                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "buffer_size must be under 1GB";
-                    }
-                    _bufferSizeSet = true;
-                }
-                catch (bad_lexical_cast const& exn)
-                {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse buffer_size";
-                }
-            }
-            else if (starts_with(parameterString, lineDelimiterHeader))
-            {
-                if(_lineDelimiterSet)
-                {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set line delimiter multiple times";
-                }
-                string paramContent = parameterString.substr(lineDelimiterHeader.size());
-                trim(paramContent);
-                if (paramContent == "\\t")
-                {
-                    _lineDelimiter = '\t';
-                }
-                else if (paramContent == "\\r")
-                {
-                    _lineDelimiter = '\r';
-                }
-                else if (paramContent == "\\n")
-                {
-                    _lineDelimiter = '\n';
-                }
-                else if (paramContent == "")
-                {
-                    _lineDelimiter = ' ';
-                }
-                else
-                {
-                    try
-                    {
-                       _lineDelimiter = lexical_cast<char>(paramContent);
-                    }
-                    catch (bad_lexical_cast const& exn)
-                    {
-                       throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse delimiter";
-                    }
-                }
-                _lineDelimiterSet = true;
-            }
-            else if (starts_with(parameterString, attributeDelimiterHeader))
-            {
-                if (_attributeDelimiterSet)
-                {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set attribute_delimiter multiple times";
-                }
-                string paramContent = parameterString.substr(attributeDelimiterHeader.size());
-                trim(paramContent);
-                if (paramContent == "\\t")
-                {
-                    _attributeDelimiter = '\t';
-                }
-                else if (paramContent == "\\r")
-                {
-                    _attributeDelimiter = '\r';
-                }
-                else if (paramContent == "\\n")
-                {
-                    _attributeDelimiter = '\n';
-                }
-                else if (paramContent == "")
-                {
-                    _attributeDelimiter = ' ';
-                }
-                else
-                {
-                    try
-                    {
-                        _attributeDelimiter = lexical_cast<char>(paramContent);
-                    }
-                    catch (bad_lexical_cast const& exn)
-                    {
-                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse attribute_delimiter";
-                    }
-                }
-                _attributeDelimiterSet = true;
-            }
-            else if  (starts_with(parameterString, numAttributesHeader))
-            {
-                if (_numAttributes != 0)
-                {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set the number of attributes multiple times";
-                }
-                string paramContent = parameterString.substr(numAttributesHeader.size());
-                trim(paramContent);
-                try
-                {
-                    _numAttributes = lexical_cast<int64_t>(paramContent);
-                    if(_numAttributes<=0)
-                    {
-                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "num_attributes must be positive";
-                    }
-                }
-                catch (bad_lexical_cast const& exn)
-                {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse num_attributes";
-                }
-            }
-            else if (starts_with (parameterString, splitOnDimensionHeader))
-            {
-                if(_splitOnDimensionSet)
-                {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set split_on_dimension multiple times";
-                }
-                string paramContent = parameterString.substr(splitOnDimensionHeader.size());
-                trim(paramContent);
-                try
-                {
-                   _splitOnDimension = lexical_cast<bool>(paramContent);
-                }
-                catch (bad_lexical_cast const& exn)
-                {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse split_on_dimension";
-                }
-            }
-            else if (starts_with(parameterString, chunkSizeHeader))
-            {
-                if (_chunkSizeSet)
-                {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "illegal attempt to set chunk_size multiple times";
-                }
-                string paramContent = parameterString.substr(chunkSizeHeader.size());
-                trim(paramContent);
-                try
-                {
-                    _chunkSize = lexical_cast<int64_t>(paramContent);
-                    if(_chunkSize<=0)
-                    {
-                        throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "chunk_size must be positive";
-                    }
-                    _chunkSizeSet = true;
-                }
-                catch (bad_lexical_cast const& exn)
-                {
-                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "could not parse chunk_size";
-                }
-            }
-            else
-            {
-                string path = parameterString;
-                trim(path);
-                bool containsStrangeCharacters = false;
-                for(size_t i=0; i<path.size(); ++i)
-                {
-                    if(path[i] == '=' || path[i] == ' ')
-                    {
-                        containsStrangeCharacters=true;
-                        break;
-                    }
-                }
-                if (_inputFilePath != "" || containsStrangeCharacters)
-                {
-                   ostringstream errorMsg;
-                   errorMsg << "unrecognized parameter: "<< parameterString;
-                   throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << errorMsg.str().c_str();
-                }
-                _singlepath     = true;
-                _inputFilePath  = path::expandForRead(path, *query);
-                _thisInstanceReadsData = query->isCoordinator();
+                parameterString =
+                    ((shared_ptr<OperatorParamPhysicalExpression>&) param)->getExpression()->evaluate().getString();
             }
         }
+
+        setKeywordParamString(kwParams, KW_PATHS, pathsSet, &AioInputSettings::setParamPaths);
+        setKeywordParamInt64(kwParams, KW_INSTANCES, instancesSet, &AioInputSettings::setParamInstances);
+        setKeywordParamInt64(kwParams, KW_HEADER, _headerSet, &AioInputSettings::setParamHeader);
+        setKeywordParamInt64(kwParams, KW_BUF_SZ, _bufferSizeSet, &AioInputSettings::setParamBufferSize);
+        setKeywordParamString(kwParams, KW_LINE_DELIM, _lineDelimiterSet, &AioInputSettings::setParamLineDelim);
+        setKeywordParamString(kwParams, KW_ATTR_DELIM, _attributeDelimiterSet, &AioInputSettings::setParamAttrDelim);
+        setKeywordParamInt64(kwParams, KW_NUM_ATTR, numAttrsSet, &AioInputSettings::setParamNumAttr);
+        setKeywordParamBool(kwParams, KW_SPLIT_ON_DIM, _splitOnDimension);
+        setKeywordParamInt64(kwParams, KW_CHUNK_SZ, _chunkSizeSet, &AioInputSettings::setParamChunkSize);
+
+        for (size_t i= 0; i<nParams; ++i)
+        {
+            string path = parameterString;
+            trim(path);
+            bool containsStrangeCharacters = false;
+            for(size_t i=0; i<path.size(); ++i)
+            {
+                if(path[i] == '=' || path[i] == ' ')
+                {
+                    containsStrangeCharacters=true;
+                    break;
+                }
+            }
+            if (_inputFilePath != "" || containsStrangeCharacters)
+            {
+                ostringstream errorMsg;
+                errorMsg << "unrecognized parameter: "<< parameterString;
+                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << errorMsg.str().c_str();
+            }
+            _singlepath     = true;
+            _inputFilePath  = path::expandForRead(path, *query);
+            _thisInstanceReadsData = query->isCoordinator();
+        }
+        // multipath vs single path actually doesn't mean there is one file specified, it refers to whether a
+        // positional argument is used (which can only specify one path), or the keywords parameter is used.
+        // If a single path is specified using the keyword 'paths:', the code path should still be
+        // _multipath = true.
         if(_multiplepath)
         {
             if(_inputInstances.size() != _inputPaths.size())
