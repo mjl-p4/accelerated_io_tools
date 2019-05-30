@@ -65,16 +65,16 @@ fi
 
 wget --no-verbose https://bootstrap.pypa.io/get-pip.py
 python get-pip.py
-pip install pandas pyarrow==$ARROW_VER "scidb-py<19.3"
+pip install pandas pyarrow==$ARROW_VER scidb-py
 
 
 # Reset SciDB instance count to 4
-scidb.py stopall $SCIDB_NAME
+scidbctl.py stop $SCIDB_NAME
 rm --recursive $SCIDB_INSTALL_PATH/DB-$SCIDB_NAME
 sed --in-place s/server-0=127.0.0.1,1/server-0=127.0.0.1,3/ \
     $SCIDB_INSTALL_PATH/etc/config.ini
-scidb.py init-all --force $SCIDB_NAME
-scidb.py startall $SCIDB_NAME
+scidbctl.py init-cluster --force $SCIDB_NAME
+scidbctl.py start $SCIDB_NAME
 iquery --afl --query "list('instances')"
 
 
@@ -84,8 +84,8 @@ service shimsvc restart
 
 
 # Compile and install plugin
-scidb.py stopall $SCIDB_NAME
+scidbctl.py stop $SCIDB_NAME
 make --directory /accelerated_io_tools
 cp /accelerated_io_tools/libaccelerated_io_tools.so $SCIDB_INSTALL_PATH/lib/scidb/plugins/
-scidb.py startall $SCIDB_NAME
+scidbctl.py start $SCIDB_NAME
 iquery --afl --query "load_library('accelerated_io_tools')"
