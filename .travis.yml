@@ -11,11 +11,11 @@ python:
   - "3.7"
 
 env:
-  global: SCIDB_VER=18.1 ARROW_VER=0.9.0
+  global: SCIDB_VER=19.3 ARROW_VER=0.9.0
   matrix:
-    - SCIDB_IMG=18.1
-    - SCIDB_IMG=18.1-trusty
-    - SCIDB_IMG=18.1-centos-6
+    - SCIDB_IMG=
+    - SCIDB_IMG=-trusty
+    - SCIDB_IMG=-centos-6
 
 services:
   - docker
@@ -29,7 +29,7 @@ before_install:
   # - wget --no-verbose --output-document -
   #   https://github.com/Paradigm4/scidb-py/archive/master.tar.gz
   #   | tar --extract --gzip --directory=.
-  - docker pull rvernica/scidb:${SCIDB_IMG}
+  - docker pull rvernica/scidb:${SCIDB_VER}${SCIDB_IMG}
   - docker run
     --name scidb
     --detach
@@ -37,7 +37,7 @@ before_install:
     --volume `pwd`:/accelerated_io_tools
     --volume /tmp:/tmp
     --env ARROW_VER=${ARROW_VER}
-    rvernica/scidb:${SCIDB_IMG}
+    rvernica/scidb:${SCIDB_VER}${SCIDB_IMG}
   - while ! curl http://localhost:8080/version; do sleep 5; done
 
 install:
