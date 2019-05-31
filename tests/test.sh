@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -o errexit
+
 DIR=`dirname $0`
 TEST_OUT=$DIR/test.out
 
@@ -13,12 +15,6 @@ project(
  ),
  test
 )" > $TEST_OUT 2>&1
-
-iquery -anq "remove(zero_to_255)"                > /dev/null 2>&1
-iquery -anq "remove(minus_128_to_127)"           > /dev/null 2>&1
-iquery -anq "remove(zero_to_65535)"              > /dev/null 2>&1
-iquery -anq "remove(minus_32768_to_32767)"       > /dev/null 2>&1
-iquery -anq "remove(big_n_wild)"                 > /dev/null 2>&1
 
 if [ 0 == 0 ]; then
     iquery -anq "store( build( <val:string> [x=0:255,64,0],  string(x % 256) ), zero_to_255 )"                                 > /dev/null 2>&1
@@ -227,8 +223,6 @@ time iquery -aq "split(
 echo "test split 7"
 echo "test split 7" >> $TEST_OUT
 
-iquery -anq "remove(foo)" > /dev/null 2>&1
-iquery -anq "remove(bar)" > /dev/null 2>&1
 # why is foo so large here?
 time iquery -anq "store(build(<val:double> [x=1:8000000,1000000,0], random()), foo)" > /dev/null
 time iquery -anq "save(foo, 'foo.tsv', -1, 'tsv')" > /dev/null
@@ -352,3 +346,4 @@ iquery -anq "remove(minus_32768_to_32767)"       > /dev/null 2>&1
 iquery -anq "remove(big_n_wild)"                 > /dev/null 2>&1
 
 diff $TEST_OUT $DIR/test.expected
+rm $TEST_OUT

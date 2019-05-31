@@ -55,7 +55,6 @@ script:
   - ./tests/test_arrow.sh "docker exec scidb"
 
 after_failure:
-  - docker exec scidb cat /accelerated_io_tools/tests/test.out
-  - docker exec scidb cat /accelerated_io_tools/tests/test_arrow.out
-  - cat ./tests/test_arrow.out
+  - cat tests/test.out
+  - cat tests/test_arrow.out
   - docker logs scidb
