@@ -22,12 +22,11 @@ Target size:       {:10.2f} MB
 Buffer size:       {:10.2f} MB
 Chunk size:        {:7d}
 Number of records: {:7d}""".format(
-    runs,
-    mb,
-    buffer_size / 1024. / 1024,
-    chunk_size,
-    cnt))
-
+        runs,
+        mb,
+        buffer_size / 1024. / 1024,
+        chunk_size,
+        cnt))
 
     ar_name = ar_names[0]
     db.build('<z:int64 not null>[i=1:{}:0:{}]'.format(cnt, chunk_size),
@@ -55,11 +54,10 @@ Fix Size Schema (int64 only)
 SciDB size:        {:7.2f} MB
 In-memory size:    {:7.2f} MB
 File size:         {:7.2f} MB""".format(
-    chunks,
-    scidb_bytes_fix / 1024. / 1024,
-    mem_bytes_fix / 1024. / 1024,
-    file_bytes_fix / 1024. / 1024))
-
+        chunks,
+        scidb_bytes_fix / 1024. / 1024,
+        mem_bytes_fix / 1024. / 1024,
+        file_bytes_fix / 1024. / 1024))
 
     ar_name = ar_names[1]
     db.build('<z:int64 not null>[i=1:{}:0:{}]'.format(cnt, chunk_size),
@@ -84,13 +82,14 @@ Variable Size Schema (int64 and string)
 SciDB size:        {:7.2f} MB
 In-memory size:    {:7.2f} MB
 File size:         {:7.2f} MB""".format(
-    scidb_bytes_var / 1024. / 1024,
-    mem_bytes_var / 1024. / 1024,
-    file_bytes_var / 1024. / 1024))
-
+        scidb_bytes_var / 1024. / 1024,
+        mem_bytes_var / 1024. / 1024,
+        file_bytes_var / 1024. / 1024))
 
     ar_name = ar_names[2]
-    db.create_array(ar_name, '<x:double>[i=1:100:0:1; j=1:1000:0:1000; k=1:1000:0:1000]')
+    db.create_array(
+        ar_name,
+        '<x:double>[i=1:100:0:1; j=1:1000:0:1000; k=1:1000:0:1000]')
     db.build(ar_name, 'random()').store(ar_name)
     ar_schemas[2] = db.arrays[ar_name].schema()
     scidb_bytes_var = db.summarize(ar_name).project('bytes')['bytes'][0]
@@ -107,9 +106,9 @@ Multi-Dimensional Schema (3-dimensional, double)
 SciDB size:        {:7.2f} MB
 In-memory size:    {:7.2f} MB
 File size:         {:7.2f} MB""".format(
-    scidb_bytes_var / 1024. / 1024,
-    mem_bytes_var / 1024. / 1024,
-    file_bytes_var / 1024. / 1024))
+        scidb_bytes_var / 1024. / 1024,
+        mem_bytes_var / 1024. / 1024,
+        file_bytes_var / 1024. / 1024))
 
     return db
 
@@ -128,8 +127,13 @@ Fix Size Schema (int64 only)
 ---""")
     fmt = '(int64,int64,int64,int64)'
     stmt = """
-db.iquery("aio_save({ar_name}, '/dev/shm/{ar_name}', 'format={fmt}', 'buffer_size={buffer_size}')",
-          fetch = True)""".format(
+db.iquery(
+    "aio_save(
+        {ar_name},
+        '/dev/shm/{ar_name}',
+        'format={fmt}',
+        'buffer_size={buffer_size}')",
+    fetch = True)""".format(
               ar_name=ar_name,
               fmt=fmt,
               buffer_size=buffer_size)
@@ -140,8 +144,13 @@ Binary: {:6.2f} seconds {:6.2f} MB/second""".format(
 
     fmt = 'arrow'
     stmt = """
-db.iquery("aio_save({ar_name}, '/dev/shm/{ar_name}', 'format={fmt}', 'buffer_size={buffer_size}')",
-          fetch = True)""".format(
+db.iquery(
+    "aio_save(
+        {ar_name},
+        '/dev/shm/{ar_name}',
+        'format={fmt}',
+        'buffer_size={buffer_size}')",
+    fetch = True)""".format(
               ar_name=ar_name,
               fmt=fmt,
               buffer_size=buffer_size)
@@ -149,7 +158,6 @@ db.iquery("aio_save({ar_name}, '/dev/shm/{ar_name}', 'format={fmt}', 'buffer_siz
     print("""\
 Arrow:  {:6.2f} seconds {:6.2f} MB/second""".format(
       rt, mb / rt))
-
 
     ar_name = ar_names[1]
     print("""
@@ -157,8 +165,13 @@ Variable Size Schema (int64 and string)
 ---""")
     fmt = '(int64,int64,int64,int64,string)'
     stmt = """
-db.iquery("aio_save({ar_name}, '/dev/shm/{ar_name}', 'format={fmt}', 'buffer_size={buffer_size}')",
-          fetch = True)""".format(
+db.iquery(
+    "aio_save(
+        {ar_name},
+        '/dev/shm/{ar_name}',
+        'format={fmt}',
+        'buffer_size={buffer_size}')",
+    fetch = True)""".format(
               ar_name=ar_name,
               fmt=fmt,
               buffer_size=buffer_size)
@@ -169,8 +182,13 @@ Binary: {:6.2f} seconds {:6.2f} MB/second""".format(
 
     fmt = 'arrow'
     stmt = """
-db.iquery("aio_save({ar_name}, '/dev/shm/{ar_name}', 'format={fmt}', 'buffer_size={buffer_size}')",
-          fetch = True)""".format(
+db.iquery(
+    "aio_save(
+        {ar_name},
+        '/dev/shm/{ar_name}',
+        'format={fmt}',
+        'buffer_size={buffer_size}')",
+    fetch = True)""".format(
               ar_name=ar_name,
               fmt=fmt,
               buffer_size=buffer_size)
@@ -178,7 +196,6 @@ db.iquery("aio_save({ar_name}, '/dev/shm/{ar_name}', 'format={fmt}', 'buffer_siz
     print("""\
 Arrow:  {:6.2f} seconds {:6.2f} MB/second""".format(
       rt, mb / rt))
-
 
     ar_name = ar_names[2]
     print("""
@@ -204,14 +221,12 @@ db.iquery("                                     \
 TSV/apply:       {:6.2f} seconds {:6.2f} MB/second""".format(
       rt, mb / rt))
 
-
     rt = timeit.Timer(stmt=stmt.format(ar_name=ar_name,
                                        fmt='arrow'),
                       setup=setup).timeit(number=runs) / runs
     print("""\
 Arrow/apply:     {:6.2f} seconds {:6.2f} MB/second""".format(
       rt, mb / rt))
-
 
     stmt = """
 db.iquery("                                     \
@@ -273,7 +288,6 @@ db.iquery('scan({})',
 Arrow:  {:6.2f} seconds {:6.2f} MB/second""".format(
       rt, mb / rt))
 
-
     i = 1
     print("""
 Variable Size Schema (int64 and string)
@@ -305,7 +319,7 @@ def cleanup(db):
     for ar_name in ar_names:
         try:
             db.remove(ar_name)
-        except:
+        except Exception:
             pass
 
 
