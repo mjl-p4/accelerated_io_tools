@@ -383,7 +383,7 @@ public:
         {
             for(size_t i = 0; i < _nAttrs; ++i)
             {
-                _inputChunkIters[i] = _inputArrayIters[i]->getChunk().getConstIterator(ConstChunkIterator::IGNORE_OVERLAPS);
+                _inputChunkIters[i] = _inputArrayIters[i]->getChunk().getConstIterator(ConstChunkIterator::IGNORE_OVERLAPS | ConstChunkIterator::IGNORE_EMPTY_CELLS);
             }
         }
         else if (!_inputChunkIters[0]->end()) // not the first time!
@@ -406,7 +406,7 @@ public:
             }
             for(size_t i =0; i < _nAttrs; ++i)
             {
-                _inputChunkIters[i] = _inputArrayIters[i]->getChunk().getConstIterator(ConstChunkIterator::IGNORE_OVERLAPS);
+                _inputChunkIters[i] = _inputArrayIters[i]->getChunk().getConstIterator(ConstChunkIterator::IGNORE_OVERLAPS | ConstChunkIterator::IGNORE_EMPTY_CELLS);
             }
         }
     }
