@@ -48,7 +48,7 @@ install:
   - if [ "${TRAVIS_PYTHON_VERSION}" = "3.5" -o
          "${TRAVIS_PYTHON_VERSION}" = "3.6" -o
          "${TRAVIS_PYTHON_VERSION}" = "3.7" ]; then
-    pip install pyarrow==0.13.0
+    pip install pyarrow==0.13.0;
     fi
   # - pip install --upgrade
   #   -r https://raw.githubusercontent.com/Paradigm4/SciDB-Py/master/requirements.txt
