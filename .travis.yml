@@ -45,11 +45,6 @@ install:
   # - docker exec scidb make --directory=/accelerated_io_tools/shim-master service
   # - docker exec scidb bash -c "source /opt/rh/python27/enable; pip install --upgrade /accelerated_io_tools/SciDB-Py-master"
   - pip install --upgrade scidb-py
-  - if [ "${TRAVIS_PYTHON_VERSION}" = "3.5" -o
-         "${TRAVIS_PYTHON_VERSION}" = "3.6" -o
-         "${TRAVIS_PYTHON_VERSION}" = "3.7" ]; then
-    pip install pyarrow==0.13.0;
-    fi
   # - pip install --upgrade
   #   -r https://raw.githubusercontent.com/Paradigm4/SciDB-Py/master/requirements.txt
   # - pip install --upgrade git+https://github.com/Paradigm4/SciDB-Py
