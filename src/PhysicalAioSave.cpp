@@ -1226,7 +1226,7 @@ private:
     size_t const                             _bytesPerChunk;
     int64_t const                            _cellsPerChunk;
     ChunkPopulator                           _populator;
-    map<InstanceID, string> const&           _instanceMap;
+    map<InstanceID, string>                  _instanceMap;
     map<InstanceID, string>::const_iterator  _mapIter;
 
 public:
@@ -1297,12 +1297,6 @@ public:
 typedef ConversionArray <BinaryChunkPopulator> BinaryConvertedArray;
 typedef ConversionArray <ArrowChunkPopulator>  ArrowConvertedArray;
 typedef ConversionArray <TextChunkPopulator>   TextConvertedArray;
-
-struct AwIoError
-{
-    AwIoError(int x) : error(x) {}
-    int     error;
-};
 
 uint64_t saveToDisk(shared_ptr<Array> const& array,
                     string file,
@@ -1395,7 +1389,7 @@ uint64_t saveToDisk(shared_ptr<Array> const& array,
             ++(*arrayIter);
         }
     }
-    catch (AwIoError& e)
+    catch (scidb::Exception& e)
     {
         if (f == stdout || f == stderr)
         {
@@ -1405,7 +1399,7 @@ uint64_t saveToDisk(shared_ptr<Array> const& array,
         {
             ::fclose(f);
         }
-        throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR) << ::strerror(e.error) << e.error;
+        e.raise();
     }
     LOG4CXX_DEBUG(logger, "ALT_SAVE>> wrote "<< bytesWritten<< " bytes, closing")
     int rc(0);
@@ -1512,7 +1506,7 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
             ++(*arrayIter);
         }
     }
-    catch (AwIoError& e)
+    catch (scidb::Exception& e)
     {
         if (arrowWriter != nullptr)
         {
@@ -1526,8 +1520,7 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
         {
             arrowStream->Close();
         }
-        throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR)
-            << ::strerror(e.error) << e.error;
+        e.raise();
     }
 
     LOG4CXX_DEBUG(logger, "ALT_SAVE>> wrote "<< bytesWritten<< " bytes, closing");
