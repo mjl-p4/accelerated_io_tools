@@ -1034,7 +1034,7 @@ private:
     vector<AttType>         _attTypes;
     vector<FunctionPointer> _converters;
     Value                   _stringBuf;
-    AioSaveSettings const&  _settings;
+    AioSaveSettings const   _settings;
     string                  _nanRepresentation;
 
 public:
