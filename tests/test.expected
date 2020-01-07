@@ -525,14 +525,14 @@ Query was executed successfully
 0, BRUH	1.92307692307692	abcdef
 test aio_save 6
 Query was executed successfully
-foo<v1:float,v2:double NOT NULL,v3:string NOT NULL> [i=1:50:0:10]	hashed	true
+foo<v1:float,v2:double NOT NULL,v3:string NOT NULL> [i=1:50:0:10]	hashed	none	true
 test aio_save 7
 Query was executed successfully
-foo<v1:float,v2:double NOT NULL,v3:string NOT NULL> [i=1:50:0:10]	hashed	true
+foo<v1:float,v2:double NOT NULL,v3:string NOT NULL> [i=1:50:0:10]	hashed	none	true
 test aio_save 8
 Query was executed successfully
-i,schema,distribution,b
-0,'foo@1<v1:float,v2:double NOT NULL,v3:string NOT NULL> [i=1:50:0:10]','hashed',true
+i,schema,distribution,etcomp,b
+0,'foo@1<v1:float,v2:double NOT NULL,v3:string NOT NULL> [i=1:50:0:10]','hashed',null,true
 test aio_save 9
 Query was executed successfully
 0	0
