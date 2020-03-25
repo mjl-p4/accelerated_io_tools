@@ -1,0 +1,48 @@
+Control Cases
+header:0
+%%	Some	text	long header
+%	some	other	long text header
+12138	3791	1290810	\N
+1	2	3	\N
+header:0, skip:0
+%%	Some	text	long header
+%	some	other	long text header
+12138	3791	1290810	\N
+1	2	3	\N
+header:1
+%	some	other	long text header
+12138	3791	1290810	\N
+1	2	3	\N
+header:1, skip:0
+%	some	other	long text header
+12138	3791	1290810	\N
+1	2	3	\N
+header:2
+12138	3791	1290810	\N
+1	2	3	\N
+header:2, skip:0
+12138	3791	1290810	\N
+1	2	3	\N
+header:3
+1	2	3	\N
+header:3, skip:0
+1	2	3	\N
+Test Cases
+header:0, skip:1
+12138	3791	1290810	\N
+1	2	3	\N
+header:0, skip:2
+%%	Some	text	long header
+%	some	other	long text header
+header:1, skip:1
+12138	3791	1290810	\N
+1	2	3	\N
+header:1, skip:2
+%	some	other	long text header
+header:2, skip:1
+12138	3791	1290810	\N
+1	2	3	\N
+header:2, skip:2
+header:3, skip:1
+1	2	3	\N
+header:3, skip:2

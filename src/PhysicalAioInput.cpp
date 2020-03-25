@@ -40,6 +40,11 @@
 #include <boost/algorithm/string.hpp>
 
 #include <fcntl.h>
+#include <sys/select.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include "AioInputSettings.h"
 
 using std::make_shared;
@@ -106,7 +111,7 @@ private:
     bool         _endOfFile;
     char*        _bufPointer;
     uint32_t*    _sizePointer;
-    FILE*        _inputFile;
+    int          _inputFile;
     size_t const _nInstances;
     ssize_t       _chunkNo;
 
@@ -121,7 +126,7 @@ public:
         _fileBlockSize(settings->getBlockSize()),
         _chunkOverheadSize( getChunkOverheadSize() ),
         _endOfFile(false),
-        _inputFile(NULL),
+        _inputFile(-1),  // invalid FD
         _nInstances(query->getInstancesCount()),
         _chunkNo(0)
     {
@@ -155,32 +160,46 @@ public:
         *_sizePointer = (uint32_t) _fileBlockSize;
         _bufPointer = (char*) (_sizePointer+1);
         string const& filePath = settings->getInputFilePath();
-        _inputFile = fopen(filePath.c_str(), "r");
-        if (_inputFile == NULL)
-        {
+        _inputFile = openFile(filePath, query->getInstanceID());
+        int const header = settings->getHeader();
+        if (header > 0) {
+            skipHeader(_inputFile, header, settings->getLineDelimiter(), query);
+        }
+    }
+
+    /**
+     * Open the input file for reading.
+     *
+     * @param filePath The path to the FIFO, pipe, or file to read input from.
+     * @param instanceId The ID of this instance, used only for the exception message
+     *    should this openFile fail.
+     */
+    static int openFile(std::string const& filePath,
+                        InstanceID instanceId)
+    {
+        // Mark this FD as non-blocking because filePath could refer to any
+        // file-like device and we must be able to periodically check for
+        // a valid query.  If we marked this as blocking, then we will end
+        // up stuck forever in a read() in cases where pipes that don't
+        // have data yet in them but the query has been cancelled.
+        auto fd = open(filePath.c_str(), O_RDONLY | O_NONBLOCK);
+
+        if (fd == -1) {
+	    int err = errno;
             ostringstream errorMsg;
-            errorMsg<<"cannot open file '"<<filePath<<"' on instance "<<query->getInstanceID();
+            errorMsg << "cannot open file '" << filePath << "' on instance " << instanceId
+		     << " (errno=" << err << ", '" << strerror(err) << "')";
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << errorMsg.str().c_str();
         }
-        int const header = settings->getHeader();
-        if(header>0)
-        {
-            char *line = NULL;
-            size_t linesize = 0;
-            ssize_t nread = 0;
-            for(int64_t j=0; j<header && nread>=0; ++j)
-            {
-                nread = getdelim(&line, &linesize, (int)settings->getLineDelimiter(), _inputFile);
-            }
-            free(line);
-        }
+
+        return fd;
     }
 
     virtual ~BinFileSplitArray()
     {
-        if(_inputFile!=NULL)
+        if (_inputFile != -1)
         {
-            ::fclose(_inputFile);
+            ::close(_inputFile);
         }
     }
 
@@ -189,18 +208,119 @@ public:
         return _rowIndex;
     }
 
+    /**
+     * Read past some number of lines from the input file, regarding
+     * them as a header containing no data to load.
+     *
+     * @param fd The input file's descriptor.
+     * @param linesToSkip The number of lines in the header to disregard.
+     * @param lineDelim The character delimiting lines in the input file.
+     * @param query A weak pointer to the query.
+     */
+    static void skipHeader(int fd,
+                           int linesToSkip,
+                           char lineDelim,
+                           std::weak_ptr<Query> query)
+    {
+        // Linux implementation of getdelim() reads a single byte-at-a-time
+        // from the input.  Do that for now, optimizing later if we need to.
+        char buf;
+        int linesSkipped = 0;
+        do {
+            auto result = scidb_read(fd, &buf, 1, query);
+            if (result == 1 && buf == lineDelim) {
+                ++linesSkipped;
+            }
+        } while (linesSkipped < linesToSkip);
+    }
+
+    /**
+     * Read from the input, allowing query cancellation to interrupt
+     * the read, ensuring that array locks are cleaned-up and the query
+     * aborted appropriately.
+     *
+     * @param fd The input file's descriptor.
+     * @param buf The buffer into which to read data.
+     * @param count The size of the buffer in bytes.
+     * @param query A weak pointer to the query.
+     */
+    static ssize_t scidb_read(int fd,
+                              void* buf,
+                              size_t const count,
+                              std::weak_ptr<Query> query)
+    {
+        ssize_t total = 0;
+        size_t rdCnt = count;
+        struct stat fdStat;
+        fstat(fd, &fdStat);
+        const bool isFifo = S_ISFIFO(fdStat.st_mode);
+        fd_set readFdSet;
+        do {
+            FD_ZERO(&readFdSet);
+            FD_SET(fd, &readFdSet);
+            // select can change the timeval parameter, so make a new
+            // copy of it each time around the loop.
+            timeval rdTimeout{/*tv_sec:*/1, /*tv_usec:*/0};
+            int fds_ready = select(fd+1, &readFdSet, nullptr, nullptr, &rdTimeout);
+            if (fds_ready > 0) {
+                if (FD_ISSET(fd, &readFdSet)) {
+                    size_t nb = ::read(fd, buf, rdCnt);
+                    if (nb > 0) {
+                        // Making progress on the read.
+                        total += nb;
+                        rdCnt -= nb;
+                    }
+                    else if (nb == 0) {
+                        if (isFifo && total == 0) {
+                            // We haven't read any data from the FIFO yet.  To preserve
+                            // the previous aio_input behavior, don't return, and try
+                            // again.  But first, check the query to be sure we haven't
+                            // aborted.  If we have aborted, then this call will throw.
+                            Query::getValidQueryPtr(query);
+                            continue;
+                        }
+                        // else, we've read data to the end of the FIFO or file.
+                        return total;
+                    }
+                    else {  // nb < 0
+                        if (errno != EAGAIN) {
+                            // Some other signal interrupted, so return what we have.
+                            return total;
+                        }
+                        // else try again on EAGAIN
+                    }
+                }
+                // else some other FD is set.  This shouldn't be possible
+                // at the commit where this scidb_read was introduced.
+                SCIDB_ASSERT(fds_ready == 1);  // select() on only one FD.
+            }
+            else if (fds_ready == 0) {
+                // No fds ready, but maybe the query died, so check
+                // that.  If the query is dead, then this will throw,
+                // prompting the input operation to terminate.
+                Query::getValidQueryPtr(query);
+            }
+            else {  // else fds_ready < 0
+                // An error occurred during select().
+                return total;
+            }
+        } while (rdCnt > 0);
+
+        return total;
+    }
+
     bool moveNext(size_t rowIndex)
     {
         if(_endOfFile)
         {
             return false;
         }
-        size_t numBytes = ::fread(_bufPointer, 1, _fileBlockSize, _inputFile);
+        size_t numBytes = scidb_read(_inputFile, _bufPointer, _fileBlockSize, _query);
         if(numBytes != _fileBlockSize)
         {
             _endOfFile = true;
-            ::fclose(_inputFile);
-            _inputFile = NULL;
+            ::close(_inputFile);
+            _inputFile = -1;
             if(numBytes == 0)
             {
                 return false;
@@ -388,6 +508,231 @@ public:
             _outputArrayIterators[i].reset();
         }
         return _output;
+    }
+};
+
+/**
+ * Class AIOOutputCache
+ *
+ * Tracks all of the pieces of the input buffer that make up the chunks
+ * written for any given line in the input file.  Allows us to know
+ * before we write any chunks for a line of the input if that line has
+ * an error that would cause the 'error' attribute not to be null.
+ *
+ * Assumes that the lifetime of the buffer read from the file is longer
+ * than the lifetime of this object.
+ */
+class AIOOutputCache
+{
+private:
+    Coordinates _outputPosition;
+    size_t const _outputLineSize;
+    size_t const _outputChunkSize;
+    bool _splitOnDimension;
+    size_t _outputColumn;
+    char const _attributeDelimiter;
+    AioInputSettings::Skip _skip;
+    bool _hasError{false};
+    Coordinate _outputPositionLimit;
+    using LineIndex = size_t;
+    LineIndex _lineIndex{1};  // start at 1, reserving 0 for NEW_CHUNK (below)
+
+    // An operation on the output array based-on the input data.
+    struct Operation
+    {
+        enum class Type
+        {
+            NEW_CHUNK,   // corresponds to AIOOutputWriter::newChunk
+            WRITE_VALUE, // corresponds to AIOOutputWriter::writeValue
+            END_LINE     // corresponds to AIOOutputWriter::endLine
+        };
+
+        Operation(Type type,
+                  Coordinates const* inputChunkPos,
+                  char const* start,
+                  char const* end)
+                : _type(type)
+                , _inputChunkPosition(nullptr)
+                , _start(start)
+                , _end(end)
+        {
+            if (inputChunkPos) {
+                _inputChunkPosition = std::make_unique<Coordinates>(*inputChunkPos);
+            }
+        }
+
+        const Type _type;
+        std::unique_ptr<Coordinates> _inputChunkPosition;
+        const char* _start;
+        const char* _end;
+    };
+
+    // All of the AIOOutputWriter operations that would've been done
+    // inline while reading the input file are instead remembered here,
+    // then inspected before any writing to the output array chunks takes
+    // place, allowing the 'skip' parameter to have its effect if configured.
+    std::map<LineIndex, std::vector<Operation>> _operations;
+
+public:
+    AIOOutputCache(ArrayDesc const& schema,
+                   shared_ptr<Query>& query,
+                   bool splitOnDimension,
+                   char const attDelimiter,
+                   AioInputSettings::Skip skip)
+        : _outputPosition(splitOnDimension ? 4 : 3, 0)
+        , _outputLineSize(splitOnDimension ? schema.getDimensions()[3].getChunkInterval() : schema.getAttributes(true).size())
+        , _outputChunkSize(schema.getDimensions()[0].getChunkInterval())
+        , _splitOnDimension(splitOnDimension)
+        , _outputColumn(0)
+        , _attributeDelimiter(attDelimiter)
+        , _skip(skip)
+    { }
+
+    /**
+     * This duplicates the initialization and setup of the AIOOutputWriter::newChunk
+     * method but without committing anything to the output chunks.
+     *
+     * @param inputChunkPosition The upper left corner of the input chunk.
+     * @param query The query.
+     */
+    void newChunk(Coordinates const& inputChunkPosition, shared_ptr<Query>& query)
+    {
+        _outputPosition[0] = inputChunkPosition[0] * _outputChunkSize;
+        _outputPositionLimit = _outputPosition[0] + _outputChunkSize;
+        _outputPosition[1] = inputChunkPosition[1];
+        _outputPosition[2] = inputChunkPosition[2];
+        if(_splitOnDimension)
+        {
+            _outputPosition[3] = 0;
+        }
+
+        _operations[0].emplace_back(Operation::Type::NEW_CHUNK, &inputChunkPosition, nullptr, nullptr);
+    }
+
+    /**
+     * This duplicates the column and offset math of the AIOOutputWriter::writeValue
+     * method but without committing anything to the output chunks, allowing us to
+     * know if there would be an error at this line before writing to the output array.
+     *
+     * @param start A pointer to the start of a memory region containing the value
+     *    to write to the next output chunk.
+     * @param end  A pointer to the end of the memory region containing the value
+     *    to write to the next output chunk.
+     */
+    void writeValue(char const* start, char const* end)
+    {
+        if(_outputPosition[0] >= _outputPositionLimit)
+        {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "The chunk size is too small for the current block size. Lower the block size or increase chunk size";
+        }
+        if(_outputColumn < _outputLineSize - 1)
+        {
+            if(_splitOnDimension)
+            {
+                ++(_outputPosition[3]);
+            }
+        }
+        else if (_outputColumn == _outputLineSize - 1)
+        {
+            _hasError = true;
+        }
+        else
+        {
+            _hasError = true;
+        }
+        ++_outputColumn;
+
+        _operations[_lineIndex].emplace_back(Operation::Type::WRITE_VALUE, nullptr, start, end);
+    }
+
+    /**
+     * This duplicates the column and offset math of the AIOOutputWriter::endLine
+     * method but without committing anything to the output chunks, allowing us to
+     * know if there would be an error at this line before writing to the output array.
+     */
+    void endLine()
+    {
+        if(_outputColumn < _outputLineSize - 1)
+        {
+            if(_splitOnDimension)
+            {
+                while (_outputColumn < _outputLineSize - 1)
+                {
+                    ++(_outputPosition[3]);
+                    ++_outputColumn;
+                }
+            }
+            else
+            {
+                while (_outputColumn < _outputLineSize - 1)
+                {
+                    ++_outputColumn;
+                }
+            }
+            _hasError = true;
+        }
+        if(_splitOnDimension)
+        {
+            _outputPosition[3] = 0;
+        }
+
+        ++(_outputPosition[0]);
+        _outputColumn = 0;
+
+        _operations[_lineIndex].emplace_back(Operation::Type::END_LINE, nullptr, nullptr, nullptr);
+
+        // endLine() is called only once per line of input.  If there's an
+        // error at this point, then depending on the 'skip' parameter,
+        // delete this line from the cache.  When the cache is replayed later
+        // to write the chunks to the output array, the deleted line won't appear
+        // in the output.
+        if ((_skip == AioInputSettings::Skip::ERRORS && _hasError)
+            || (_skip == AioInputSettings::Skip::NON_ERRORS && !_hasError)) {
+            _operations.erase(_lineIndex);
+        }
+        _hasError = false;
+
+        ++_lineIndex;
+    }
+
+    /**
+     * Playback all of the operations recorded while processing the lines
+     * from the input chunk of the file, modulo any dropped lines due to
+     * an error, depending on the 'skip' parameter.
+     *
+     * @param query The query.
+     * @param writer The instance of the AIOOutputWriter that owns the
+     *     output array and its chunks.
+     */
+    void playback(std::shared_ptr<Query> query,
+                  AIOOutputWriter& writer)
+    {
+        if (_operations.size() == 1) {
+            // Every line on this chunk had an error, and
+            // only the NEW_CHUNK operation remains
+            // for playback.  Don't execute it, because
+            // executing it would create a chunk that has
+            // nothing on it.
+            return;
+        }
+
+        for (auto& line : _operations) {
+            for (auto& op : line.second) {
+                switch (op._type) {
+                case Operation::Type::NEW_CHUNK:
+                    writer.newChunk(*op._inputChunkPosition, query);
+                    break;
+                case Operation::Type::WRITE_VALUE:
+                    writer.writeValue(op._start, op._end);
+                    break;
+                case Operation::Type::END_LINE:
+                    writer.endLine();
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
     }
 };
 
@@ -605,17 +950,22 @@ public:
                 const char* end = start;
                 const char* terminus = start + buf.size();
                 bool finished = false;
-                writer.newChunk(pos, query);
+                AIOOutputCache cache(_schema,
+                                     query,
+                                     settings->getSplitOnDimension(),
+                                     settings->getAttributeDelimiter(),
+                                     settings->getSkip());
+                cache.newChunk(pos, query);
                 while (!finished)
                 {
                     while( end != terminus && (*end)!=attDelim && (*end)!=lineDelim )
                     {
                         ++end;
                     }
-                    writer.writeValue(start, end);
+                    cache.writeValue(start, end);
                     if(end == terminus || (*end) == lineDelim )
                     {
-                        writer.endLine();
+                        cache.endLine();
                         ++nLines;
                         if (nLines > outputChunkSize)
                         {
@@ -632,6 +982,16 @@ public:
                         end   = end+1;
                     }
                 }
+
+                // Playback the cache calls made during the
+                // loop above, into the output writer, in
+                // the same order and with the same values as
+                // they would've been executed had the cache
+                // layer not been present.  This must be done
+                // here and before the buf buffer goes out-of-scope,
+                // otherwise the recorded addresses will point to
+                // bogus data.
+                cache.playback(query, writer);
             }
             ++(*inputIterator);
         }
