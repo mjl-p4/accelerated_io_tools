@@ -64,7 +64,7 @@ private:
 
 public:
     OutputWriter(ArrayDesc const& schema, shared_ptr<Query>& query, bool splitOnDimension, char const attDelimiter):
-        _output(make_shared<MemArray>(schema,query)),
+        _output(std::make_shared<MemArray>(schema,query)),
         _outputPosition( splitOnDimension ? 4 : 3, 0),
         _numLiveAttributes(schema.getAttributes(true).size()),
         _outputLineSize(splitOnDimension ? schema.getDimensions()[3].getChunkInterval() : _numLiveAttributes),
