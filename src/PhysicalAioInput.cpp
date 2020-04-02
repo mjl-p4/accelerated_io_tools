@@ -40,6 +40,7 @@
 #include <boost/algorithm/string.hpp>
 
 #include <fcntl.h>
+#include <string.h>
 #include <sys/select.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -245,7 +246,7 @@ public:
      * @param query A weak pointer to the query.
      */
     static ssize_t scidb_read(int fd,
-                              void* buf,
+                              void* buffer,
                               size_t const count,
                               std::weak_ptr<Query> query)
     {
@@ -255,6 +256,7 @@ public:
         fstat(fd, &fdStat);
         const bool isFifo = S_ISFIFO(fdStat.st_mode);
         fd_set readFdSet;
+        auto buf = static_cast<char*>(buffer);
         do {
             FD_ZERO(&readFdSet);
             FD_SET(fd, &readFdSet);
@@ -269,6 +271,7 @@ public:
                         // Making progress on the read.
                         total += nb;
                         rdCnt -= nb;
+                        buf += nb;
                     }
                     else if (nb == 0) {
                         if (isFifo && total == 0) {
@@ -290,9 +293,13 @@ public:
                         // else try again on EAGAIN
                     }
                 }
-                // else some other FD is set.  This shouldn't be possible
-                // at the commit where this scidb_read was introduced.
-                SCIDB_ASSERT(fds_ready == 1);  // select() on only one FD.
+                else {
+                    // else some other FD is set.  This shouldn't be possible
+                    // at the commit where this scidb_read was introduced
+                    // because we passed on only one FD to select().
+                    throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION)
+                        << "Unexpected file descriptor in aio_input() has data available";
+                }
             }
             else if (fds_ready == 0) {
                 // No fds ready, but maybe the query died, so check
@@ -311,18 +318,25 @@ public:
 
     bool moveNext(size_t rowIndex)
     {
-        if(_endOfFile)
-        {
+        if (_endOfFile) {
             return false;
         }
-        size_t numBytes = scidb_read(_inputFile, _bufPointer, _fileBlockSize, _query);
-        if(numBytes != _fileBlockSize)
-        {
+        ssize_t numBytes = scidb_read(_inputFile, _bufPointer, _fileBlockSize, _query);
+
+        if (numBytes == -1) {
+            // Error, inspect errno and abort the query with an exception.
+            ostringstream oss;
+            oss << "aio_input() error reading from fd, errno="
+                << errno << " (" << strerror(errno) << ")";
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION)
+                << oss.str().c_str();
+        }
+
+        if (numBytes != _fileBlockSize) {
             _endOfFile = true;
             ::close(_inputFile);
             _inputFile = -1;
-            if(numBytes == 0)
-            {
+            if (numBytes == 0) {
                 return false;
             }
             *_sizePointer = (uint32_t) numBytes;
@@ -525,23 +539,17 @@ public:
 class AIOOutputCache
 {
 private:
-    Coordinates _outputPosition;
     size_t const _outputLineSize;
-    size_t const _outputChunkSize;
-    bool _splitOnDimension;
     size_t _outputColumn;
-    char const _attributeDelimiter;
     AioInputSettings::Skip _skip;
     bool _hasError{false};
-    Coordinate _outputPositionLimit;
-    using LineIndex = size_t;
-    LineIndex _lineIndex{1};  // start at 1, reserving 0 for NEW_CHUNK (below)
 
     // An operation on the output array based-on the input data.
     struct Operation
     {
         enum class Type
         {
+            NONE,
             NEW_CHUNK,   // corresponds to AIOOutputWriter::newChunk
             WRITE_VALUE, // corresponds to AIOOutputWriter::writeValue
             END_LINE     // corresponds to AIOOutputWriter::endLine
@@ -557,35 +565,36 @@ private:
                 , _end(end)
         {
             if (inputChunkPos) {
-                _inputChunkPosition = std::make_unique<Coordinates>(*inputChunkPos);
+                _inputChunkPosition = std::make_shared<Coordinates>(*inputChunkPos);
             }
         }
 
-        const Type _type;
-        std::unique_ptr<Coordinates> _inputChunkPosition;
-        const char* _start;
-        const char* _end;
+        Type _type{Type::NONE};
+        std::shared_ptr<Coordinates> _inputChunkPosition;
+        const char* _start{nullptr};
+        const char* _end{nullptr};
     };
 
     // All of the AIOOutputWriter operations that would've been done
     // inline while reading the input file are instead remembered here,
     // then inspected before any writing to the output array chunks takes
     // place, allowing the 'skip' parameter to have its effect if configured.
-    std::map<LineIndex, std::vector<Operation>> _operations;
+    using Operations = std::vector<Operation>;
+    Operations _operations;
+    Operations _currLine;
 
 public:
     AIOOutputCache(ArrayDesc const& schema,
                    shared_ptr<Query>& query,
                    bool splitOnDimension,
-                   char const attDelimiter,
                    AioInputSettings::Skip skip)
-        : _outputPosition(splitOnDimension ? 4 : 3, 0)
-        , _outputLineSize(splitOnDimension ? schema.getDimensions()[3].getChunkInterval() : schema.getAttributes(true).size())
-        , _outputChunkSize(schema.getDimensions()[0].getChunkInterval())
-        , _splitOnDimension(splitOnDimension)
+        : _outputLineSize(splitOnDimension ?
+                          schema.getDimensions()[3].getChunkInterval() :
+                          schema.getAttributes(true).size())
         , _outputColumn(0)
-        , _attributeDelimiter(attDelimiter)
         , _skip(skip)
+        , _operations()
+        , _currLine()
     { }
 
     /**
@@ -597,16 +606,7 @@ public:
      */
     void newChunk(Coordinates const& inputChunkPosition, shared_ptr<Query>& query)
     {
-        _outputPosition[0] = inputChunkPosition[0] * _outputChunkSize;
-        _outputPositionLimit = _outputPosition[0] + _outputChunkSize;
-        _outputPosition[1] = inputChunkPosition[1];
-        _outputPosition[2] = inputChunkPosition[2];
-        if(_splitOnDimension)
-        {
-            _outputPosition[3] = 0;
-        }
-
-        _operations[0].emplace_back(Operation::Type::NEW_CHUNK, &inputChunkPosition, nullptr, nullptr);
+        _operations.emplace_back(Operation::Type::NEW_CHUNK, &inputChunkPosition, nullptr, nullptr);
     }
 
     /**
@@ -621,28 +621,13 @@ public:
      */
     void writeValue(char const* start, char const* end)
     {
-        if(_outputPosition[0] >= _outputPositionLimit)
-        {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "The chunk size is too small for the current block size. Lower the block size or increase chunk size";
-        }
-        if(_outputColumn < _outputLineSize - 1)
-        {
-            if(_splitOnDimension)
-            {
-                ++(_outputPosition[3]);
-            }
-        }
-        else if (_outputColumn == _outputLineSize - 1)
-        {
+        if (_outputColumn >= _outputLineSize - 1) {
             _hasError = true;
         }
-        else
-        {
-            _hasError = true;
-        }
+
         ++_outputColumn;
 
-        _operations[_lineIndex].emplace_back(Operation::Type::WRITE_VALUE, nullptr, start, end);
+        _currLine.emplace_back(Operation::Type::WRITE_VALUE, nullptr, start, end);
     }
 
     /**
@@ -652,34 +637,13 @@ public:
      */
     void endLine()
     {
-        if(_outputColumn < _outputLineSize - 1)
-        {
-            if(_splitOnDimension)
-            {
-                while (_outputColumn < _outputLineSize - 1)
-                {
-                    ++(_outputPosition[3]);
-                    ++_outputColumn;
-                }
-            }
-            else
-            {
-                while (_outputColumn < _outputLineSize - 1)
-                {
-                    ++_outputColumn;
-                }
-            }
+        if (_outputColumn < _outputLineSize - 1) {
             _hasError = true;
         }
-        if(_splitOnDimension)
-        {
-            _outputPosition[3] = 0;
-        }
 
-        ++(_outputPosition[0]);
         _outputColumn = 0;
 
-        _operations[_lineIndex].emplace_back(Operation::Type::END_LINE, nullptr, nullptr, nullptr);
+        _currLine.emplace_back(Operation::Type::END_LINE, nullptr, nullptr, nullptr);
 
         // endLine() is called only once per line of input.  If there's an
         // error at this point, then depending on the 'skip' parameter,
@@ -688,11 +652,15 @@ public:
         // in the output.
         if ((_skip == AioInputSettings::Skip::ERRORS && _hasError)
             || (_skip == AioInputSettings::Skip::NON_ERRORS && !_hasError)) {
-            _operations.erase(_lineIndex);
+            _currLine.clear();
+        }
+        else {
+            _operations.insert(_operations.end(),
+                               _currLine.begin(),
+                               _currLine.end());
+            _currLine.clear();
         }
         _hasError = false;
-
-        ++_lineIndex;
     }
 
     /**
@@ -716,23 +684,28 @@ public:
             return;
         }
 
-        for (auto& line : _operations) {
-            for (auto& op : line.second) {
-                switch (op._type) {
-                case Operation::Type::NEW_CHUNK:
-                    writer.newChunk(*op._inputChunkPosition, query);
-                    break;
-                case Operation::Type::WRITE_VALUE:
-                    writer.writeValue(op._start, op._end);
-                    break;
-                case Operation::Type::END_LINE:
-                    writer.endLine();
-                    break;
-                default:
-                    break;
-                }
+        for (auto& op : _operations) {
+            switch (op._type) {
+            case Operation::Type::NEW_CHUNK:
+                writer.newChunk(*op._inputChunkPosition, query);
+                break;
+            case Operation::Type::WRITE_VALUE:
+                writer.writeValue(op._start, op._end);
+                break;
+            case Operation::Type::END_LINE:
+                writer.endLine();
+                break;
+            case Operation::Type::NONE:
+                // fall-through to default
+            default:
+                throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION)
+                    << "Invalid operation type 'NONE' during aio_input()";
+                break;  // unreachable
             }
         }
+
+        _currLine.clear();
+        _operations.clear();
     }
 };
 
@@ -897,6 +870,10 @@ public:
         char const attDelim = settings->getAttributeDelimiter();
         char const lineDelim = settings->getLineDelimiter();
         AIOOutputWriter writer(_schema, query, settings->getSplitOnDimension(), settings->getAttributeDelimiter());
+        AIOOutputCache cache(_schema,
+                             query,
+                             settings->getSplitOnDimension(),
+                             settings->getSkip());
         size_t const overheadSize = getChunkOverheadSize();
         size_t const sizeOffset = getSizeOffset();
         while(!inputIterator-> end())
@@ -950,11 +927,6 @@ public:
                 const char* end = start;
                 const char* terminus = start + buf.size();
                 bool finished = false;
-                AIOOutputCache cache(_schema,
-                                     query,
-                                     settings->getSplitOnDimension(),
-                                     settings->getAttributeDelimiter(),
-                                     settings->getSkip());
                 cache.newChunk(pos, query);
                 while (!finished)
                 {

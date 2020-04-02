@@ -4,7 +4,7 @@ header:0
 %	some	other	long text header
 12138	3791	1290810	\N
 1	2	3	\N
-header:0, skip:0
+header:0, skip:'nothing'
 %%	Some	text	long header
 %	some	other	long text header
 12138	3791	1290810	\N
@@ -13,36 +13,36 @@ header:1
 %	some	other	long text header
 12138	3791	1290810	\N
 1	2	3	\N
-header:1, skip:0
+header:1, skip:'nothing'
 %	some	other	long text header
 12138	3791	1290810	\N
 1	2	3	\N
 header:2
 12138	3791	1290810	\N
 1	2	3	\N
-header:2, skip:0
+header:2, skip:'nothing'
 12138	3791	1290810	\N
 1	2	3	\N
 header:3
 1	2	3	\N
-header:3, skip:0
+header:3, skip:'nothing'
 1	2	3	\N
 Test Cases
-header:0, skip:1
+header:0, skip:'errors'
 12138	3791	1290810	\N
 1	2	3	\N
-header:0, skip:2
+header:0, skip:'non-errors'
 %%	Some	text	long header
 %	some	other	long text header
-header:1, skip:1
+header:1, skip:'errors'
 12138	3791	1290810	\N
 1	2	3	\N
-header:1, skip:2
+header:1, skip:'non-errors'
 %	some	other	long text header
-header:2, skip:1
+header:2, skip:'errors'
 12138	3791	1290810	\N
 1	2	3	\N
-header:2, skip:2
-header:3, skip:1
+header:2, skip:'non-errors'
+header:3, skip:'errors'
 1	2	3	\N
-header:3, skip:2
+header:3, skip:'non-errors'

@@ -332,31 +332,24 @@ private:
         return kwPair == kwp.end() ? Parameter() : kwPair->second;
     }
 
-    void setSkip(vector<int64_t> args)
+    void setSkip(vector<string> args)
     {
-        auto skipOp = args[0];
+        const auto& skipOp = args[0];
 
-        // Accepted values must match the Skip enumeration above.
-        if (skipOp < 0 || skipOp > 2) {
-            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION)
-                << "'skip' may be:  0 (pass everything), 1 (skip errors), or 2 (skip non-errors)";
-        }
-
-        switch (skipOp) {
-        case 0:
+        if (skipOp == "nothing") {
             _skip = AioInputSettings::Skip::NOTHING;
-            break;
-        case 1:
+        }
+        else if (skipOp == "errors") {
             _skip = AioInputSettings::Skip::ERRORS;
-            break;
-        case 2:
+        }
+        else if (skipOp == "non-errors") {
             _skip = AioInputSettings::Skip::NON_ERRORS;
-            break;
-        default:
-            // Can't happen if the check above remains intact.  If we
-            // get here, it's evident that this assertion won't hold.
-            SCIDB_ASSERT(skipOp >= 0 && skipOp <= 2);
-        };
+        }
+        else {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION)
+                << "'skip' may be:  'nothing' (pass everything), 'errors' (skip errors), "
+                "or 'non-errors' (skip non-errors)";
+        }
     }
 
 public:
@@ -422,7 +415,7 @@ public:
         setKeywordParamInt64(kwParams, KW_NUM_ATTR, numAttrsSet, &AioInputSettings::setParamNumAttr);
         setKeywordParamBool(kwParams, KW_SPLIT_ON_DIM, _splitOnDimension);
         setKeywordParamInt64(kwParams, KW_CHUNK_SZ, _chunkSizeSet, &AioInputSettings::setParamChunkSize);
-        setKeywordParamInt64(kwParams, KW_SKIP, _skipSet, &AioInputSettings::setSkip);
+        setKeywordParamString(kwParams, KW_SKIP, _skipSet, &AioInputSettings::setSkip);
 
         for (size_t i= 0; i<nParams; ++i)
         {

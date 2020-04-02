@@ -73,7 +73,7 @@ public:
             { KW_NUM_ATTR, RE(PP(PLACEHOLDER_CONSTANT, TID_INT64)) },
             { KW_CHUNK_SZ, RE(PP(PLACEHOLDER_CONSTANT, TID_INT64)) },
             { KW_SPLIT_ON_DIM, RE(PP(PLACEHOLDER_CONSTANT, TID_BOOL)) },
-            { KW_SKIP, RE(PP(PLACEHOLDER_CONSTANT, TID_INT64)) }
+            { KW_SKIP, RE(PP(PLACEHOLDER_CONSTANT, TID_STRING)) }
         };
         return &argSpec;
     }
