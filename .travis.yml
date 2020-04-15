@@ -51,10 +51,12 @@ install:
 
 script:
   - docker exec scidb /accelerated_io_tools/tests/test.sh
+  - docker exec scidb /accelerated_io_tools/tests/test-skip.sh
   - docker exec scidb /accelerated_io_tools/tests/test_arrow.sh
   - ./tests/test_arrow.sh "docker exec scidb"
 
 after_failure:
   - cat tests/test.out
+  - cat tests/test-skip.out
   - cat tests/test_arrow.out
   - docker logs scidb
