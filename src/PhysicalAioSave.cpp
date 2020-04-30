@@ -34,6 +34,7 @@
 #include <system/SystemCatalog.h>
 #include <system/Sysinfo.h>
 
+#ifdef USE_ARROW
 #include <arrow/buffer.h>
 #include <arrow/builder.h>
 #include <arrow/io/file.h>
@@ -46,6 +47,7 @@
 #include <arrow/status.h>
 #include <arrow/type.h>
 #include <arrow/util/io-util.h>
+#endif
 
 #include <query/TypeSystem.h>
 #include <query/FunctionDescription.h>
@@ -70,6 +72,7 @@
 #include "AioSaveSettings.h"
 
 
+#ifdef USE_ARROW
 #define THROW_NOT_OK(s)                                            \
     {                                                              \
         arrow::Status _s = (s);                                    \
@@ -91,6 +94,7 @@
                     << _s.ToString().c_str() << (int)_s.code();   \
         }                                                         \
     }
+#endif
 
 namespace scidb
 {
@@ -107,6 +111,7 @@ static void EXCEPTION_ASSERT(bool cond)
     }
 }
 
+#ifdef USE_ARROW
 std::shared_ptr<arrow::Schema> attributes2ArrowSchema(ArrayDesc const &arrayDesc,
                                                       bool attsOnly)
 {
@@ -223,6 +228,7 @@ std::shared_ptr<arrow::Schema> attributes2ArrowSchema(ArrayDesc const &arrayDesc
 
     return arrow::schema(arrowFields);
 }
+#endif
 
 ArrayDesc const addDimensionsToArrayDesc(ArrayDesc const& arrayDesc,
                                          bool attsOnly,
@@ -586,6 +592,7 @@ public:
     }
 };
 
+#ifdef USE_ARROW
 class ArrowChunkPopulator
 {
 
@@ -1011,6 +1018,7 @@ private:
                 _arrowBuilders[i].get())->Append(values, is_valid));
     }
 };
+#endif
 
 class TextChunkPopulator
 {
@@ -1300,7 +1308,9 @@ public:
 };
 
 typedef ConversionArray <BinaryChunkPopulator> BinaryConvertedArray;
+#ifdef USE_ARROW
 typedef ConversionArray <ArrowChunkPopulator>  ArrowConvertedArray;
+#endif
 typedef ConversionArray <TextChunkPopulator>   TextConvertedArray;
 
 uint64_t saveToDisk(shared_ptr<Array> const& array,
@@ -1427,6 +1437,7 @@ uint64_t saveToDisk(shared_ptr<Array> const& array,
     return 0;
 }
 
+#ifdef USE_ARROW
 uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
                          string fileName,
                          std::shared_ptr<Query> const& query,
@@ -1543,6 +1554,7 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
     LOG4CXX_DEBUG(logger, "ALT_SAVE>> closed")
     return 0;
 }
+#endif
 
 
 class PhysicalAioSave : public PhysicalOperator
@@ -1613,10 +1625,12 @@ public:
         {
             outArray.reset(new BinaryConvertedArray(_schema, input, query, settings));
         }
+#ifdef USE_ARROW
         else if(settings.isArrowFormat())
         {
             outArray.reset(new ArrowConvertedArray(_schema, input, query, settings));
         }
+#endif
         else
         {
             outArray.reset(new TextConvertedArray(_schema, input, query, settings));
@@ -1630,12 +1644,14 @@ public:
             if(thisInstanceSavesData)
             {
                 string const& path = iter->second;
+#ifdef USE_ARROW
                 if (settings.isArrowFormat())
                 {
                     saveToDiskArrow(
                         outArray, path, query, false, settings, inputSchema);
                 }
                 else
+#endif
                 {
                     saveToDisk(
                         outArray, path, query, false, settings, inputSchema);
@@ -1654,12 +1670,14 @@ public:
         if (thisInstanceSavesData)
         {
             string const& path = iter->second;
+#ifdef USE_ARROW
             if (settings.isArrowFormat())
             {
                 saveToDiskArrow(
                     outArrayRedist, path, query, false, settings, inputSchema);
             }
             else
+#endif
             {
                 saveToDisk(
                     outArrayRedist, path, query, false, settings, inputSchema);
