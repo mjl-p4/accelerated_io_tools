@@ -48,20 +48,39 @@ static log4cxx::LoggerPtr logger(log4cxx::Logger::getLogger("scidb.operators.aio
 
 namespace scidb
 {
-static const char* const KW_PATHS 		 = "paths";
-static const char* const KW_INSTANCES	 = "instances";
-static const char* const KW_BUF_SZ 		 = "buffer_size";
-static const char* const KW_HEADER 		 = "header";
+static const char* const KW_PATHS        = "paths";
+static const char* const KW_INSTANCES    = "instances";
+static const char* const KW_BUF_SZ       = "buffer_size";
+static const char* const KW_HEADER       = "header";
 static const char* const KW_LINE_DELIM 	 = "line_delimiter";
 static const char* const KW_ATTR_DELIM 	 = "attribute_delimiter";
-static const char* const KW_NUM_ATTR 	 = "num_attributes";
-static const char* const KW_CHUNK_SZ 	 = "chunk_size";
+static const char* const KW_NUM_ATTR     = "num_attributes";
+static const char* const KW_CHUNK_SZ     = "chunk_size";
 static const char* const KW_SPLIT_ON_DIM = "split_on_dimension";
+static const char* const KW_SKIP         = "skip";
 
 typedef std::shared_ptr<OperatorParamLogicalExpression> ParamType_t ;
 
 class AioInputSettings
 {
+public:
+
+    /**
+     * Used to indicate if aio_input should, with respect to
+     * the 'error' attribute:
+     *   - skip NOTHING: pass all lines from input through.
+     *   - skip ERRORS: pass only lines from input where the
+     *     'error' attribute is null.
+     *   - skip NON_ERRORS: pass only lines from input where
+     *     the 'error' attribute is not null (useful for
+     *     more quickly finding unexpected lines in the input).
+     */
+    enum class Skip {
+        NOTHING = 0,
+        ERRORS,
+        NON_ERRORS
+    };
+
 private:
 
     bool             _singlepath;
@@ -83,6 +102,8 @@ private:
     bool             _chunkSizeSet;
     bool             _splitOnDimension;
     bool             _splitOnDimensionSet;
+    Skip             _skip;
+    bool             _skipSet;
 
     void checkIfSet(bool alreadySet, const char* kw)
     {
@@ -311,6 +332,26 @@ private:
         return kwPair == kwp.end() ? Parameter() : kwPair->second;
     }
 
+    void setSkip(vector<string> args)
+    {
+        const auto& skipOp = args[0];
+
+        if (skipOp == "nothing") {
+            _skip = AioInputSettings::Skip::NOTHING;
+        }
+        else if (skipOp == "errors") {
+            _skip = AioInputSettings::Skip::ERRORS;
+        }
+        else if (skipOp == "non-errors") {
+            _skip = AioInputSettings::Skip::NON_ERRORS;
+        }
+        else {
+            throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION)
+                << "'skip' may be:  'nothing' (pass everything), 'errors' (skip errors), "
+                "or 'non-errors' (skip non-errors)";
+        }
+    }
+
 public:
     static const size_t MAX_PARAMETERS = 1;
 
@@ -334,7 +375,9 @@ public:
        _chunkSize(10000000),
        _chunkSizeSet(false),
        _splitOnDimension(false),
-       _splitOnDimensionSet(false)
+       _splitOnDimensionSet(false),
+       _skip(AioInputSettings::Skip::NOTHING),
+       _skipSet(false)
     {
         bool pathsSet = false;
         bool instancesSet = false;
@@ -372,6 +415,7 @@ public:
         setKeywordParamInt64(kwParams, KW_NUM_ATTR, numAttrsSet, &AioInputSettings::setParamNumAttr);
         setKeywordParamBool(kwParams, KW_SPLIT_ON_DIM, _splitOnDimension);
         setKeywordParamInt64(kwParams, KW_CHUNK_SZ, _chunkSizeSet, &AioInputSettings::setParamChunkSize);
+        setKeywordParamString(kwParams, KW_SKIP, _skipSet, &AioInputSettings::setSkip);
 
         for (size_t i= 0; i<nParams; ++i)
         {
@@ -502,6 +546,11 @@ public:
     bool getSplitOnDimension() const
     {
         return _splitOnDimension;
+    }
+
+    Skip getSkip() const
+    {
+        return _skip;
     }
 };
 
