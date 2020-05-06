@@ -1,7 +1,7 @@
 accelerated_io_tools
 ==========
 
-[![SciDB 19.3](https://img.shields.io/badge/SciDB-19.3-blue.svg)](https://forum.paradigm4.com/t/scidb-release-19-3/2359)
+[![SciDB 19.11](https://img.shields.io/badge/SciDB-19.11-blue.svg)](https://forum.paradigm4.com/t/scidb-release-19-3/2359)
 [![arrow 0.9.0](https://img.shields.io/badge/arrow-0.9.0-blue.svg)](https://arrow.apache.org/release/0.9.0.html)
 [![Build Status](https://travis-ci.org/Paradigm4/accelerated_io_tools.svg)](https://travis-ci.org/Paradigm4/accelerated_io_tools)
 
