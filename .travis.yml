@@ -24,11 +24,14 @@ before_install:
   # - wget --no-verbose --output-document -
   #   https://github.com/Paradigm4/shim/archive/master.tar.gz
   #   | tar --extract --gzip --directory=.
+
   # - mkdir scidb-py
   # - wget --no-verbose --output-document -
   #   https://github.com/Paradigm4/scidb-py/archive/master.tar.gz
   #   | tar --extract --gzip --directory=.
+
   - docker pull rvernica/scidb:${SCIDB_VER}${SCIDB_IMG}
+
   - docker run
     --name scidb
     --detach
@@ -37,6 +40,11 @@ before_install:
     --volume /tmp:/tmp
     --env ARROW_VER=${ARROW_VER}
     rvernica/scidb:${SCIDB_VER}${SCIDB_IMG}
+
+  - if [ "$SCIDB_IMG" = "-centos-7"]; then
+      docker exec scidb /opt/scidb/$SCIDB_VER/bin/scidbctl.py start scidb ;
+    fi
+
   - while ! curl http://localhost:8080/version; do sleep 5; done
 
 install:
