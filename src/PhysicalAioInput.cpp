@@ -266,7 +266,7 @@ public:
             int fds_ready = select(fd+1, &readFdSet, nullptr, nullptr, &rdTimeout);
             if (fds_ready > 0) {
                 if (FD_ISSET(fd, &readFdSet)) {
-                    size_t nb = ::read(fd, buf, rdCnt);
+                    ssize_t nb = ::read(fd, buf, rdCnt);
                     if (nb > 0) {
                         // Making progress on the read.
                         total += nb;
