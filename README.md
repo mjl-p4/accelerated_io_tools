@@ -405,6 +405,8 @@ aio_save(array, parameter1:value1, parameter2:value2,...)
 ```
 The `paths` must always be specified.
 
+Arrow support is built by default.  However, if you'd like to build without arrow because it's not available for your system, then remove the `-DUSE_ARROW` flags from `src/Makefile` to remove arrow support at compile time.
+
 ## Save to one or more files:
 By default, the file is saved to a path on the query coordinator instance. You can distribute the IO and network load by simultaneously writing data to multiple FS devices from several different instances (one instance per path).
 * `paths:'/path/to/file'`: the location to save the file; required. If the operator enocunters a string parameter without a keyword specifier, it assumes that to be the path.
