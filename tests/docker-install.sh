@@ -80,7 +80,12 @@ iquery --afl --query "list('instances')"
 
 # Turn on aio in Shim
 echo aio=1 > /var/lib/shim/conf
-service shimsvc restart
+if [ `lsb_release --id | cut --fields=2` = "CentOS" ]
+then
+    systemctl restart shimsvc
+else
+    service shimsvc restart
+fi
 
 
 # Compile and install plugin
