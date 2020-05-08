@@ -13,7 +13,6 @@ python:
 env:
   global: SCIDB_VER=19.11 ARROW_VER=0.9.0
   matrix:
-    - SCIDB_IMG=
     - SCIDB_IMG=-xenial
     - SCIDB_IMG=-centos-7
 
