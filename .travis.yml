@@ -45,6 +45,7 @@ before_install:
 
   - if [ "$SCIDB_IMG" = "-centos-7" ]; then
       docker exec scidb /opt/scidb/$SCIDB_VER/bin/scidbctl.py start scidb ;
+      docker exec scidb systemctl start shimsvc ;
     fi
 
   - while ! curl http://localhost:8080/version; do sleep 5; done
