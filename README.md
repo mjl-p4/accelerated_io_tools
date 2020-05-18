@@ -13,17 +13,17 @@ A prototype library for the accelerated import and export of data out of SciDB. 
 The package extends regular SciDB IO and provides benefits in a few areas:
 
 #### 1. Fully distributed parsing and packing
-When loading token-delimited data, the instance(s) reading the data use a fixed-size `fread` call - usually reading multiple megabytes at once. The read blocks are sent around the different SciDB instances as quickly as possible. Then, the "ragged line ending" of each block is separated and sent to the instance containing the next block. Finally, all the instances parse the data and populate the resulting array in parallel. Thus the expensive parsing step is almost fully parallelized; the ingest rate scales up with the number of instances.
+When loading token-delimited data, the instance(s) reading the data use a fixed-size `read` call - usually reading multiple megabytes at once. The read blocks are sent around the different SciDB instances as quickly as possible. Then, the "ragged line ending" of each block is separated and sent to the instance containing the next block. Finally, all the instances parse the data and populate the resulting array in parallel. Thus the expensive parsing step is almost fully parallelized; the ingest rate scales up with the number of instances.
 
 When saving data, the reverse process is used: each instance packs its data into fixed-size blocks, then streams down to one or more saving instances. Save can also be done in binary form for faster speed.
 
 #### 2. Loading from multiple files
-When the parsing is so distributed, we find the read speed of the IO device is often the load bottleneck. To go around this, aio_input can be told to load data from 6 different files, for example. In such a case, 6 different SciDB instances, will open up 6 different files, on 6 different IO devices. The file pieces will then be quickly scattered across the whole SciDB cluster - up to perhaps 128 instances. Then the parallel parsing will begin. In reverse, saving to K different files is also possible.
+When the parsing is so distributed, we find the read speed of the IO device is often the load bottleneck. To go around this, `aio_input` can be told to load data from 6 different files, for example. In such a case, 6 different SciDB instances, will open up 6 different files, on 6 different IO devices. The file pieces will then be quickly scattered across the whole SciDB cluster - up to perhaps 128 instances. Then the parallel parsing will begin. In reverse, saving to K different files is also possible.
 
 The load from K files or save to K files happens transactionally as a single SciDB query. The user does not need to worry about firing up multiple "writer" processes and managing them. Simply provide a list of file paths and SciDB will handle the rest.
 
 #### 3. Error tolerance
-The aio_input operator ingests data in spite of extraneous characters, ragged rows that contain too few or too many columns, or columns that are mostly numeric but sometimes contain characters. Such datasets can be loaded easily into temporary arrays. SciDB can then be effectively used to find errors and fix them as needed.
+The `aio_input` operator ingests data in spite of extraneous characters, ragged rows that contain too few or too many columns, or columns that are mostly numeric but sometimes contain characters. Such datasets can be loaded easily into temporary arrays. SciDB can then be effectively used to find errors and fix them as needed.
 
 The `accelerated_io_tools` and regular `prototype_load_tools` libraries cannot coexist on the same installation; the user must load one or the other. The accelerated .so is superior in every way.
 
@@ -113,7 +113,21 @@ $ iquery -aq "aio_input('/tmp/foo.tsv', num_attributes:2)"
 {3,0,0} '4','dave','long    extra stuff here'
 {4,0,0} '5error_no_tab',null,'short'
 ```
-Note the extra `error` attribute is added and is not null whenever the input line of text does not match the specified number of attributes. The given filesystem object is opened and read once with the fopen/fread/fclose call family; it can be a file, symlink, fifo or any other object that supports these calls.
+Note the extra `error` attribute is added and is not null whenever the input line of text does not match the specified number of attributes. The given filesystem object is opened and read once with the open/read/close call family; it can be a file, symlink, fifo or any other object that supports these calls.
+
+`aio_input` can skip errors detected in the input with `skip:errors`:
+```
+$ iquery -anq "store(aio_input('/tmp/foo.tsv', num_attributes:2, skip:errors), temp2)"
+Query was executed successfully
+
+$ iquery -aq "scan(temp2)"
+{tuple_no,dst_instance_id,src_instance_id} a0,a1,error
+{0,0,0} '1','alex',null
+{1,0,0} '2','bob',null
+{2,0,0} '3','jack',null
+```
+Alternatively, `aio_input` can load only those lines which have errors with `skip:non-errors`.  By default, `aio_input` will not skip anything, and the keyword can be omitted altogether or present as `skip:nothing`.
+
 
 Example CSV ingest and store from multiple files:
 ```
@@ -148,6 +162,7 @@ If more than one path is specified, then `instances` must be used to specify the
 * `header:H`: an integer number of lines to skip from the file;  if "paths" is used, applies to all files. Default is 0.
 * `line_delimiter:'L'`: a character that separates the lines (cells) of the file; values of `\t` `\r` `\n` and ` ` are also supported. Default is `\n`.
 * `attribute_delimiter:A`: a character that separates the columns (attributes) of the file; values of `\t` `\r` `\n` and ` ` are also supported. Default is `\t`.
+* `skip:S`: tells `aio_input` to skip `errors`, `non-errors`, or `nothing` (the default).  Use this keyword to skip errors, rather than `filter`, when reading from input.
 
 ### Splitting on dimension:
 * `split_on_dimension:<true/false>`: a flag that determines whether the file columns are placed in SciDB attributes, or cells along an extra dimension. Default is `false` (create attributes).
