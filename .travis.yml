@@ -30,14 +30,14 @@ before_install:
   - docker pull rvernica/scidb:${SCIDB_VER}${SCIDB_IMG}
 
   - docker run
-    --name scidb
     --detach
+    --env ARROW_VER=${ARROW_VER}
+    --name scidb
     --publish 8080:8080
     --volume /sys/fs/cgroup:/sys/fs/cgroup:ro
     --volume /tmp/$(mktemp --directory):/run
-    --volume `pwd`:/accelerated_io_tools
     --volume /tmp:/tmp
-    --env ARROW_VER=${ARROW_VER}
+    --volume `pwd`:/accelerated_io_tools
     rvernica/scidb:${SCIDB_VER}${SCIDB_IMG}
 
   - if [ "$SCIDB_IMG" = "-centos-7" ]; then
