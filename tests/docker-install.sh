@@ -2,13 +2,6 @@
 
 set -o errexit
 
-if [ `lsb_release --id | cut --fields=2` != "CentOS" ]
-then
-    sed --in-place                                                  \
-        "\#deb http://deb.debian.org/debian jessie-updates main#d"  \
-        /etc/apt/sources.list
-fi
-
 wget -O- https://paradigm4.github.io/extra-scidb-libs/install.sh \
 |  sh -s -- --only-prereq
 
