@@ -2,7 +2,7 @@
 **
 * BEGIN_COPYRIGHT
 *
-* Copyright (C) 2008-2016 SciDB, Inc.
+* Copyright (C) 2008-2020 Paradigm4 Inc.
 * All Rights Reserved.
 *
 * accelerated_io_tools is a plugin for SciDB, an Open Source Array DBMS maintained
@@ -86,7 +86,7 @@ public:
         // setbuffer(_inputFile, sbuffer, sizeof(sbuffer));
 
         if (_inputFile == NULL)
-        {   
+        {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "FileSplitter() cannot open file";
         }
         if(header>0)

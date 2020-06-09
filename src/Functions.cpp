@@ -2,7 +2,7 @@
 **
 * BEGIN_COPYRIGHT
 *
-* Copyright (C) 2008-2016 SciDB, Inc.
+* Copyright (C) 2008-2020 Paradigm4 Inc.
 * All Rights Reserved.
 *
 * accelerated_io_tools is a plugin for SciDB, an Open Source Array DBMS maintained
@@ -424,8 +424,8 @@ static scidb::UserDefinedFunction mltdv( scidb::FunctionDescription("maxlen_tdv"
  * arg2: attribute name
  */
 static void extract_format_field( const Value **args, Value* res, void*) {
-    for(int i = 0; i < 3; i++) { 
-        if(args[i]->isNull()) { 
+    for(int i = 0; i < 3; i++) {
+        if(args[i]->isNull()) {
             res->setNull(args[i]->getMissingReason());
             return;
         }
@@ -441,29 +441,29 @@ static void extract_format_field( const Value **args, Value* res, void*) {
     size_t index = 0;
     size_t j = 0, k = 0;
     bool match = false;
-    for(; j < formatLen && !match; j += k) { 
+    for(; j < formatLen && !match; j += k) {
       if(formatField[j] == ':') { index++; j++; }
       match = true;
-      for(k = 0; j+k < formatLen && formatField[j+k] != ':'; k++) { 
+      for(k = 0; j+k < formatLen && formatField[j+k] != ':'; k++) {
         if(k >= attrLen || formatField[j+k] != attrName[k]) { match = false; }
       }
     }
 
-    if(!match) { 
+    if(!match) {
       res->setNull(0);
       return;
     }
 
     size_t start = 0;
     size_t indexi = 0;
-    for(; start < sampleLen && indexi < index; start++) { 
-        if(sampleField[start] == ':') { 
+    for(; start < sampleLen && indexi < index; start++) {
+        if(sampleField[start] == ':') {
             indexi += 1;
         }
     }
-    
+
     size_t end = start+1;
-    for(; end < sampleLen && sampleField[end] != ':'; end += 1) 
+    for(; end < sampleLen && sampleField[end] != ':'; end += 1)
         {}
 
     size_t size = end - start + 1;
