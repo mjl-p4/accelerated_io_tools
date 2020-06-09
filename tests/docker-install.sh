@@ -5,8 +5,10 @@ set -o errexit
 wget -O- https://paradigm4.github.io/extra-scidb-libs/install.sh \
 |  sh -s -- --only-prereq
 
+id=`lsb_release --id --short`
+
 # Install prerequisites
-if [ `lsb_release --id | cut --fields=2` = "CentOS" ]
+if [ "$id" = "CentOS" ]
 then
     # yum install --assumeyes                                                    \
     #     https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm
@@ -73,7 +75,7 @@ iquery --afl --query "list('instances')"
 
 # Turn on aio in Shim
 echo aio=1 > /var/lib/shim/conf
-if [ `lsb_release --id | cut --fields=2` = "CentOS" ]
+if [ "$id" = "CentOS" ]
 then
     systemctl restart shimsvc
 else
