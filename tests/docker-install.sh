@@ -22,13 +22,14 @@ then
     # wget --output-document /etc/yum.repos.d/bintray-rvernica-rpm.repo \
     #      https://bintray.com/rvernica/rpm/rpm
 
-    yum install --assumeyes \
-        centos-release-scl
+    yum install --assumeyes https://apache.bintray.com/arrow/centos/$(
+        cut --delimiter : --fields 5 /etc/system-release-cpe
+        )/apache-arrow-release-latest.rpm
 
-    yum install --assumeyes    \
-        arrow-devel-$ARROW_VER \
-        libpqxx-devel          \
-        python27
+    for pkg in centos-release-scl arrow-devel-$ARROW_VER libpqxx-devel python27
+    do
+        yum install --assumeyes $pkg
+    done
 
     source /opt/rh/python27/enable
 else
@@ -49,6 +50,18 @@ else
     # deb https://dl.bintray.com/rvernica/deb trusty universe
     # APT_LINE
     # apt-key adv --keyserver hkp://keyserver.ubuntu.com --recv 46BD98A354BA5235
+
+    codename=`lsb_release --codename --short`
+    if [ "$codename" = "stretch" ]
+    then
+        cat > /etc/apt/sources.list.d/backports.list <<EOF
+deb http://deb.debian.org/debian $codename-backports main
+EOF
+    fi
+    wget https://apache.bintray.com/arrow/$(
+        echo $id | tr 'A-Z' 'a-z'
+        )/apache-arrow-archive-keyring-latest-$codename.deb
+    apt install --assume-yes ./apache-arrow-archive-keyring-latest-$codename.deb
 
     apt-get update
     apt-get install                              \

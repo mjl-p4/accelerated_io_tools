@@ -46,7 +46,7 @@
 #include <arrow/record_batch.h>
 #include <arrow/status.h>
 #include <arrow/type.h>
-#include <arrow/util/io-util.h>
+#include <arrow/util/io_util.h>
 #endif
 
 #include <query/TypeSystem.h>
@@ -55,7 +55,6 @@
 #include <query/TypeSystem.h>
 #include <query/FunctionLibrary.h>
 #include <query/PhysicalOperator.h>
-//#include <array/DBArray.h>
 #include <array/Tile.h>
 #include <array/TileIteratorAdaptors.h>
 #include <util/Platform.h>
@@ -73,18 +72,7 @@
 
 
 #ifdef USE_ARROW
-#define THROW_NOT_OK(s)                                            \
-    {                                                              \
-        arrow::Status _s = (s);                                    \
-        if (!_s.ok())                                              \
-        {                                                          \
-            throw USER_EXCEPTION(                                  \
-                SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION) \
-                    << _s.ToString().c_str();                      \
-        }                                                          \
-    }
-
-#define THROW_NOT_OK_FILE(s)                                      \
+#define THROW_NOT_OK(s)                                           \
     {                                                             \
         arrow::Status _s = (s);                                   \
         if (!_s.ok())                                             \
@@ -606,7 +594,8 @@ private:
     std::vector<size_t>                               _inputSizes;
     std::vector<std::unique_ptr<arrow::ArrayBuilder>> _arrowBuilders;
     std::vector<std::shared_ptr<arrow::Array>>        _arrowArrays;
-    arrow::MemoryPool*                                _arrowPool = arrow::default_memory_pool();
+    arrow::MemoryPool*                                _arrowPool =
+      arrow::default_memory_pool();
     std::vector<std::vector<int64_t>>                 _dimsValues;
 
 public:
@@ -663,6 +652,17 @@ public:
                        size_t const bytesPerChunk,
                        int16_t const cellsPerChunk)
     {
+        THROW_NOT_OK(
+            populateChunkStatus(builder, cursor, bytesPerChunk, cellsPerChunk));
+    }
+
+
+private:
+    arrow::Status populateChunkStatus(MemChunkBuilder& builder,
+                                      ArrayCursor& cursor,
+                                      size_t const bytesPerChunk,
+                                      int16_t const cellsPerChunk)
+    {
         // Basic setup
         const size_t nAttrs = _attrs.size();
 
@@ -696,13 +696,13 @@ public:
                         Value const& value = citer->getItem();
                         if(value.isNull())
                         {
-                            THROW_NOT_OK(
+                            ARROW_RETURN_NOT_OK(
                                 static_cast<arrow::BinaryBuilder*>(
                                     _arrowBuilders[i].get())->AppendNull());
                         }
                         else
                         {
-                            THROW_NOT_OK(
+                            ARROW_RETURN_NOT_OK(
                                 static_cast<arrow::BinaryBuilder*>(
                                     _arrowBuilders[i].get())->Append(
                                         reinterpret_cast<const char*>(
@@ -735,13 +735,13 @@ public:
                         Value const& value = citer->getItem();
                         if(value.isNull())
                         {
-                            THROW_NOT_OK(
+                            ARROW_RETURN_NOT_OK(
                                 static_cast<arrow::StringBuilder*>(
                                     _arrowBuilders[i].get())->AppendNull());
                         }
                         else
                         {
-                            THROW_NOT_OK(
+                            ARROW_RETURN_NOT_OK(
                                 static_cast<arrow::StringBuilder*>(
                                     _arrowBuilders[i].get())->Append(
                                         value.getString()));
@@ -772,13 +772,13 @@ public:
                         Value const& value = citer->getItem();
                         if(value.isNull())
                         {
-                            THROW_NOT_OK(
+                            ARROW_RETURN_NOT_OK(
                                 static_cast<arrow::StringBuilder*>(
                                     _arrowBuilders[i].get())->AppendNull());
                         }
                         else
                         {
-                            THROW_NOT_OK(
+                            ARROW_RETURN_NOT_OK(
                                 static_cast<arrow::StringBuilder*>(
                                     _arrowBuilders[i].get())->Append(
                                         string(1, value.getChar())));
@@ -802,110 +802,122 @@ public:
                 }
                 case TE_BOOL:
                 {
-                    populateCell<bool,
-                                 arrow::BooleanBuilder>(citer,
-                                                        &Value::getBool,
-                                                        i,
-                                                        bytesCount);
+                    ARROW_RETURN_NOT_OK((
+                        populateCell<bool,arrow::BooleanBuilder>(
+                            citer,
+                            &Value::getBool,
+                            i,
+                            bytesCount)));
                     break;
                 }
                 case TE_DATETIME:
                 {
-                    populateCell<int64_t,
-                                 arrow::Date64Builder>(citer,
-                                                       &Value::getDateTime,
-                                                       i,
-                                                       bytesCount);
+                    ARROW_RETURN_NOT_OK((
+                        populateCell<int64_t,arrow::Date64Builder>(
+                            citer,
+                            &Value::getDateTime,
+                            i,
+                            bytesCount)));
                     break;
                 }
                 case TE_DOUBLE:
                 {
-                    populateCell<double,
-                                 arrow::DoubleBuilder>(citer,
-                                                       &Value::getDouble,
-                                                       i,
-                                                       bytesCount);
+                    ARROW_RETURN_NOT_OK((
+                        populateCell<double,arrow::DoubleBuilder>(
+                            citer,
+                            &Value::getDouble,
+                            i,
+                            bytesCount)));
                     break;
                 }
                 case TE_FLOAT:
                 {
-                    populateCell<float,
-                                 arrow::FloatBuilder>(citer,
-                                                      &Value::getFloat,
-                                                      i,
-                                                      bytesCount);
+                    ARROW_RETURN_NOT_OK((
+                        populateCell<float,arrow::FloatBuilder>(
+                            citer,
+                            &Value::getFloat,
+                            i,
+                            bytesCount)));
                     break;
                 }
                 case TE_INT8:
                 {
-                    populateCell<int8_t,
-                                 arrow::Int8Builder>(citer,
-                                                     &Value::getInt8,
-                                                     i,
-                                                     bytesCount);
+                    ARROW_RETURN_NOT_OK((
+                        populateCell<int8_t,arrow::Int8Builder>(
+                            citer,
+                            &Value::getInt8,
+                            i,
+                            bytesCount)));
                     break;
                 }
                 case TE_INT16:
                 {
-                    populateCell<int16_t,
-                                 arrow::Int16Builder>(citer,
-                                                      &Value::getInt16,
-                                                      i,
-                                                      bytesCount);
+                    ARROW_RETURN_NOT_OK((
+                        populateCell<int16_t,arrow::Int16Builder>(
+                            citer,
+                            &Value::getInt16,
+                            i,
+                            bytesCount)));
                     break;
                 }
                 case TE_INT32:
                 {
-                    populateCell<int32_t,
-                                 arrow::Int32Builder>(citer,
-                                                      &Value::getInt32,
-                                                      i,
-                                                      bytesCount);
+                    ARROW_RETURN_NOT_OK((
+                        populateCell<int32_t,arrow::Int32Builder>(
+                            citer,
+                            &Value::getInt32,
+                            i,
+                            bytesCount)));
                     break;
                 }
                 case TE_INT64:
                 {
-                    populateCell<int64_t,
-                                 arrow::Int64Builder>(citer,
-                                                      &Value::getInt64,
-                                                      i,
-                                                      bytesCount);
+                    ARROW_RETURN_NOT_OK((
+                        populateCell<int64_t,arrow::Int64Builder>(
+                            citer,
+                            &Value::getInt64,
+                            i,
+                            bytesCount)));
                     break;
                 }
                 case TE_UINT8:
                 {
-                    populateCell<uint8_t,
-                                 arrow::UInt8Builder>(citer,
-                                                      &Value::getUint8,
-                                                      i,
-                                                      bytesCount);
+                    ARROW_RETURN_NOT_OK((
+                        populateCell<uint8_t,arrow::UInt8Builder>(
+                            citer,
+                            &Value::getUint8,
+                            i,
+                            bytesCount)));
                     break;
                 }
                 case TE_UINT16:
                 {
-                    populateCell<uint16_t,
-                                 arrow::UInt16Builder>(citer,
-                                                       &Value::getUint16,
-                                                       i,
-                                                       bytesCount);
+                    ARROW_RETURN_NOT_OK((
+                        populateCell<uint16_t,arrow::UInt16Builder>(
+                            citer,
+                            &Value::getUint16,
+                            i,
+                            bytesCount)));
                     break;
                 }
                 case TE_UINT32:
                 {
-                    populateCell<uint32_t,
-                                 arrow::UInt32Builder>(citer,
-                                                       &Value::getUint32,
-                                                       i,
-                                                       bytesCount);
+                    ARROW_RETURN_NOT_OK((
+                        populateCell<uint32_t,arrow::UInt32Builder>(
+                            citer,
+                            &Value::getUint32,
+                            i,
+                            bytesCount)));
                     break;
                 }
                 case TE_UINT64:
                 {
-                    populateCell<uint64_t,
-                                 arrow::UInt64Builder>(citer,
-                                                       &Value::getUint64,
-                                                       i,
-                                                       bytesCount);
+                    ARROW_RETURN_NOT_OK((
+                        populateCell<uint64_t,arrow::UInt64Builder>(
+                            citer,
+                            &Value::getUint64,
+                            i,
+                            bytesCount)));
                     break;
                 }
                 default:
@@ -914,7 +926,8 @@ public:
                     error << "Type "
                           << _inputTypes[i]
                           << " not supported in arrow format";
-                    throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION) << error.str();
+                    throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER,
+                                         SCIDB_LE_ILLEGAL_OPERATION) << error.str();
                 }
                 }
 
@@ -927,10 +940,10 @@ public:
                     {
                         for (size_t j = 0; j < _nDims; ++j)
                         {
-                            THROW_NOT_OK(
+                            ARROW_RETURN_NOT_OK(
                                 static_cast<arrow::Int64Builder*>(
                                     _arrowBuilders[nAttrs + j].get()
-                                    )->Append(_dimsValues[j]));
+                                    )->AppendValues(_dimsValues[j]));
                         }
                     }
                 }
@@ -942,44 +955,49 @@ public:
         // Finalize Arrow Builders and populate Arrow Arrays (resets builders)
         for (size_t i = 0; i < nAttrs + (_attsOnly ? 0 : _nDims); ++i)
         {
-            THROW_NOT_OK(
+            ARROW_RETURN_NOT_OK(
                 _arrowBuilders[i]->Finish(&_arrowArrays[i])); // Resets builder
         }
 
         // Create Arrow Record Batch
         std::shared_ptr<arrow::RecordBatch> arrowBatch;
-        arrowBatch = arrow::RecordBatch::Make(
-            _arrowSchema, nCells, _arrowArrays);
+        arrowBatch = arrow::RecordBatch::Make(_arrowSchema, nCells, _arrowArrays);
 
-        // Stream Arrow Record Batch to Arrow Pool Buffer using Arrow Record
-        // Batch Writer and Arrow Buffer Output Stream
-        std::shared_ptr<arrow::PoolBuffer> arrowBuffer(
-            new arrow::PoolBuffer(_arrowPool));
-        // std::shared_ptr<arrow::PoolBuffer> arrowBuffer =
-        //   make_shared<arrow::PoolBuffer>(_arrowPool);
-        arrow::io::BufferOutputStream arrowStream(arrowBuffer);
+        // Stream Arrow Record Batch to Arrow Buffer using Arrow
+        // Record Batch Writer and Arrow Buffer Output Stream
+        std::shared_ptr<arrow::io::BufferOutputStream> arrowStream;
+        ARROW_ASSIGN_OR_RAISE(
+            arrowStream,
+            arrow::io::BufferOutputStream::Create(bytesCount, _arrowPool));
+
         std::shared_ptr<arrow::ipc::RecordBatchWriter> arrowWriter;
-        THROW_NOT_OK(
+        ARROW_RETURN_NOT_OK(
             arrow::ipc::RecordBatchStreamWriter::Open(
-                &arrowStream, _arrowSchema, &arrowWriter));
-        THROW_NOT_OK(
-            arrowWriter->WriteRecordBatch(*arrowBatch));
-        THROW_NOT_OK(arrowWriter->Close());
-        THROW_NOT_OK(arrowStream.Close());
+                &*arrowStream, _arrowSchema, &arrowWriter));
+        ARROW_RETURN_NOT_OK(arrowWriter->WriteRecordBatch(*arrowBatch));
+        ARROW_RETURN_NOT_OK(arrowWriter->Close());
+
+        std::shared_ptr<arrow::Buffer> arrowBuffer;
+        ARROW_ASSIGN_OR_RAISE(arrowBuffer, arrowStream->Finish());
+
+        LOG4CXX_DEBUG(logger,
+                      "ArrowChunkPopulator::populateChunkStatus bytesCount: "
+                      << bytesCount << "arrowBuffer::size: " << arrowBuffer->size())
 
         // Copy data to Mem Chunk Builder
         builder.addData(reinterpret_cast<const char*>(arrowBuffer->data()),
                         arrowBuffer->size());
+
+        return arrow::Status::OK();
     }
 
-private:
     template <typename SciDBType,
               typename ArrowBuilder,
               typename ValueFunc> inline
-    void populateCell(shared_ptr<ConstChunkIterator> citer,
-                      ValueFunc valueGetter,
-                      const size_t i,
-                      size_t &bytesCount)
+    arrow::Status populateCell(shared_ptr<ConstChunkIterator> citer,
+                               ValueFunc valueGetter,
+                               const size_t i,
+                               size_t &bytesCount)
     {
         vector<SciDBType> values;
         vector<bool> is_valid;
@@ -1013,9 +1031,8 @@ private:
             ++(*citer);
         }
 
-        THROW_NOT_OK(
-            static_cast<ArrowBuilder*>(
-                _arrowBuilders[i].get())->Append(values, is_valid));
+        return static_cast<ArrowBuilder*>(
+            _arrowBuilders[i].get())->AppendValues(values, is_valid);
     }
 };
 #endif
@@ -1438,12 +1455,12 @@ uint64_t saveToDisk(shared_ptr<Array> const& array,
 }
 
 #ifdef USE_ARROW
-uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
-                         string fileName,
-                         std::shared_ptr<Query> const& query,
-                         bool const append,
-                         AioSaveSettings const& settings,
-                         ArrayDesc const& inputSchema)
+arrow::Status saveToDiskArrow(shared_ptr<Array> const& array,
+                              string fileName,
+                              std::shared_ptr<Query> const& query,
+                              bool const append,
+                              AioSaveSettings const& settings,
+                              ArrayDesc const& inputSchema)
 {
     EXCEPTION_ASSERT(array->getArrayDesc().getAttributes(true).size()==1);
 
@@ -1459,18 +1476,19 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
     }
     else
     {
-        std::shared_ptr<arrow::io::FileOutputStream> arrowFile;
-        auto arrowStatus = arrow::io::FileOutputStream::Open(
-            fileName, append, &arrowFile);
-        if (!arrowStatus.ok())
+        auto arrowResult = arrow::io::FileOutputStream::Open(fileName, append);
+        if (!arrowResult.ok())
         {
+            auto arrowStatus = arrowResult.status();
             auto str = arrowStatus.ToString().c_str();
             int code = (int)arrowStatus.code();
-            LOG4CXX_DEBUG(logger, "Attempted to open output file '" << fileName << "' failed: " << str << " (" << code << ")");
+            LOG4CXX_DEBUG(logger,
+                          "Attempted to open output file '"
+                          << fileName << "' failed: " << str << " (" << code << ")");
             throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_CANT_OPEN_FILE)
                  << fileName << str << code;
         }
-        arrowStream = arrowFile;
+        arrowStream = arrowResult.ValueOrDie();
         // TODO: is file lock necessary?
     }
 
@@ -1483,11 +1501,12 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
     {
         std::shared_ptr<arrow::Schema> arrowSchema = attributes2ArrowSchema(
             inputSchema, settings.isAttsOnly());
-        THROW_NOT_OK_FILE(
+        ARROW_RETURN_NOT_OK(
             arrow::ipc::RecordBatchStreamWriter::Open(
                 arrowStream.get(), arrowSchema, &arrowWriter));
 
-        shared_ptr<ConstArrayIterator> arrayIter = array->getConstIterator(inputSchema.getAttributes(true).firstDataAttribute());
+        shared_ptr<ConstArrayIterator> arrayIter =
+            array->getConstIterator(inputSchema.getAttributes(true).firstDataAttribute());
         for (size_t n = 0; !arrayIter->end(); n++)
         {
             ConstChunk const& ch = arrayIter->getChunk();
@@ -1498,8 +1517,13 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
             bytesWritten += size;
             if (bytesWritten >= settings.getResultSizeLimit())
             {
-                LOG4CXX_INFO(logger, "Attempted to write " << bytesWritten << " bytes to '" << fileName << "' which is over specified limit.");
-                throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR) << "Exceeding specified result size limit of" << settings.getResultSizeLimit();
+                LOG4CXX_INFO(logger,
+                             "Attempted to write " << bytesWritten
+                             << " bytes to '" << fileName
+                             << "' which is over specified limit.");
+                throw USER_EXCEPTION(SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR)
+                    << "Exceeding specified result size limit of"
+                    << settings.getResultSizeLimit();
             }
             char* data = ((char*)ch.getConstData() + AioSaveSettings::chunkDataOffset());
 
@@ -1507,18 +1531,18 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
                 reinterpret_cast<const uint8_t*>(data), size); // zero copy
 
             // Read Record Batch
-            // THROW_NOT_OK(
+            // ARROW_RETURN_NOT_OK(
             //     arrow::ipc::ReadRecordBatch(
             //         arrowSchema, &arrowBufferReader, &arrowBatch));
 
             // Read Record Batch using Stream Reader
-            THROW_NOT_OK(
+            ARROW_RETURN_NOT_OK(
                 arrow::ipc::RecordBatchStreamReader::Open(
                     &arrowBufferReader, &arrowReader));
-            THROW_NOT_OK(arrowReader->ReadNext(&arrowBatch));
+            ARROW_RETURN_NOT_OK(arrowReader->ReadNext(&arrowBatch));
 
             // Write Record Batch to stream
-            THROW_NOT_OK_FILE(
+            ARROW_RETURN_NOT_OK(
                 arrowWriter->WriteRecordBatch(*arrowBatch));
 
             ++(*arrayIter);
@@ -1542,17 +1566,17 @@ uint64_t saveToDiskArrow(shared_ptr<Array> const& array,
     }
 
     LOG4CXX_DEBUG(logger, "ALT_SAVE>> wrote "<< bytesWritten<< " bytes, closing");
-    THROW_NOT_OK_FILE(arrowWriter->Close());
+    ARROW_RETURN_NOT_OK(arrowWriter->Close());
     if (fileName == "console" || fileName == "stdout" || fileName == "stderr")
     {
-        THROW_NOT_OK_FILE(arrowStream->Flush());
+        ARROW_RETURN_NOT_OK(arrowStream->Flush());
     }
     else
     {
-        THROW_NOT_OK_FILE(arrowStream->Close());
+        ARROW_RETURN_NOT_OK(arrowStream->Close());
     }
-    LOG4CXX_DEBUG(logger, "ALT_SAVE>> closed")
-    return 0;
+    LOG4CXX_DEBUG(logger, "ALT_SAVE>> closed");
+    return arrow::Status::OK();
 }
 #endif
 
@@ -1647,8 +1671,9 @@ public:
 #ifdef USE_ARROW
                 if (settings.isArrowFormat())
                 {
-                    saveToDiskArrow(
-                        outArray, path, query, false, settings, inputSchema);
+                    THROW_NOT_OK(
+                        saveToDiskArrow(
+                            outArray, path, query, false, settings, inputSchema));
                 }
                 else
 #endif
@@ -1673,8 +1698,9 @@ public:
 #ifdef USE_ARROW
             if (settings.isArrowFormat())
             {
-                saveToDiskArrow(
-                    outArrayRedist, path, query, false, settings, inputSchema);
+                THROW_NOT_OK(
+                    saveToDiskArrow(
+                        outArrayRedist, path, query, false, settings, inputSchema));
             }
             else
 #endif
