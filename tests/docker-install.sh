@@ -73,7 +73,7 @@ fi
 
 wget --no-verbose https://bootstrap.pypa.io/get-pip.py
 python get-pip.py
-pip install enum34
+pip install scidb-py
 pip install git+git://github.com/paradigm4/scidb-py.git@arrow-update#egg=scidb-py
 
 
