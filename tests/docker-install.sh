@@ -73,7 +73,7 @@ fi
 
 wget --no-verbose https://bootstrap.pypa.io/get-pip.py
 python get-pip.py
-pip install pandas pyarrow==$ARROW_VER scidb-py
+pip install git+git://github.com/paradigm4/scidb-py.git@arrow-update#egg=scidb-py
 
 
 # Reset SciDB instance count to 4
