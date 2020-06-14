@@ -54,6 +54,7 @@ install:
   # - docker exec scidb bash -c "source /opt/rh/python27/enable; pip install --upgrade /accelerated_io_tools/SciDB-Py-master"
 
   - pip install --upgrade scidb-py
+  - pip install git+git://github.com/paradigm4/scidb-py.git@arrow-update#egg=scidb-py
 
   # - pip install --upgrade
   #   -r https://raw.githubusercontent.com/Paradigm4/SciDB-Py/master/requirements.txt
