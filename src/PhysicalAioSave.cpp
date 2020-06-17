@@ -980,7 +980,7 @@ private:
         std::shared_ptr<arrow::io::BufferOutputStream> arrowStream;
         ARROW_ASSIGN_OR_RAISE(
             arrowStream,
-            arrow::io::BufferOutputStream::Create(bytesCount, _arrowPool));
+            arrow::io::BufferOutputStream::Create(bytesCount * 2, _arrowPool));
 
         std::shared_ptr<arrow::ipc::RecordBatchWriter> arrowWriter;
         ARROW_RETURN_NOT_OK(
@@ -993,8 +993,8 @@ private:
         ARROW_ASSIGN_OR_RAISE(arrowBuffer, arrowStream->Finish());
 
         LOG4CXX_DEBUG(logger,
-                      "ArrowChunkPopulator::populateChunkStatus bytesCount: "
-                      << bytesCount << "arrowBuffer::size: " << arrowBuffer->size())
+                      "ALT_SAVE>> ArrowChunkPopulator::populateChunkStatus bytesCount x2: "
+                      << bytesCount * 2 << " arrowBuffer::size: " << arrowBuffer->size())
 
         // Copy data to Mem Chunk Builder
         builder.addData(reinterpret_cast<const char*>(arrowBuffer->data()),
