@@ -72,17 +72,29 @@
 
 
 #ifdef USE_ARROW
-#define THROW_NOT_OK(s)                                           \
-    {                                                             \
-        arrow::Status _s = (s);                                   \
-        if (!_s.ok())                                             \
-        {                                                         \
-            throw USER_EXCEPTION(                                 \
-                SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR) \
-                    << _s.ToString().c_str() << (int)_s.code();   \
-        }                                                         \
+#define THROW_NOT_OK(s)                                                 \
+    {                                                                   \
+        arrow::Status _s = (s);                                         \
+        if (!_s.ok())                                                   \
+        {                                                               \
+            throw USER_EXCEPTION(                                       \
+                SCIDB_SE_ARRAY_WRITER, SCIDB_LE_ILLEGAL_OPERATION)      \
+                    << _s.ToString().c_str();                           \
+        }                                                               \
+    }
+
+#define THROW_NOT_OK_FILE(s)                                            \
+    {                                                                   \
+        arrow::Status _s = (s);                                         \
+        if (!_s.ok())                                                   \
+        {                                                               \
+            throw USER_EXCEPTION(                                       \
+                SCIDB_SE_ARRAY_WRITER, SCIDB_LE_FILE_WRITE_ERROR)       \
+                    << _s.ToString().c_str() << (int)_s.code();         \
+        }                                                               \
     }
 #endif
+
 
 namespace scidb
 {
@@ -1671,7 +1683,7 @@ public:
 #ifdef USE_ARROW
                 if (settings.isArrowFormat())
                 {
-                    THROW_NOT_OK(
+                    THROW_NOT_OK_FILE(
                         saveToDiskArrow(
                             outArray, path, query, false, settings, inputSchema));
                 }
@@ -1698,7 +1710,7 @@ public:
 #ifdef USE_ARROW
             if (settings.isArrowFormat())
             {
-                THROW_NOT_OK(
+                THROW_NOT_OK_FILE(
                     saveToDiskArrow(
                         outArrayRedist, path, query, false, settings, inputSchema));
             }
