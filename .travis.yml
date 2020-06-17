@@ -64,7 +64,6 @@ script:
   - docker exec scidb /accelerated_io_tools/tests/test.sh
   - docker exec scidb /accelerated_io_tools/tests/test-skip.sh
   - docker exec scidb /accelerated_io_tools/tests/test_arrow.sh
-  - docker exec scidb rm /accelerated_io_tools/tests/test_arrow.out
   - ./tests/test_arrow.sh "docker exec scidb"
 
 after_failure:
