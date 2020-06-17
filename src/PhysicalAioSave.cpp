@@ -973,7 +973,8 @@ private:
 
         // Create Arrow Record Batch
         std::shared_ptr<arrow::RecordBatch> arrowBatch;
-        arrowBatch = arrow::RecordBatch::Make(_arrowSchema, nCells, _arrowArrays);
+        arrowBatch = arrow::RecordBatch::Make(_arrowSchema, _arrowArrays[0]->length(), _arrowArrays);
+        ARROW_RETURN_NOT_OK(arrowBatch->Validate());
 
         // Stream Arrow Record Batch to Arrow Buffer using Arrow
         // Record Batch Writer and Arrow Buffer Output Stream
