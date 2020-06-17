@@ -1521,9 +1521,9 @@ arrow::Status saveToDiskArrow(shared_ptr<Array> const& array,
             array->getConstIterator(inputSchema.getAttributes(true).firstDataAttribute());
         for (size_t n = 0; !arrayIter->end(); n++)
         {
-            ConstChunk const& ch = arrayIter->getChunk();
-            PinBuffer scope(ch);
-            uint32_t* sizePointer = (uint32_t*) (((char*)ch.getConstData()) +
+            ConstChunk const& chunk = arrayIter->getChunk();
+            PinBuffer scope(chunk);
+            uint32_t* sizePointer = (uint32_t*) (((char*)chunk.getConstData()) +
                                                  AioSaveSettings::chunkSizeOffset());
             uint32_t size = *sizePointer;
             bytesWritten += size;
@@ -1537,7 +1537,7 @@ arrow::Status saveToDiskArrow(shared_ptr<Array> const& array,
                     << "Exceeding specified result size limit of"
                     << settings.getResultSizeLimit();
             }
-            char* data = ((char*)ch.getConstData() + AioSaveSettings::chunkDataOffset());
+            char* data = ((char*)chunk.getConstData() + AioSaveSettings::chunkDataOffset());
 
             arrow::io::BufferReader arrowBufferReader(
                 reinterpret_cast<const uint8_t*>(data), size); // zero copy
