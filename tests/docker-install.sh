@@ -74,9 +74,8 @@ fi
 wget --no-verbose https://bootstrap.pypa.io/get-pip.py
 python get-pip.py
 # pip install --upgrade scidb-py
-wget --no-verbose https://github.com/Paradigm4/SciDB-Py/raw/arrow-update/requirements.txt
-pip install --upgrade -r requirements.txt
-pip install --upgrade git+git://github.com/paradigm4/scidb-py.git@arrow-update#egg=scidb-py
+pip install --upgrade -r https://github.com/Paradigm4/SciDB-Py/raw/master/requirements.txt
+pip install --upgrade git+git://github.com/paradigm4/scidb-py.git@master#egg=scidb-py
 
 
 # Reset SciDB instance count to 4
