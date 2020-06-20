@@ -740,23 +740,21 @@ private:
                 }
                 case TE_STRING:
                 {
-                    // TODO Use Append(vector<... when 0.10.0 is
-                    // released due to ARROW-2351 and ARROW-2388
+                    vector<string> values;
+                    vector<uint8_t> is_valid;
+
                     while (!citer->end())
                     {
                         Value const& value = citer->getItem();
                         if(value.isNull())
                         {
-                            ARROW_RETURN_NOT_OK(
-                                static_cast<arrow::StringBuilder*>(
-                                    _arrowBuilders[i].get())->AppendNull());
+                            values.push_back("");
+                            is_valid.push_back(0);
                         }
                         else
                         {
-                            ARROW_RETURN_NOT_OK(
-                                static_cast<arrow::StringBuilder*>(
-                                    _arrowBuilders[i].get())->Append(
-                                        value.getString()));
+                            values.push_back(value.getString());
+                            is_valid.push_back(1);
                         }
                         bytesCount += _inputSizes[i] + value.size();
 
@@ -773,27 +771,29 @@ private:
 
                         ++(*citer);
                     }
+
+                    ARROW_RETURN_NOT_OK(
+                        static_cast<arrow::StringBuilder*>(
+                            _arrowBuilders[i].get())->AppendValues(values, is_valid.data()));
                     break;
                 }
                 case TE_CHAR:
                 {
-                    // TODO Use Append(vector<... when 0.10.0 is
-                    // released due to ARROW-2351 and ARROW-2388
+                    vector<string> values;
+                    vector<uint8_t> is_valid;
+
                     while (!citer->end())
                     {
                         Value const& value = citer->getItem();
                         if(value.isNull())
                         {
-                            ARROW_RETURN_NOT_OK(
-                                static_cast<arrow::StringBuilder*>(
-                                    _arrowBuilders[i].get())->AppendNull());
+                            values.push_back("");
+                            is_valid.push_back(0);
                         }
                         else
                         {
-                            ARROW_RETURN_NOT_OK(
-                                static_cast<arrow::StringBuilder*>(
-                                    _arrowBuilders[i].get())->Append(
-                                        string(1, value.getChar())));
+                            values.push_back(string(1, value.getChar()));
+                            is_valid.push_back(1);
                         }
                         bytesCount += _inputSizes[i] + value.size();
 
@@ -810,6 +810,10 @@ private:
 
                         ++(*citer);
                     }
+
+                    ARROW_RETURN_NOT_OK(
+                        static_cast<arrow::StringBuilder*>(
+                            _arrowBuilders[i].get())->AppendValues(values, is_valid.data()));
                     break;
                 }
                 case TE_BOOL:
