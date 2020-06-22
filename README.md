@@ -2,7 +2,7 @@ accelerated_io_tools
 ==========
 
 [![SciDB 19.11](https://img.shields.io/badge/SciDB-19.11-blue.svg)](https://forum.paradigm4.com/t/scidb-release-19-11/2411)
-[![arrow 0.9.0](https://img.shields.io/badge/arrow-0.9.0-blue.svg)](https://arrow.apache.org/release/0.9.0.html)
+[![arrow 0.16.0](https://img.shields.io/badge/arrow-0.16.0-blue.svg)](https://arrow.apache.org/release/0.16.0.html)
 [![Build Status](https://travis-ci.org/Paradigm4/accelerated_io_tools.svg)](https://travis-ci.org/Paradigm4/accelerated_io_tools)
 
 A prototype library for the accelerated import and export of data out of SciDB. The work started previously as the `prototype_load_tools` package and continued to get optimized and expanded. Currently contains two SciDB operators and several functions:
@@ -493,11 +493,10 @@ The easiest way to install `accelerated_io_tools` is to install
 The following libraries are required to build the plugin:
 
 * SciDB development libraries
-* Protocol Buffers development library
 * PostgreSQL development library
-* Apache Arrow development library version `0.9.0`
+* Apache Arrow development library version `0.16.0`
 
-#### CentOS 6 & 7
+#### CentOS 7
 
 1. Install the Extra Packages for Enterprise Linux (EPEL) repository
    (see [instructions](https://fedoraproject.org/wiki/EPEL)), if not
@@ -507,18 +506,21 @@ The following libraries are required to build the plugin:
    > cat <<EOF | sudo tee /etc/yum.repos.d/scidb-extra.repo
    [scidb-extra]
    name=SciDB extra libs repository
-   baseurl=https://downloads.paradigm4.com/extra/$SCIDB_VER/centos6.3
+   baseurl=https://downloads.paradigm4.com/extra/$SCIDB_VER/centos7
    gpgcheck=0
    enabled=1
    EOF
    ```
+1. Use Apache Arrow [instructions](https://arrow.apache.org/install/)
+   for setting up the Apache Arrow repository
 1. Install dependencies:
    ```bash
-   > sudo yum install scidb-18.1-dev scidb-18.1-libboost-devel \
-       log4cxx-devel protobuf-devel libpqxx-devel arrow-devel-0.9.0
+   > yum install https://downloads.paradigm4.com/devtoolset-3/centos/7/sclo/x86_64/rh/devtoolset-3/scidb-devtoolset-3.noarch.rpm
+   > sudo yum install scidb-$SCIDB_VER-dev scidb-$SCIDB_VER-libboost-devel \
+       devtoolset-3-toolchain log4cxx-deve protobuf-devellibpqxx-devel arrow-devel-0.16.0
    ```
 
-#### Ubuntu Trusty
+#### Ubuntu Xenial
 
 1. Install the `apt-transport-https` package (if not already installed):
    ```bash
@@ -531,10 +533,12 @@ The following libraries are required to build the plugin:
    APT_LINE
    > sudo apt-get update
    ```
+1. Use Apache Arrow [instructions](https://arrow.apache.org/install/)
+   for setting up the Apache Arrow repository
 1. Install the dependencies:
    ```bash
-   > sudo apt-get install scidb-18.1-dev libprotobuf-dev libpqxx-dev \
-       libarrow-dev=0.9.0-1
+   > sudo apt-get install scidb-$SCIDB_VER-dev libboost-system1.58-dev liblog4cxx10-dev \
+       libprotobuf-dev libpqxx-dev libarrow-dev=0.16.0-1
    ```
 
 ### Install the plugin
@@ -550,7 +554,7 @@ instructions to get `dev_tools` first. Then:
 
 Follow the [Install Prerequisites](#install-prerequisites)
 above. Download the sourcecode from GitHub and run `make` in the top
-directory. Copy the resultin `.so` file to your SciDB plugins
+directory. Copy the resulting `.so` file to your SciDB plugins
 directory as instructed by the `make` output.
 
 ## Note: unload prototype_load_tools if loaded

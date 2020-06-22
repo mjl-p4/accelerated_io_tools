@@ -2,13 +2,13 @@ language: python
 
 python:
   - "2.7"
-  - "3.4"
   - "3.5"
   - "3.6"
   - "3.7"
+  - "3.8"
 
 env:
-  global: SCIDB_VER=19.11 ARROW_VER=0.9.0
+  global: SCIDB_VER=19.11 ARROW_VER=0.16.0
   matrix:
     - SCIDB_IMG=-xenial
     - SCIDB_IMG=-centos-7
@@ -20,11 +20,6 @@ before_install:
   # - mkdir shim
   # - wget --no-verbose --output-document -
   #   https://github.com/Paradigm4/shim/archive/master.tar.gz
-  #   | tar --extract --gzip --directory=.
-
-  # - mkdir scidb-py
-  # - wget --no-verbose --output-document -
-  #   https://github.com/Paradigm4/scidb-py/archive/master.tar.gz
   #   | tar --extract --gzip --directory=.
 
   - docker pull rvernica/scidb:${SCIDB_VER}${SCIDB_IMG}
@@ -51,13 +46,10 @@ install:
   - docker exec scidb /accelerated_io_tools/tests/docker-install.sh
 
   # - docker exec scidb make --directory=/accelerated_io_tools/shim-master service
-  # - docker exec scidb bash -c "source /opt/rh/python27/enable; pip install --upgrade /accelerated_io_tools/SciDB-Py-master"
 
-  - pip install --upgrade scidb-py
-
-  # - pip install --upgrade
-  #   -r https://raw.githubusercontent.com/Paradigm4/SciDB-Py/master/requirements.txt
-  # - pip install --upgrade git+https://github.com/Paradigm4/SciDB-Py
+  # - pip install --upgrade scidb-py
+  - pip install --upgrade -r https://github.com/Paradigm4/SciDB-Py/raw/master/requirements.txt
+  - pip install --upgrade git+git://github.com/paradigm4/scidb-py.git@master#egg=scidb-py
 
 script:
   - docker exec scidb /accelerated_io_tools/tests/test.sh

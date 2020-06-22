@@ -509,7 +509,7 @@ Query was executed successfully
 {chunk_no,dest_instance_id,source_instance_id} val
 50 MB (52700000 B)
 {chunk_no,dest_instance_id,source_instance_id} val
-47 MB (49988452 B)
+47 MB (49988456 B)
 3100000
 3100000
 Query was executed successfully
@@ -521,7 +521,7 @@ Query was executed successfully
 {chunk_no,dest_instance_id,source_instance_id} val
 50 MB (53268772 B)
 {chunk_no,dest_instance_id,source_instance_id} val
-47 MB (49557108 B)
+47 MB (49557112 B)
 2700000
 2700000
 Query was executed successfully
