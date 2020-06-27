@@ -47,9 +47,7 @@ install:
 
   # - docker exec scidb make --directory=/accelerated_io_tools/shim-master service
 
-  # - pip install --upgrade scidb-py
-  - pip install --upgrade -r https://github.com/Paradigm4/SciDB-Py/raw/master/requirements.txt
-  - pip install --upgrade git+git://github.com/paradigm4/scidb-py.git@master#egg=scidb-py
+  - pip install --upgrade numpy scidb-py
 
 script:
   - docker exec scidb /accelerated_io_tools/tests/test.sh
