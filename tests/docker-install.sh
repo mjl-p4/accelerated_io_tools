@@ -13,7 +13,7 @@ then
     # yum install --assumeyes                                                    \
     #     https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm
 
-    for pkg in centos-release-scl libpqxx-devel python27
+    for pkg in arrow-devel-$ARROW_VER centos-release-scl libpqxx-devel python27
     do
         yum install --assumeyes $pkg
     done
@@ -23,6 +23,7 @@ else
     apt-get update
     apt-get install                              \
             --assume-yes --no-install-recommends \
+            libarrow-dev=$ARROW_VER-1            \
             libpqxx-dev
 fi
 
