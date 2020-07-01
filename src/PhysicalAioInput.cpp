@@ -919,6 +919,9 @@ public:
                 }
                 if(lastBlock && buf.size() <= 1)
                 {
+                    // Manually unpin before changing the iterator state, otherwise the PinBuffer's chunk
+                    // reference will dangle and cause a crash.
+                    pinScope.unPin();
                     ++(*inputIterator);
                     continue;
                 }
