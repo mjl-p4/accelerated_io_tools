@@ -61,8 +61,8 @@ using namespace scidb;
 
 static size_t getChunkOverheadSize()
 {
-    return             (  sizeof(ConstRLEPayload::Header) +
-                                 2 * sizeof(ConstRLEPayload::Segment) +
+    return             (  sizeof(RLEPayload::PayloadHeader) +
+                                 2 * sizeof(PayloadSegment) +
                                  sizeof(varpart_offset_t) + 5);
 }
 
@@ -79,7 +79,8 @@ private:
 
 public:
     BinEmptySinglePass(ArrayDesc const& schema):
-            super(schema)
+        super(schema),
+        _dummy(SCIDB_CODE_LOC)
     {
         super::setEnforceHorizontalIteration(true);
     }
@@ -123,6 +124,7 @@ public:
         super(schema),
         _rowIndex(0),
         _chunkAddress(0, Coordinates(3,0)),
+        _chunk(SCIDB_CODE_LOC),
         _query(query),
         _fileBlockSize(settings->getBlockSize()),
         _chunkOverheadSize( getChunkOverheadSize() ),
@@ -135,24 +137,25 @@ public:
         _chunkAddress.coords[2] = query->getInstanceID();
         try
         {
-            _chunk.allocate(_chunkOverheadSize + _fileBlockSize);
+            _chunk.allocate(_chunkOverheadSize + _fileBlockSize,
+                            AllocType::chunk, SCIDB_CODE_LOC);
         }
         catch(...)
         {
             throw SYSTEM_EXCEPTION(SCIDB_SE_INTERNAL, SCIDB_LE_ILLEGAL_OPERATION) << "File splitter cannot allocate memory";
         }
         _bufPointer = (char*) _chunk.getWriteData();
-        ConstRLEPayload::Header* hdr = (ConstRLEPayload::Header*) _bufPointer;
+        RLEPayload::PayloadHeader* hdr = (RLEPayload::PayloadHeader*) _bufPointer;
         hdr->_magic = RLE_PAYLOAD_MAGIC;
         hdr->_nSegs = 1;
         hdr->_elemSize = 0;
         hdr->_dataSize = _fileBlockSize + 5 + sizeof(varpart_offset_t);
         hdr->_varOffs = sizeof(varpart_offset_t);
         hdr->_isBoolean = 0;
-        ConstRLEPayload::Segment* seg = (ConstRLEPayload::Segment*) (hdr+1);
-        *seg =  ConstRLEPayload::Segment(0,0,false,false);
+        PayloadSegment* seg = (PayloadSegment*) (hdr+1);
+        *seg =  PayloadSegment(0,0,false,false);
         ++seg;
-        *seg =  ConstRLEPayload::Segment(1,0,false,false);
+        *seg =  PayloadSegment(1,0,false,false);
         varpart_offset_t* vp =  (varpart_offset_t*) (seg+1);
         *vp = 0;
         uint8_t* sizeFlag = (uint8_t*) (vp+1);

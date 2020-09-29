@@ -216,7 +216,8 @@ private:
 
 public:
     EmptySinglePass(ArrayDesc const& schema):
-            super(schema)
+        super(schema),
+        _dummy(SCIDB_CODE_LOC)
     {
         super::setEnforceHorizontalIteration(true);
     }
@@ -255,6 +256,7 @@ public:
         _rowIndex(0),
         _chunkAddress(0, Coordinates(2,0)),
         _query(query),
+        _chunk(SCIDB_CODE_LOC),
         _splitter(settings->getInputFilePath(),
                   settings->getLinesPerChunk(),
                   settings->getBufferSize(),

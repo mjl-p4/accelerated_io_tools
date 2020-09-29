@@ -64,12 +64,12 @@ class AioSaveSettings
 public:
     static size_t chunkDataOffset()
     {
-        return (sizeof(ConstRLEPayload::Header) + 2 * sizeof(ConstRLEPayload::Segment) + sizeof(varpart_offset_t) + 5);
+        return (sizeof(RLEPayload::PayloadHeader) + 2 * sizeof(PayloadSegment) + sizeof(varpart_offset_t) + 5);
     }
 
     static size_t chunkSizeOffset()
     {
-        return (sizeof(ConstRLEPayload::Header) + 2 * sizeof(ConstRLEPayload::Segment) + sizeof(varpart_offset_t) + 1);
+        return (sizeof(RLEPayload::PayloadHeader) + 2 * sizeof(PayloadSegment) + sizeof(varpart_offset_t) + 1);
     }
 
 

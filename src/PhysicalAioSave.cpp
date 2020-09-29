@@ -265,11 +265,12 @@ public:
     static const size_t s_startingSize = 8*1024*1024 + 512;
 
     MemChunkBuilder():
-        _allocSize(s_startingSize)
+        _allocSize(s_startingSize),
+        _chunk(SCIDB_CODE_LOC)
     {
-        _chunk.allocate(_allocSize);
+        _chunk.allocate(_allocSize, AllocType::chunk, SCIDB_CODE_LOC);
         _chunkStartPointer = (char*) _chunk.getWriteData();
-        ConstRLEPayload::Header* hdr = (ConstRLEPayload::Header*) _chunkStartPointer;
+        RLEPayload::PayloadHeader* hdr = (RLEPayload::PayloadHeader*) _chunkStartPointer;
         hdr->_magic = RLE_PAYLOAD_MAGIC;
         hdr->_nSegs = 1;
         hdr->_elemSize = 0;
@@ -277,10 +278,10 @@ public:
         _dataSizePointer = &(hdr->_dataSize);
         hdr->_varOffs = sizeof(varpart_offset_t);
         hdr->_isBoolean = 0;
-        ConstRLEPayload::Segment* seg = (ConstRLEPayload::Segment*) (hdr+1);
-        *seg =  ConstRLEPayload::Segment(0,0,false,false);
+        PayloadSegment* seg = (PayloadSegment*) (hdr+1);
+        *seg =  PayloadSegment(0,0,false,false);
         ++seg;
-        *seg =  ConstRLEPayload::Segment(1,0,false,false);
+        *seg =  PayloadSegment(1,0,false,false);
         varpart_offset_t* vp =  (varpart_offset_t*) (seg+1);
         *vp = 0;
         uint8_t* sizeFlag = (uint8_t*) (vp+1);
@@ -309,13 +310,14 @@ public:
             }
             vector<char> buf(_allocSize);
             memcpy(&(buf[0]), _chunk.getWriteData(), mySize);
-            _chunk.allocate(_allocSize);
+            _chunk.allocate(_allocSize,
+                            AllocType::chunk, SCIDB_CODE_LOC);
             _chunkStartPointer = (char*) _chunk.getWriteData();
             memcpy(_chunkStartPointer, &(buf[0]), mySize);
             _dataStartPointer = _chunkStartPointer + AioSaveSettings::chunkDataOffset();
             _sizePointer = (uint32_t*) (_chunkStartPointer + AioSaveSettings::chunkSizeOffset());
             _writePointer = _chunkStartPointer + mySize;
-            ConstRLEPayload::Header* hdr = (ConstRLEPayload::Header*) _chunkStartPointer;
+            RLEPayload::PayloadHeader* hdr = (RLEPayload::PayloadHeader*) _chunkStartPointer;
             _dataSizePointer = &(hdr->_dataSize);
         }
         memcpy(_writePointer, data, size);
