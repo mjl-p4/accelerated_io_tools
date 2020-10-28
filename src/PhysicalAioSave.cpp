@@ -1672,19 +1672,22 @@ public:
         ArrayDesc const& inputSchema = input->getArrayDesc();
         bool singleChunk = isSingleChunk(inputSchema);
         shared_ptr< Array> outArray;
+        shared_ptr<Array> result;
+        ArrayDesc denseSchema(_schema);
+        denseSchema.setAttributes(denseSchema.getDataAttributes());
         if(settings.isBinaryFormat())
         {
-            outArray.reset(new BinaryConvertedArray(_schema, input, query, settings));
+            outArray.reset(new BinaryConvertedArray(denseSchema, input, query, settings));
         }
 #ifdef USE_ARROW
         else if(settings.isArrowFormat())
         {
-            outArray.reset(new ArrowConvertedArray(_schema, input, query, settings));
+            outArray.reset(new ArrowConvertedArray(denseSchema, input, query, settings));
         }
 #endif
         else
         {
-            outArray.reset(new TextConvertedArray(_schema, input, query, settings));
+            outArray.reset(new TextConvertedArray(denseSchema, input, query, settings));
         }
         InstanceID const myInstanceID = query->getInstanceID();
         map<InstanceID, string>::const_iterator iter = settings.getInstanceMap().find(myInstanceID);
@@ -1709,7 +1712,8 @@ public:
                         outArray, path, query, false, settings, inputSchema);
                 }
             }
-            return shared_ptr<Array>(new MemArray(_schema, query));
+            result = shared_ptr<Array>(new MemArray(denseSchema, query));
+            return shared_ptr<Array>(new NonEmptyableArray(result));
         }
         shared_ptr<Array> outArrayRedist;
         LOG4CXX_DEBUG(logger, "ALT_SAVE>> Starting SG")
@@ -1741,7 +1745,8 @@ public:
             SynchableArray* syncArray = safe_dynamic_cast<SynchableArray*>(outArrayRedist.get());
             syncArray->sync();
         }
-        return shared_ptr<Array>(new MemArray(_schema, query));
+        result = shared_ptr<Array>(new MemArray(denseSchema, query));
+        return shared_ptr<Array>(new NonEmptyableArray(result));
     }
 };
 

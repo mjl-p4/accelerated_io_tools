@@ -56,6 +56,7 @@ public:
         //vector<AttributeDesc> attributes(1);
         Attributes attributes;
         attributes.push_back(AttributeDesc("value",  TID_STRING, 0, CompressorType::NONE));
+        attributes.addEmptyTagAttribute();
         vector<DimensionDesc> dimensions(2);
 
         dimensions[0] = DimensionDesc("source_instance_id", 0, 0, CoordinateBounds::getMax(), CoordinateBounds::getMax(), 1, 0);

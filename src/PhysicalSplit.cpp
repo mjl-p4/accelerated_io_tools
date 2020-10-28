@@ -331,19 +331,22 @@ public:
     {
         shared_ptr<SplitSettings> settings (new SplitSettings (_parameters, false, query));
         shared_ptr<Array> result;
+        ArrayDesc denseSchema(_schema);
+        denseSchema.setAttributes(denseSchema.getDataAttributes());
         if( static_cast<int64_t> (query->getInstanceID()) == settings->getParseInstance())
         {
-            result = shared_ptr<FileSplitArray>(new FileSplitArray(_schema, query, settings));
+            result = shared_ptr<FileSplitArray>(new FileSplitArray(denseSchema, query, settings));
         }
         else
         {
-            result = std::shared_ptr<EmptySinglePass>(new EmptySinglePass(_schema));
+            result = std::shared_ptr<EmptySinglePass>(new EmptySinglePass(denseSchema));
         }
         result = redistributeToRandomAccess(result,
                                             createDistribution(dtHashPartitioned),
                                             ArrayResPtr(),
                                             query,
                                             shared_from_this());
+        result = std::shared_ptr<Array>(new NonEmptyableArray(result));
         return result;
     }
 };
