@@ -812,7 +812,7 @@ public:
         InstanceID const myId = query->getInstanceID();
         size_t const numInstances = query->getInstancesCount();
         size_t const vectorSize = numInstances *  sizeof(Coordinate);
-        shared_ptr<SharedBuffer> buf(new MemoryBuffer( &(myLastBlocks[0]), vectorSize));
+        shared_ptr<SharedBuffer> buf(new MemoryBuffer(SCIDB_CODE_LOC, &(myLastBlocks[0]), vectorSize));
         for(InstanceID i = 0; i<numInstances; ++i)
         {
             if (i == myId)
