@@ -2,7 +2,7 @@ accelerated_io_tools
 ==========
 
 [![SciDB 19.11](https://img.shields.io/badge/SciDB-19.11-blue.svg)](https://forum.paradigm4.com/t/scidb-release-19-11/2411)
-[![arrow 0.16.0](https://img.shields.io/badge/arrow-0.16.0-blue.svg)](https://arrow.apache.org/release/0.16.0.html)
+[![arrow 3.0.0](https://img.shields.io/badge/arrow-3.0.0-blue.svg)](https://arrow.apache.org/release/3.0.0.html)
 [![Build Status](https://travis-ci.org/Paradigm4/accelerated_io_tools.svg)](https://travis-ci.org/Paradigm4/accelerated_io_tools)
 
 A prototype library for the accelerated import and export of data out of SciDB. The work started previously as the `prototype_load_tools` package and continued to get optimized and expanded. Currently contains two SciDB operators and several functions:
@@ -494,7 +494,7 @@ The following libraries are required to build the plugin:
 
 * SciDB development libraries
 * PostgreSQL development library
-* Apache Arrow development library version `0.16.0`
+* Apache Arrow development library version `3.0.0`
 
 #### CentOS 7
 
@@ -517,7 +517,7 @@ The following libraries are required to build the plugin:
    ```bash
    > yum install https://downloads.paradigm4.com/devtoolset-3/centos/7/sclo/x86_64/rh/devtoolset-3/scidb-devtoolset-3.noarch.rpm
    > sudo yum install scidb-$SCIDB_VER-dev scidb-$SCIDB_VER-libboost-devel \
-       devtoolset-3-toolchain log4cxx-deve protobuf-devellibpqxx-devel arrow-devel-0.16.0
+       devtoolset-3-toolchain log4cxx-deve protobuf-devellibpqxx-devel arrow-devel-3.0.0
    ```
 
 #### Ubuntu Xenial
@@ -538,7 +538,7 @@ The following libraries are required to build the plugin:
 1. Install the dependencies:
    ```bash
    > sudo apt-get install scidb-$SCIDB_VER-dev libboost-system1.58-dev liblog4cxx10-dev \
-       libprotobuf-dev libpqxx-dev libarrow-dev=0.16.0-1
+       libprotobuf-dev libpqxx-dev libarrow-dev=3.0.0-1
    ```
 
 ### Install the plugin
