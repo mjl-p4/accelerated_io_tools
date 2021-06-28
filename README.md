@@ -496,7 +496,7 @@ The following libraries are required to build the plugin:
 * PostgreSQL development library
 * Apache Arrow development library version `3.0.0`
 
-#### CentOS 7
+#### RHEL/CentOS 7
 
 1. Install the Extra Packages for Enterprise Linux (EPEL) repository
    (see [instructions](https://fedoraproject.org/wiki/EPEL)), if not
@@ -511,14 +511,30 @@ The following libraries are required to build the plugin:
    enabled=1
    EOF
    ```
-1. Use Apache Arrow [instructions](https://arrow.apache.org/install/)
-   for setting up the Apache Arrow repository
-1. Install dependencies:
-   ```bash
-   > yum install https://downloads.paradigm4.com/devtoolset-3/centos/7/sclo/x86_64/rh/devtoolset-3/scidb-devtoolset-3.noarch.rpm
-   > sudo yum install scidb-$SCIDB_VER-dev scidb-$SCIDB_VER-libboost-devel \
-       devtoolset-3-toolchain log4cxx-deve protobuf-devellibpqxx-devel arrow-devel-3.0.0
-   ```
+
+##### Apache Arrow
+
+The Apache Arrow library and SciDB are compiled using different
+tool-chains. As a consequence, the Apache Arrow library needs to be
+compiled from source.
+
+```
+curl --location \
+    "https://www.apache.org/dyn/closer.lua?action=download&filename=arrow/arrow-3.0.0/apache-arrow-3.0.0.tar.gz" \
+    | tar --extract --gzip
+cd apache-arrow-3.0.0/cpp
+mkdir build
+cd build
+scl enable devtoolset-3                                             \
+    "cmake3 ..                                                      \
+         -DARROW_WITH_LZ4=ON                                        \
+         -DARROW_WITH_ZLIB=ON                                       \
+         -DCMAKE_CXX_COMPILER=/opt/rh/devtoolset-3/root/usr/bin/g++ \
+         -DCMAKE_C_COMPILER=/opt/rh/devtoolset-3/root/usr/bin/gcc   \
+         -DCMAKE_INSTALL_PREFIX=/opt/apache-arrow"
+make
+make install
+```
 
 #### Ubuntu Xenial
 
