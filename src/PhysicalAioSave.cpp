@@ -990,13 +990,9 @@ private:
             arrow::io::BufferOutputStream::Create(bytesCount * 2, _arrowPool));
 
         std::shared_ptr<arrow::ipc::RecordBatchWriter> arrowWriter;
-        ARROW_RETURN_NOT_OK(
-            arrow::ipc::RecordBatchStreamWriter::Open(
-                &*arrowStream, _arrowSchema, &arrowWriter));
-        // Arrow >= 0.17.0
-        // ARROW_ASSIGN_OR_RAISE(
-        //     arrowWriter,
-        //     arrow::ipc::NewStreamWriter(&*arrowStream, _arrowSchema));
+        ARROW_ASSIGN_OR_RAISE(
+            arrowWriter,
+            arrow::ipc::MakeStreamWriter(&*arrowStream, _arrowSchema));
 
         ARROW_RETURN_NOT_OK(arrowWriter->WriteRecordBatch(*arrowBatch));
         ARROW_RETURN_NOT_OK(arrowWriter->Close());
@@ -1525,13 +1521,9 @@ arrow::Status saveToDiskArrow(shared_ptr<Array> const& array,
     {
         std::shared_ptr<arrow::Schema> arrowSchema = attributes2ArrowSchema(
             inputSchema, settings.isAttsOnly());
-        ARROW_RETURN_NOT_OK(
-            arrow::ipc::RecordBatchStreamWriter::Open(
-                arrowStream.get(), arrowSchema, &arrowWriter));
-        // Arrow >= 0.17.0
-        // ARROW_ASSIGN_OR_RAISE(
-        //     arrowWriter,
-        //     arrow::ipc::NewStreamWriter(arrowStream.get(), arrowSchema));
+        ARROW_ASSIGN_OR_RAISE(
+            arrowWriter,
+            arrow::ipc::MakeStreamWriter(arrowStream.get(), arrowSchema));
 
         shared_ptr<ConstArrayIterator> arrayIter =
             array->getConstIterator(inputSchema.getAttributes(true).firstDataAttribute());
@@ -1559,13 +1551,9 @@ arrow::Status saveToDiskArrow(shared_ptr<Array> const& array,
                 reinterpret_cast<const uint8_t*>(data), size); // zero copy
 
             // Read Record Batch using Stream Reader
-            ARROW_RETURN_NOT_OK(
-                arrow::ipc::RecordBatchStreamReader::Open(
-                    &arrowBufferReader, &arrowReader));
-            // Arrow >= 0.17.0
-            // ARROW_ASSIGN_OR_RAISE(
-            //     arrowReader,
-            //     arrow::ipc::RecordBatchStreamReader::Open(&arrowBufferReader));
+            ARROW_ASSIGN_OR_RAISE(
+                arrowReader,
+                arrow::ipc::RecordBatchStreamReader::Open(&arrowBufferReader));
             ARROW_RETURN_NOT_OK(arrowReader->ReadNext(&arrowBatch));
 
             // Write Record Batch to stream

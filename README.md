@@ -2,7 +2,7 @@ accelerated_io_tools
 ==========
 
 [![SciDB 19.11](https://img.shields.io/badge/SciDB-19.11-blue.svg)](https://forum.paradigm4.com/t/scidb-release-19-11/2411)
-[![arrow 0.16.0](https://img.shields.io/badge/arrow-0.16.0-blue.svg)](https://arrow.apache.org/release/0.16.0.html)
+[![arrow 3.0.0](https://img.shields.io/badge/arrow-3.0.0-blue.svg)](https://arrow.apache.org/release/3.0.0.html)
 [![Build Status](https://travis-ci.org/Paradigm4/accelerated_io_tools.svg)](https://travis-ci.org/Paradigm4/accelerated_io_tools)
 
 A prototype library for the accelerated import and export of data out of SciDB. The work started previously as the `prototype_load_tools` package and continued to get optimized and expanded. Currently contains two SciDB operators and several functions:
@@ -494,9 +494,9 @@ The following libraries are required to build the plugin:
 
 * SciDB development libraries
 * PostgreSQL development library
-* Apache Arrow development library version `0.16.0`
+* Apache Arrow development library version `3.0.0`
 
-#### CentOS 7
+#### RHEL/CentOS 7
 
 1. Install the Extra Packages for Enterprise Linux (EPEL) repository
    (see [instructions](https://fedoraproject.org/wiki/EPEL)), if not
@@ -511,14 +511,30 @@ The following libraries are required to build the plugin:
    enabled=1
    EOF
    ```
-1. Use Apache Arrow [instructions](https://arrow.apache.org/install/)
-   for setting up the Apache Arrow repository
-1. Install dependencies:
-   ```bash
-   > yum install https://downloads.paradigm4.com/devtoolset-3/centos/7/sclo/x86_64/rh/devtoolset-3/scidb-devtoolset-3.noarch.rpm
-   > sudo yum install scidb-$SCIDB_VER-dev scidb-$SCIDB_VER-libboost-devel \
-       devtoolset-3-toolchain log4cxx-deve protobuf-devellibpqxx-devel arrow-devel-0.16.0
-   ```
+
+##### Apache Arrow
+
+The Apache Arrow library and SciDB are compiled using different
+tool-chains. As a consequence, the Apache Arrow library needs to be
+compiled from source.
+
+```
+curl --location \
+    "https://www.apache.org/dyn/closer.lua?action=download&filename=arrow/arrow-3.0.0/apache-arrow-3.0.0.tar.gz" \
+    | tar --extract --gzip
+cd apache-arrow-3.0.0/cpp
+mkdir build
+cd build
+scl enable devtoolset-3                                             \
+    "cmake3 ..                                                      \
+         -DARROW_WITH_LZ4=ON                                        \
+         -DARROW_WITH_ZLIB=ON                                       \
+         -DCMAKE_CXX_COMPILER=/opt/rh/devtoolset-3/root/usr/bin/g++ \
+         -DCMAKE_C_COMPILER=/opt/rh/devtoolset-3/root/usr/bin/gcc   \
+         -DCMAKE_INSTALL_PREFIX=/opt/apache-arrow"
+make
+make install
+```
 
 #### Ubuntu Xenial
 
@@ -538,7 +554,7 @@ The following libraries are required to build the plugin:
 1. Install the dependencies:
    ```bash
    > sudo apt-get install scidb-$SCIDB_VER-dev libboost-system1.58-dev liblog4cxx10-dev \
-       libprotobuf-dev libpqxx-dev libarrow-dev=0.16.0-1
+       libprotobuf-dev libpqxx-dev libarrow-dev=3.0.0-1
    ```
 
 ### Install the plugin
