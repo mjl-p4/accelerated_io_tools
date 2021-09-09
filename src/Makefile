@@ -21,8 +21,8 @@ ifeq ($(SCIDB_THIRDPARTY_PREFIX),)
   SCIDB_THIRDPARTY_PREFIX := $(SCIDB_3RDPARTY)
 endif
 
-CFLAGS  := -DARROW_NO_DEPRECATED_API -DNDEBUG -DUSE_ARROW -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -O3 -Wall -Wextra -Wno-long-long -Wno-strict-aliasing -Wno-system-headers -Wno-unused -Wno-unused-parameter -Wno-variadic-macros -fPIC -fno-omit-frame-pointer -g -std=c++14
-INC     := -I. -DPROJECT_ROOT="\"$(SCIDB)\"" -I"$(SCIDB_THIRDPARTY_PREFIX)/3rdparty/boost/include/" -I"$(SCIDB)/include"
+CFLAGS  := -DARROW_NO_DEPRECATED_API -DNDEBUG -DUSE_ARROW -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -O3 -Wall -Wextra -Wno-long-long -Wno-strict-aliasing -Wno-system-headers -Wno-unused -Wno-unused-parameter -Wno-variadic-macros -fPIC -fno-omit-frame-pointer -g -std=c++17
+INC     := -I. -DPROJECT_ROOT="\"$(SCIDB)\"" -I"$(SCIDB_THIRDPARTY_PREFIX)/3rdparty/boost/include/" -I"$(SCIDB)/include"  -I"/usr/pgsql-9.3/include"
 LIBS    :=-shared -Wl,-soname,libaccelerated_io_tools.so -L. -L"$(SCIDB_THIRDPARTY_PREFIX)/3rdparty/boost/lib" -L"$(SCIDB)/lib" -Wl,-rpath,$(SCIDB)/lib -lm -larrow
 SRCS    := plugin.cpp LogicalSplit.cpp PhysicalSplit.cpp LogicalParse.cpp PhysicalParse.cpp LogicalAioInput.cpp PhysicalAioInput.cpp LogicalAioSave.cpp PhysicalAioSave.cpp Functions.cpp
 HEADERS := AioInputSettings.h AioSaveSettings.h ParseSettings.h SplitSettings.h UnparseTemplateParser.h
