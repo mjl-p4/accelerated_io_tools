@@ -6,24 +6,9 @@ ifeq ($(SCIDB),)
   endif
 endif
 
-# A way to set the 3rdparty prefix path that is convenient
-# for SciDB developers.
-ifeq ($(SCIDB_VER),)
-  SCIDB_3RDPARTY := $(SCIDB)
-else
-  SCIDB_3RDPARTY := /opt/scidb/$(SCIDB_VER)
-endif
-
-# A better way to set the 3rdparty prefix path that does
-# not assume an absolute path. You can still use the above
-# method if you prefer.
-ifeq ($(SCIDB_THIRDPARTY_PREFIX),)
-  SCIDB_THIRDPARTY_PREFIX := $(SCIDB_3RDPARTY)
-endif
-
 CFLAGS  := -DARROW_NO_DEPRECATED_API -DNDEBUG -DUSE_ARROW -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -O3 -Wall -Wextra -Wno-long-long -Wno-strict-aliasing -Wno-system-headers -Wno-unused -Wno-unused-parameter -Wno-variadic-macros -fPIC -fno-omit-frame-pointer -g -std=c++17
-INC     := -I. -DPROJECT_ROOT="\"$(SCIDB)\"" -I"$(SCIDB_THIRDPARTY_PREFIX)/3rdparty/boost/include/" -I"$(SCIDB)/include"  -I"/usr/pgsql-9.3/include"
-LIBS    :=-shared -Wl,-soname,libaccelerated_io_tools.so -L. -L"$(SCIDB_THIRDPARTY_PREFIX)/3rdparty/boost/lib" -L"$(SCIDB)/lib" -Wl,-rpath,$(SCIDB)/lib -lm -larrow
+INC     := -I. -DPROJECT_ROOT="\"$(SCIDB)\""  -I"$(SCIDB)/include"  -I"/usr/pgsql-9.3/include" -I"/usr/include/boost169"
+LIBS    :=-shared -Wl,-soname,libaccelerated_io_tools.so -L. -L"$(SCIDB)/lib" -Wl,-rpath,$(SCIDB)/lib -lm -larrow
 SRCS    := plugin.cpp LogicalSplit.cpp PhysicalSplit.cpp LogicalParse.cpp PhysicalParse.cpp LogicalAioInput.cpp PhysicalAioInput.cpp LogicalAioSave.cpp PhysicalAioSave.cpp Functions.cpp
 HEADERS := AioInputSettings.h AioSaveSettings.h ParseSettings.h SplitSettings.h UnparseTemplateParser.h
 OBJS    := $(SRCS:%.cpp=%.o)
