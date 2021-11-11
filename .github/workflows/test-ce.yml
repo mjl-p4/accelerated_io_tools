@@ -1,4 +1,4 @@
-name: Test Suite
+name: Test w/ SciDB CE
 
 on: [push, pull_request]
 
