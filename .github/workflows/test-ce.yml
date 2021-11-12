@@ -51,6 +51,12 @@ jobs:
         run: docker exec scidb systemctl start shimsvc
         if: ${{ matrix.OS == 'centos-7' }}
 
+      - name: Update CA Certificates for Xenial
+        run: >-
+          docker exec scidb bash -c
+          "apt-get update || apt-get upgrade --assume-yes ca-certificates"
+        if: ${{ matrix.OS == 'xenial' }}
+
       - name: Wait for SciDB to start
         run: while ! curl http://localhost:8080/version; do sleep 5; done
 
