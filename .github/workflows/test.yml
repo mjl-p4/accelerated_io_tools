@@ -13,7 +13,7 @@ jobs:
 
     services:
       scidb:
-        image: ghcr.io/paradigm4/centos-7-3rdparty:19.11
+        image: ghcr.io/paradigm4/centos-7-3rdparty:21.8
         volumes:
           - /home/runner/work/accelerated_io_tools:/__w
           - /sys/fs/cgroup:/sys/fs/cgroup
@@ -40,11 +40,11 @@ jobs:
         run: |
           docker exec scidb /root/install-scidb.sh ${{ secrets.P4_USERNAME }} ${{ secrets.P4_PASSWORD }}
           echo "Update config"
-          docker exec scidb sed --in-place s/server-0=127.0.0.1,1/server-0=127.0.0.1,3/ /opt/scidb/19.11/etc/config.ini
+          docker exec scidb sed --in-place s/server-0=127.0.0.1,1/server-0=127.0.0.1,3/ /opt/scidb/21.8/etc/config.ini
           echo "Init SciDB"
           docker exec scidb /root/init-scidb.sh
           echo "Install Shim"
-          docker exec scidb /root/install-shim.sh v19.11
+          docker exec scidb /root/install-shim.sh v21.8
           docker exec scidb bash -c "echo aio=1 >> /var/lib/shim/conf"
 
       - name: Start SciDB
@@ -56,7 +56,7 @@ jobs:
       - name: Make, Install, and Load accelerated_io_tools
         run: |
           docker exec scidb make --directory=/__w/accelerated_io_tools
-          docker exec scidb cp /__w/accelerated_io_tools/libaccelerated_io_tools.so /opt/scidb/19.11/lib/scidb/plugins/
+          docker exec scidb cp /__w/accelerated_io_tools/libaccelerated_io_tools.so /opt/scidb/21.8/lib/scidb/plugins/
           docker exec scidb iquery --afl --query "load_library('accelerated_io_tools')"
 
       - name: Setup Python dependencies
