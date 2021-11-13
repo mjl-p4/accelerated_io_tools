@@ -55,7 +55,7 @@ jobs:
 
       - name: Make, Install, and Load accelerated_io_tools
         run: |
-          docker exec scidb make --directory=/__w/accelerated_io_tools
+          docker exec scidb scl enable devtoolset-9 "make --directory=/__w/accelerated_io_tools"
           docker exec scidb cp /__w/accelerated_io_tools/libaccelerated_io_tools.so /opt/scidb/21.8/lib/scidb/plugins/
           docker exec scidb iquery --afl --query "load_library('accelerated_io_tools')"
 
