@@ -2,7 +2,7 @@
 
 set -o errexit
 
-wget -O- https://paradigm4.github.io/extra-scidb-libs/install.sh \
+wget -O- https://raw.githubusercontent.com/Paradigm4/extra-scidb-libs/v19.11/install.sh \
 |  sh -s -- --only-prereq
 
 id=`lsb_release --id --short`
