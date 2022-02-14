@@ -58,6 +58,7 @@
 #include <array/Tile.h>
 #include <array/TileIteratorAdaptors.h>
 #include <util/Platform.h>
+#include <util/UniqueNameAssigner.h>
 #include <network/Network.h>
 #include <array/SinglePassArray.h>
 #include <array/SynchableArray.h>
@@ -230,24 +231,35 @@ std::shared_ptr<arrow::Schema> attributes2ArrowSchema(ArrayDesc const &arrayDesc
 }
 #endif
 
-ArrayDesc const addDimensionsToArrayDesc(ArrayDesc const& arrayDesc,
-                                         bool attsOnly,
-                                         size_t nAttrs)
+static ArrayDesc const addDimensionsToArrayDesc(ArrayDesc const& arrayDesc)
 {
-    ArrayDesc arrayDescWithDim(arrayDesc);
-
-    Dimensions const &dims = arrayDesc.getDimensions();
+    bool hasEbm = arrayDesc.hasEmptyBitmapAttribute();
+    Attributes newAttrs(arrayDesc.getDataAttributes());
+    Dimensions const& dims = arrayDesc.getDimensions();
     const size_t nDims = dims.size();
 
-    for (size_t i = 0; i < nDims; ++i)
-    {
-        arrayDescWithDim.addAttribute(
-            AttributeDesc(dims[i].getBaseName() + "val",
-                          TID_INT64,
-                          0,
-                          CompressorType::NONE));
+    UniqueNameAssigner una;
+    for (auto const& attr : newAttrs) {
+        una.insertName(attr.getName());
     }
-    return arrayDescWithDim;
+    for (auto const& dim : dims) {
+        una.insertName(dim.getBaseName() + "val");
+    }
+
+    for (size_t i = 0; i < nDims; ++i) {
+        newAttrs.push_back(AttributeDesc(una.assignUniqueName(dims[i].getBaseName() + "val"),
+                                         TID_INT64,
+                                         0,
+                                         CompressorType::NONE));
+    }
+
+    return ArrayDesc(arrayDesc.getNamespaceName(),
+                     arrayDesc.getName(),
+                     hasEbm ? addEmptyTagAttribute(newAttrs) : newAttrs,
+                     dims,
+                     arrayDesc.getDistribution(),
+                     arrayDesc.getResidency(),
+                     arrayDesc.getFlags());
 }
 
 class MemChunkBuilder
@@ -476,7 +488,7 @@ public:
         _nAttrs(inputArrayDesc.getAttributes(true).size()),
         _nDims(inputArrayDesc.getDimensions().size()),
         _templ(TemplateParser::parse(
-                   _attsOnly ? inputArrayDesc : addDimensionsToArrayDesc(inputArrayDesc, _attsOnly, _nAttrs),
+                   _attsOnly ? inputArrayDesc : addDimensionsToArrayDesc(inputArrayDesc),
                    settings.getBinaryFormatString(),
                    false)),
         _nColumns(_templ.columns.size()),
