@@ -335,7 +335,7 @@ public:
                 << oss.str().c_str();
         }
 
-        if (numBytes != _fileBlockSize) {
+        if (static_cast<size_t>(numBytes) != _fileBlockSize) {
             _endOfFile = true;
             ::close(_inputFile);
             _inputFile = -1;
