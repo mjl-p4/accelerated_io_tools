@@ -16,6 +16,11 @@ CFLAGS  := -DARROW_NO_DEPRECATED_API $(ARROW) -D__STDC_FORMAT_MACROS \
            -Wno-strict-aliasing -Wno-system-headers -Wno-unused \
            -Wno-unused-parameter -Wno-variadic-macros -fPIC \
            -fno-omit-frame-pointer -g -std=c++17
+
+# Disable GCC 9 warning about pointers to members of a packed struct.
+# Hopefully will be fixed at some point, see https://gcc.gnu.org/bugzilla//show_bug.cgi?id=96293
+CFLAGS += -Wno-address-of-packed-member
+
 INC     := -I. -DPROJECT_ROOT="\"$(SCIDB)\""  -I"$(SCIDB)/include" \
            -I"/usr/pgsql-9.3/include" $(BOOSTINC)
 LIBS    := -shared -Wl,-soname,libaccelerated_io_tools.so -L. -L"$(SCIDB)/lib" \
