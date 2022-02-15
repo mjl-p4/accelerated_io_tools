@@ -233,10 +233,8 @@ std::shared_ptr<arrow::Schema> attributes2ArrowSchema(ArrayDesc const &arrayDesc
 
 static ArrayDesc const addDimensionsToArrayDesc(ArrayDesc const& arrayDesc)
 {
-    bool hasEbm = arrayDesc.hasEmptyBitmapAttribute();
     Attributes newAttrs(arrayDesc.getDataAttributes());
     Dimensions const& dims = arrayDesc.getDimensions();
-    const size_t nDims = dims.size();
 
     UniqueNameAssigner una;
     for (auto const& attr : newAttrs) {
@@ -246,13 +244,14 @@ static ArrayDesc const addDimensionsToArrayDesc(ArrayDesc const& arrayDesc)
         una.insertName(dim.getBaseName() + "val");
     }
 
-    for (size_t i = 0; i < nDims; ++i) {
-        newAttrs.push_back(AttributeDesc(una.assignUniqueName(dims[i].getBaseName() + "val"),
+    for (auto const& dim : dims) {
+        newAttrs.push_back(AttributeDesc(una.assignUniqueName(dim.getBaseName() + "val"),
                                          TID_INT64,
                                          0,
                                          CompressorType::NONE));
     }
 
+    bool hasEbm = arrayDesc.hasEmptyBitmapAttribute();
     return ArrayDesc(arrayDesc.getNamespaceName(),
                      arrayDesc.getName(),
                      hasEbm ? addEmptyTagAttribute(newAttrs) : newAttrs,
